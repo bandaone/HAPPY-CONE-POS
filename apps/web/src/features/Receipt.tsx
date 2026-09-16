@@ -41,8 +41,8 @@ export function Receipt({ order }: { order: Order }) {
         <ReceiptRow label="Cash received" value={money(order.payment.tendered_ngwee ?? order.payment.amount_ngwee)}/>
         <ReceiptRow label="Change" value={money(order.payment.change_ngwee ?? 0)}/>
       </> : <>
-        {order.payment.provider && <ReceiptRow label="Provider" value={order.payment.provider}/>} 
-        {order.payment.reference && <ReceiptRow label="Payment reference" value={order.payment.reference}/>} 
+        {order.payment.provider && <ReceiptRow label="Provider" value={order.payment.provider}/>}
+        {order.payment.reference && <ReceiptRow label="Payment reference" value={order.payment.reference}/>}
       </>}
     </dl>
     <dl className="receipt-details receipt-service-details">
