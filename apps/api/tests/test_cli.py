@@ -3,7 +3,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import IntegrityError
 
 
 def test_migrate_is_repeatable_and_seed_explicit(tmp_path):
@@ -56,7 +58,8 @@ def test_create_user_does_not_seed_demo_inventory(tmp_path):
     engine.dispose()
 
 
-def test_cashier_name_migration_backfills_existing_orders(tmp_path):
+@pytest.mark.parametrize('partial_upgrade', [False, True])
+def test_cashier_name_migration_backfills_populated_database_and_retries(tmp_path, partial_upgrade):
     env = {**os.environ, 'DATABASE_URL': f'sqlite:///{tmp_path}/upgrade.db'}
     cwd = Path(__file__).resolve().parents[1]
 
@@ -90,6 +93,19 @@ def test_cashier_name_migration_backfills_existing_orders(tmp_path):
             "('order-id', 'A001', 'day-id', 'cashier-id', 'NEW', 2800, 'legacy-key', "
             "'legacy-hash', 0, '2026-09-17 08:30:00')"
         ))
+        db.execute(text(
+            "INSERT INTO payments "
+            "(id, order_id, method, status, amount_ngwee, tendered_ngwee, change_ngwee, "
+            "confirmed_by, created_at) VALUES "
+            "('payment-id', 'order-id', 'CASH', 'CONFIRMED', 2800, 3000, 200, "
+            "'cashier-id', '2026-09-17 08:30:00')"
+        ))
+        if partial_upgrade:
+            db.execute(text('ALTER TABLE orders ADD COLUMN cashier_name VARCHAR(120)'))
+            db.execute(text(
+                "UPDATE orders SET cashier_name = "
+                "(SELECT users.name FROM users WHERE users.id = orders.actor_id)"
+            ))
     upgraded = alembic('upgrade', 'head')
     assert upgraded.returncode == 0, upgraded.stderr
     with engine.connect() as db:
@@ -98,4 +114,6 @@ def test_cashier_name_migration_backfills_existing_orders(tmp_path):
     checks = {constraint['sqltext'] for constraint in inspect(engine).get_check_constraints('orders')}
     assert any("statusIN('NEW','PREPARING','READY','SERVED')" in check.replace(' ', '') for check in checks)
     assert any('total_ngwee>=0' in check.replace(' ', '') for check in checks)
+    with pytest.raises(IntegrityError), engine.begin() as db:
+        db.execute(text("UPDATE orders SET cashier_name = NULL WHERE id = 'order-id'"))
     engine.dispose()
