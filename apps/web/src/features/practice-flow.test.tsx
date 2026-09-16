@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../App";
 import type { Catalog, CheckoutCommand, Day, Order, User } from "../lib/types";
@@ -26,48 +26,7 @@ beforeEach(() => {
   sessionStorage.clear();
 });
 
-describe("practice workspace sale", () => {
-  it("takes K50 for the K42 signature order, prepares it, and reports the sale", async () => {
-    const user = userEvent.setup();
-    render(<App/>);
-
-    expect(screen.getAllByRole("img", { name: "Happy Cone Ice Cream" }).length).toBeGreaterThan(0);
-    expect(await screen.findByRole("heading", { name: "A little scoop of happy." })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Customize Vanilla bean" }));
-
-    let dialog = screen.getByRole("dialog");
-    await user.click(within(dialog).getByRole("button", { name: /Double/ }));
-    await user.click(within(dialog).getByRole("button", { name: /Cone/ }));
-    await user.click(within(dialog).getByRole("button", { name: /Oreo/ }));
-    expect(within(dialog).getByText("K42.00")).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: /Add to order/ }));
-
-    expect(screen.getAllByText("K42.00").length).toBeGreaterThan(0);
-    await user.click(screen.getByRole("button", { name: /Take payment/ }));
-    dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("K42.00")).toBeInTheDocument();
-    await user.type(within(dialog).getByLabelText("Cash received (K)"), "50.00");
-    expect(within(dialog).getByText("K8.00")).toBeInTheDocument();
-    await waitFor(() => expect(within(dialog).getByRole("button", { name: /Confirm payment/ })).toBeEnabled());
-    await user.click(within(dialog).getByRole("button", { name: /Confirm payment/ }));
-
-    dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("A001")).toBeInTheDocument();
-    expect(within(dialog).getByText("K8.00")).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: /Next order/ }));
-
-    await user.click(screen.getByRole("button", { name: "Prepare" }));
-    expect(await screen.findByText("A001")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Start preparing" }));
-    expect(await screen.findByRole("button", { name: "Mark ready" })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Reports" }));
-    expect(await screen.findByRole("heading", { name: "Daily report" })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getAllByText("K42.00").length).toBeGreaterThan(1));
-    expect(screen.getByText("Vanilla bean · Double")).toBeInTheDocument();
-    expect(screen.getByText("Gross before refunds")).toBeInTheDocument();
-  });
-
+describe("live checkout recovery", () => {
   it("reuses the original payment command after an unknown result, dialog close, and reload", async () => {
     const catalog: Catalog = {
       products: [{ id: "vanilla", name: "Vanilla bean", category: "Scoops", description: "Small-batch ice cream", color: "#f5e7bd", active: true, variants: [
@@ -101,7 +60,7 @@ describe("practice workspace sale", () => {
       throw new Error(`Unexpected request: ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
-    localStorage.setItem("happy-cone:mode", JSON.stringify("live"));
+    localStorage.setItem("happy-cone:tour:v1:manager-live", "complete");
     sessionStorage.setItem("happy-cone:session-token", JSON.stringify("live-token"));
 
     const user = userEvent.setup();

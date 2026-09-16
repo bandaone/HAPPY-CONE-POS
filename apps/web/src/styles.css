@@ -31,6 +31,24 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .report-bar>span{background:#df6278}
 .login-story{background:linear-gradient(145deg,#fde9e8,#fff4e6)}
 .login-story p{color:#73555d}
+.login-page{min-height:100dvh;padding:clamp(18px,4vw,54px);display:grid;place-items:center;background:radial-gradient(circle at 18% 12%,#fde4e8 0,transparent 32%),linear-gradient(135deg,#fffaf7,#fff4e8)}
+.login-page .login-layout{width:min(1080px,100%);min-height:min(720px,calc(100dvh - clamp(36px,8vw,108px)));box-shadow:0 30px 90px #6b263017;border-color:#edd8d5}
+.login-page .login-story{padding:clamp(34px,5vw,68px)}
+.login-page .login-story h1{font-family:Georgia,serif;font-size:clamp(46px,5.3vw,72px);letter-spacing:-2.7px;line-height:1.03;font-weight:400;margin:42px 0 20px}
+.login-welcome{font-weight:650;letter-spacing:.01em}
+.login-form .button.primary{width:100%;min-height:50px;margin-top:3px}
+.login-support{margin:24px 0 0!important;padding-top:20px;border-top:1px solid var(--line);font-size:11px!important;line-height:1.65}
+.tour-body{padding:25px}
+.tour-icon{width:54px;height:54px;border-radius:17px;display:grid;place-items:center;background:#f9e3e3;color:var(--accent);margin-bottom:18px}
+.tour-progress{font-size:11px;font-weight:750;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:11px}
+.tour-copy{font-size:15px;line-height:1.65;color:var(--ink)}
+.tour-note{font-size:11px;line-height:1.65;color:var(--muted);margin-top:15px;padding:12px 14px;border-left:3px solid #eaa0aa;background:#fff7f5}
+.tour-dots{display:flex;gap:6px;margin-top:22px}
+.tour-dots span{width:20px;height:4px;border-radius:8px;background:#eadfdd}
+.tour-dots span.active{background:var(--accent)}
+.tour-actions{justify-content:space-between}
+.tour-actions>div{display:flex;gap:9px}
+.tour-restart{margin-top:22px}
 .brand-logo{position:relative;display:block;overflow:hidden;flex:0 0 auto;background:#fff;isolation:isolate}
 .brand-logo img{position:absolute;display:block;max-width:none;height:auto;pointer-events:none;user-select:none}
 .brand-logo-header{width:126px;height:78px}
@@ -41,6 +59,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .brand-logo-hero img{width:528px;left:-89px;top:-159px}
 .brand-logo-receipt{width:130px;height:80px;margin:0 auto 6px}
 .brand-logo-receipt img{width:195px;left:-33px;top:-59px}
-@media(max-width:760px){.rail>.brand-logo-mark{display:none}.brand-logo-header{width:105px;height:65px}.brand-logo-header img{width:160px;left:-27px;top:-48px}}
+@media(max-width:760px){.rail>.brand-logo-mark{display:none}.brand-logo-header{width:105px;height:65px}.brand-logo-header img{width:160px;left:-27px;top:-48px}.login-page{padding:0;place-items:stretch}.login-page .login-layout{min-height:100dvh;border:0;border-radius:0;box-shadow:none}.tour-actions{align-items:stretch}.tour-actions,.tour-actions>div{gap:8px}.tour-actions>div{flex:1}.tour-actions>div .button{flex:1}}
 @media(max-width:390px){.brand-logo-header{width:92px;height:58px}.brand-logo-header img{width:142px;left:-24px;top:-43px}}
 @media print{.brand-logo-receipt{-webkit-print-color-adjust:exact;print-color-adjust:exact}}

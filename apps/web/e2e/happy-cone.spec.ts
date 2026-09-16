@@ -3,13 +3,16 @@ import AxeBuilder from '@axe-core/playwright';
 
 async function signIn(page:Page, username='manager') {
   await page.goto('/');
-  await page.getByRole('button',{name:/Sign in to your live counter/}).click();
+  await expect(page.getByRole('heading',{name:'Staff sign-in'})).toBeVisible();
   await page.getByLabel('Username',{exact:true}).fill(username);
   await page.getByLabel('Password',{exact:true}).fill('browser-test-password');
   const response=page.waitForResponse(r=>r.url().endsWith('/api/auth/login')&&r.request().method()==='POST');
   await page.getByRole('button',{name:'Open counter'}).click();
   const token=(await (await response).json()).token as string;
   await expect(page.getByRole('button',{name:'Account and stand'})).toBeVisible();
+  const tour=page.getByRole('dialog',{name:'Welcome to your counter'});
+  await expect(tour).toBeVisible();
+  await tour.getByRole('button',{name:'Skip tour'}).click();
   return token;
 }
 async function addVanilla(page:Page) {
@@ -26,20 +29,16 @@ test.beforeEach(async ({ request }) => {
   expect(response.ok()).toBe(true);
 });
 
-test('practice counter is accessible and reflows on phone and desktop',async({page})=>{
+test('login is accessible and reflows on phone and desktop',async({page})=>{
   await page.goto('/');
-  await expect(page.getByRole('heading',{name:'A little scoop of happy.'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Staff sign-in'})).toBeVisible();
+  await expect(page.getByRole('navigation',{name:'Main navigation'})).toHaveCount(0);
   expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze()).violations).toEqual([]);
   await page.screenshot({path:'test-results/happy-cone-desktop.png',fullPage:true});
-  await page.getByRole('button',{name:'Customize Vanilla bean',exact:true}).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze()).violations).toEqual([]);
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('button',{name:'Customize Vanilla bean',exact:true})).toBeFocused();
   await page.setViewportSize({width:375,height:812});
   await page.screenshot({path:'test-results/happy-cone-phone.png',fullPage:true});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await expect(page.getByRole('button',{name:'Counter',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Open counter',exact:true})).toBeVisible();
   expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze()).violations).toEqual([]);
 });
 
