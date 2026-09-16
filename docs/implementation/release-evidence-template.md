@@ -30,12 +30,13 @@ Copy this file for each release and replace every blank. A release is blocked wh
 
 ## Role and workflow review
 
-Record pass/fail and any issue identifier for owner, manager, cashier and server sign-in; business-day open/close; cash sale; manually confirmed payment; receipt print/reprint; preparation transitions; refund; inventory movement/count; reports; activity log; staff account creation/deactivation/password reset; own-password change; offline cash order and reconnect sync.
+Record pass/fail and any issue identifier for owner, manager, cashier and server sign-in; business-day open/close; category/product/variation creation; price and recipe edit; catalog archive; cash sale; manually confirmed payment; receipt print/reprint; preparation transitions; refund; inventory movement/count; reports; activity log; staff account creation/deactivation/password reset; own-password change; offline cash order and reconnect sync.
 
 | Workflow / role | Result / evidence |
 | --- | --- |
 | Owner administration | |
 | Manager operations | |
+| Catalog, prices and recipes | |
 | Cashier counter | |
 | Server preparation | |
 | Offline and recovery | |
@@ -51,7 +52,7 @@ Record pass/fail and any issue identifier for owner, manager, cashier and server
 | Reduced motion | |
 | Touch targets during observed service trial | |
 | Sunlight/glare and preparation-screen distance | |
-| 58/80 mm grayscale ticket legibility | |
+| 58/80 mm grayscale receipt legibility and no clipped values | |
 
 ## Operations gate
 

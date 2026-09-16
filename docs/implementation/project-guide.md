@@ -10,7 +10,7 @@ The intended flow is:
 2. The cashier selects products, variants, a required serving option, and optional toppings. The API calculates prices from the active catalog; client totals are never trusted.
 3. The cashier records cash or a manually confirmed external mobile-money/card payment. An offline checkout may use cash only.
 4. Checkout writes the order, confirmed payment, audit entry, and recipe-component stock movements as one transaction. An idempotency key prevents a retry from creating a second sale.
-5. The browser presents the customer ticket. Printing is optional and a print failure does not undo the sale.
+5. The browser presents an operational customer receipt with the item codes, quantities, unit prices, payment details, cashier and change. Printing is optional and a print failure does not undo the sale.
 6. The order appears in the preparation queue. A server, manager, or owner moves it through `NEW -> PREPARING -> READY -> SERVED`.
 7. Managers record receipts, waste, staff use, returns, and adjustments as immutable ledger movements. A stock count records expected, counted, and variance values; it never silently changes the ledger balance.
 8. A manager or owner closes the day with actual cash. The API freezes a summary including net sales, payment totals, expected cash, actual cash, and variance.
@@ -22,12 +22,26 @@ The initial payment implementations record cash and manual confirmation of payme
 
 | Role | Primary work | Key limits |
 | --- | --- | --- |
-| `CASHIER` | Sign in, read the catalog, open/read the business day, quote and complete sales, view tickets | Cannot change stock, close the day, refund, or use management reports |
-| `SERVER` | Read the catalog and live preparation queue, view tickets, advance eligible order states | Cannot alter prices, payments, stock, or cash records |
-| `MANAGER` | All stand operations, catalog availability, stock movements/counts, refunds, day close, reports and audit | Cannot delete completed financial history |
-| `OWNER_ADMIN` | Full current administration and reporting boundary | Uses the same audited financial and stock rules |
+| `CASHIER` | Sign in, read the catalog, open/read the business day, quote and complete sales, view receipts | Cannot change stock, close the day, refund, or use management reports |
+| `SERVER` | Read the catalog and live preparation queue, view receipts, advance eligible order states | Cannot alter prices, payments, stock, or cash records |
+| `MANAGER` | All stand operations; create and edit categories, products, variations, prices, serving choices, extras and recipes; stock movements/counts, refunds, day close, reports and audit | Cannot delete completed financial history; archives menu records instead of deleting them |
+| `OWNER_ADMIN` | Full catalog, staff, operations and reporting administration | Uses the same audited financial and stock rules |
 
 The API owns authorization. Hiding a browser control is a usability measure and is never treated as the permission check.
+
+## Menu and price ownership
+
+Owners and managers set prices and item details in **Settings → Menu and stock recipes**. A product holds the customer-facing name, category, description, display colour and availability. Each variation is the actual sellable choice and holds its permanent item code, name, selling price and stock recipe. Serving choices and extras are maintained in modifier groups; each extra has its own item code, price, availability and optional stock recipe.
+
+Create the stock item in **Stock** before adding it to a recipe. Recipe quantities use the unit shown beside the field. For example, a single scoop can consume `90 g` of an ice-cream stock item and a waffle-cone extra can consume `1 each`. The system rejects duplicate ingredients and quantities that are zero or negative. A variation or extra may be saved without a recipe, but the editor warns that its sales will not reduce stock until a recipe is added.
+
+Item codes are permanent because receipts, reports and audit records use them. To stop selling an item, edit it and turn off **Available for sale**. Earlier receipts remain unchanged. Cashiers and servers can read the active menu but cannot change descriptions, prices, availability or recipes.
+
+## Receipt status
+
+The current printout is an operational customer receipt sized for common 58 mm and 80 mm thermal printers. It records the order number, stable sale reference, date and time, item and variation codes, modifiers, quantities, unit prices, total, payment details, cashier, item count and payment status. The cashier name is copied onto the order at checkout, so a later staff-account rename does not alter an earlier receipt.
+
+The receipt deliberately carries the statement **Operational customer receipt — fiscal integration not configured**. It must not be presented as a tax invoice. TPIN, Smart Invoice/VSDC identifiers, fiscal signatures and QR verification must come from a separately approved fiscal integration rather than invented fields.
 
 ## Architecture
 
@@ -174,7 +188,7 @@ The target is WCAG 2.2 AA for the web interface. These are design and review req
 - Validation must preserve entered data, identify the problem in text, and place focus on an error summary or the first invalid field. Destructive or financial actions need clear names that include the target and result.
 - The interface must reflow at 320 CSS pixels and remain usable at 200% zoom without clipped controls or two-dimensional page scrolling. Text size and spacing must not rely on fixed heights.
 - Motion must respect `prefers-reduced-motion`. Time-based messages need sufficient reading time, and session expiry must warn the user when practical without silently losing an in-progress order.
-- Customer-ticket print styles must remain legible in grayscale at 58 mm and 80 mm widths, with the order number, total, and payment status expressed in text.
+- Customer-receipt print styles must remain legible in grayscale at 58 mm and 80 mm widths, with the order number, total, and payment status expressed in text.
 - Offline and degraded states must be explicit. Network-dependent payment methods must be disabled with an explanation; the UI must never present an unconfirmed payment as successful.
 
 Before a release, reviewers must complete keyboard-only passes for sign-in, day open/close, checkout, preparation transitions, inventory entry, refunds, and reports; inspect each page with a screen reader; test 320 px reflow and 200% zoom; check contrast with a measurement tool; and test reduced motion, offline state, validation errors, and receipt printing. Automated accessibility checks should run with component/browser tests when added, but they do not replace this manual review. Record browser, assistive technology, defects, and disposition in the release evidence.
@@ -183,6 +197,6 @@ Before a release, reviewers must complete keyboard-only passes for sign-in, day 
 
 The repository implements the approved 15-task MVP roadmap. Consult `docs/implementation/progress.md` for the implementation ledger and release verification evidence. The API contract in `docs/implementation/api-contract.md` is the integration authority.
 
-The MVP scope includes role-based sessions, active catalog and recipes, inventory ledger/counts, explicit business days, idempotent checkout, cash/manual payments, customer tickets, the preparation queue, refunds, audit, daily reports, an offline cash queue, and adapter boundaries. Production payment gateways, certified ZRA fiscal integration, direct ESC/POS bridges, suppliers/procurement, multi-branch stock, customer accounts, delivery, loyalty, self-ordering, and forecasting are planned beyond this MVP.
+The delivered scope includes role-based sessions, full owner/manager catalog and recipe administration, inventory ledger/counts, explicit business days, idempotent checkout, cash/manual payments, operational customer receipts, the preparation queue, refunds, audit, daily reports, an offline cash queue, and adapter boundaries. Production payment gateways, certified ZRA fiscal integration, direct ESC/POS bridges, suppliers/procurement, multi-branch stock, customer accounts, delivery, loyalty, self-ordering, and forecasting remain later integrations.
 
 Do not infer production readiness from a successful local demo. Follow `docs/implementation/deployment-runbook.md`; deployment still requires the recorded accessibility/device review, backup restore rehearsal, TLS and host monitoring, plus organization-specific fiscal/payment approvals.

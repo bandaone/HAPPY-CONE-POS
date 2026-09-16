@@ -182,7 +182,7 @@ function ItemForm({ client, kind, parentId, item, inventory, finish }: {
       return <div className="recipe-row" key={row.key}>
         <label className="field">Ingredient {index + 1}<select aria-label={`Ingredient ${index + 1}`} required value={row.item_id} onChange={event => updateRow(row.key, { item_id: event.target.value })}><option value="">Choose stock item</option>{inventory.map(entry => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label>
         <label className="field">Quantity {index + 1}<span className="quantity-with-unit"><input aria-label={`Quantity ${index + 1}`} inputMode="decimal" required value={row.quantity} onChange={event => updateRow(row.key, { quantity: event.target.value })}/><span>{stock?.unit ?? "unit"}</span></span></label>
-        <button className="button danger" type="button" aria-label={`Remove ingredient ${index + 1}`} onClick={() => removeRow(row.key)}>Remove</button>
+        <button className="button danger" type="button" aria-label={`Remove recipe row ${index + 1}`} onClick={() => removeRow(row.key)}>Remove</button>
       </div>;
     })}
     {!rows.length && <div className="notice">No stock will be deducted for this item. Save only if that is intentional.</div>}

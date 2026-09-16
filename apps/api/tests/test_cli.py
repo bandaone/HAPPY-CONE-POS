@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+
 from sqlalchemy import create_engine, inspect, text
 
 
@@ -52,4 +53,49 @@ def test_create_user_does_not_seed_demo_inventory(tmp_path):
         assert db.scalar(text('SELECT COUNT(*) FROM stock_movements')) == 0
         assert db.scalar(text('SELECT COUNT(*) FROM products')) == 0
         assert db.scalar(text("SELECT COUNT(*) FROM audit_events WHERE action = 'USER_CREATED'")) == 1
+    engine.dispose()
+
+
+def test_cashier_name_migration_backfills_existing_orders(tmp_path):
+    env = {**os.environ, 'DATABASE_URL': f'sqlite:///{tmp_path}/upgrade.db'}
+    cwd = Path(__file__).resolve().parents[1]
+
+    def alembic(*arguments):
+        return subprocess.run(
+            [sys.executable, '-m', 'alembic', *arguments],
+            env=env,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+
+    initial = alembic('upgrade', '0001')
+    assert initial.returncode == 0, initial.stderr
+    engine = create_engine(env['DATABASE_URL'])
+    with engine.begin() as db:
+        db.execute(text(
+            "INSERT INTO users (id, username, name, password_hash, role, active) "
+            "VALUES ('cashier-id', 'cashier', 'Original Cashier', 'unused', 'CASHIER', 1)"
+        ))
+        db.execute(text(
+            "INSERT INTO business_days "
+            "(id, status, opened_by, opened_at, opening_float_ngwee, next_order_number) "
+            "VALUES ('day-id', 'OPEN', 'cashier-id', '2026-09-17 08:00:00', 0, 2)"
+        ))
+        db.execute(text(
+            "INSERT INTO orders "
+            "(id, number, business_day_id, actor_id, status, total_ngwee, idempotency_key, "
+            "payload_hash, offline, created_at) VALUES "
+            "('order-id', 'A001', 'day-id', 'cashier-id', 'NEW', 2800, 'legacy-key', "
+            "'legacy-hash', 0, '2026-09-17 08:30:00')"
+        ))
+    upgraded = alembic('upgrade', 'head')
+    assert upgraded.returncode == 0, upgraded.stderr
+    with engine.connect() as db:
+        assert db.scalar(text("SELECT cashier_name FROM orders WHERE id = 'order-id'")) == 'Original Cashier'
+        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0002_order_cashier_name'
+    checks = {constraint['sqltext'] for constraint in inspect(engine).get_check_constraints('orders')}
+    assert any("statusIN('NEW','PREPARING','READY','SERVED')" in check.replace(' ', '') for check in checks)
+    assert any('total_ngwee>=0' in check.replace(' ', '') for check in checks)
     engine.dispose()

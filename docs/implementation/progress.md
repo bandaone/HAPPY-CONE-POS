@@ -38,7 +38,7 @@ All 15 roadmap tasks are implemented in source:
 
 The code-level MVP is complete. The later deployment-candidate section supersedes this original boundary: container, PostgreSQL, backup and restore smoke tests now pass. A real deployment still needs TLS, managed secrets, scheduled encrypted off-host backups, monitoring, production staff setup, organization-approved payment/ZRA decisions, and the manual assistive-technology/keyboard/zoom/printer review described in the project guide.
 
-No Git author identity is configured in the project, so the work has not been committed under a fabricated identity.
+The implementation is maintained in Git with the repository's configured author identity; no fabricated identity is used.
 
 ## Deployment-candidate hardening — 2026-09-16
 
@@ -48,3 +48,13 @@ No Git author identity is configured in the project, so the work has not been co
 - Improved Settings and account wording around staff access, payment confirmation, tickets and fiscal status.
 - Verification after these changes: 35 API tests, 22 web tests and 5 Playwright/axe browser scenarios. The production web build and focused Python correctness lint pass. The remaining environment gates are listed in the beyond-MVP readiness document.
 - Built Docker images passed an isolated PostgreSQL/Nginx rehearsal: migration, four-role seed, database readiness, a server-priced K36.00 sale, report persistence, validated backup, guarded restore, and post-restore report verification. The disposable stack and volume were removed afterward.
+
+## Full catalog and operational receipts — 2026-09-17
+
+- Owners and managers can create and edit categories, customer-facing products, sellable variations, modifier groups and extras. They control descriptions, display colour, selling prices, choice limits, availability and recipe-level stock consumption from **Settings → Menu and stock recipes**.
+- Permanent item codes preserve receipt and reporting references. Items are archived through availability instead of deleting business history. Cashier and server roles remain read-only for catalog data, with API authorization enforcing the boundary.
+- Checkout now snapshots the cashier's name on the order. The redesigned operational receipt shows the order and sale reference, date/time, item and variation codes, quantities, unit prices, modifier details, total, payment/tender/change or provider reference, cashier, unit count and payment status.
+- The receipt is styled for 58 mm and 80 mm thermal output and explicitly states that fiscal integration is not configured. It does not invent tax-invoice, TPIN, Smart Invoice/VSDC, signature or QR fields.
+- API and web contracts cover the complete catalog administration surface, including validation for codes, prices, choice limits, recipe ingredients and positive quantities. Catalog mutations are audited.
+- Final verification: 42 API tests and 28 web component tests passed; all 5 Playwright/Chrome journeys passed against the production build, including axe WCAG A/AA scans, 375 px reflow, the complete owner catalog workflow, all four staff-role boundaries, checkout, stock consumption, receipt and historical reprint, preparation, reporting, day close and offline recovery. Automated print-media evidence verifies that amount columns stay inside the receipt at 58 mm and 80 mm equivalent widths. TypeScript and Vite built successfully (349.65 kB JavaScript, 101.21 kB gzip; 46.16 kB CSS, 12.64 kB gzip). Migration replay, historic-order backfill, shell syntax, Python correctness lint and changed-file import lint passed.
+- An isolated PostgreSQL 16 Compose volume migrated to `0002_order_cashier_name`; schema inspection confirmed `orders.cashier_name` is non-null. A real K42.00 checkout returned `A001`, cashier `Chipo Phiri`, and the expected server-owned total. The disposable container, network and volume were removed after verification.

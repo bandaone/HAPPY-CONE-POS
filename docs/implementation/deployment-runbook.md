@@ -7,13 +7,13 @@ This is the operating runbook for the owner and trusted technical administrator.
 Do not move a release to the live stand until all of these checks are recorded:
 
 - CI passes API tests, web tests, the production web build, shell syntax and container builds.
-- The release is exercised through built Nginx and PostgreSQL on staging, including migration, sign-in, sale, ticket, preparation, refund, stock effect, day close and report.
+- The release is exercised through built Nginx and PostgreSQL on staging, including migration, sign-in, catalog creation and price edit, sale, receipt, preparation, refund, stock effect, day close and report.
 - A backup is created, copied off-host, decrypted and restored into an empty staging database within the agreed recovery time.
 - TLS, DNS, host firewall, disk alerts, container restart alerts and `/ready` uptime monitoring are active.
 - Owner, manager, cashier and server accounts are tested; shared production passwords are prohibited.
-- Keyboard-only, 200% zoom, narrow-screen, screen-reader, offline-cash and physical-printer checks pass on the devices used at the stand.
+- Keyboard-only, 200% zoom, narrow-screen, screen-reader, offline-cash and physical-printer checks pass on the devices used at the stand. Test both 58 mm and 80 mm paper if both widths will be used.
 - The chosen payment procedure is approved. Any direct provider integration must separately pass provider sandbox, webhook and reconciliation tests.
-- The ZRA workflow has been confirmed for the business. The current application ticket says fiscal integration is not configured and must not be represented as a certified fiscal invoice.
+- The ZRA workflow has been confirmed for the business. The current customer receipt says fiscal integration is not configured and must not be represented as a certified fiscal invoice.
 
 ## Host and secrets
 
@@ -42,9 +42,9 @@ Create the first `OWNER_ADMIN` with `python -m app.cli create-user` and the `--p
 2. Close the business day if the release could interrupt service.
 3. Run an encrypted backup and verify its checksum and off-host copy.
 4. Pull or check out the reviewed release tag and build immutable images.
-5. Run the migration command once, then replace the API and web services.
+5. Run the migration command once, then replace the API and web services. The current migration adds the cashier name snapshot used by historical receipts; confirm migration `0002_order_cashier_name` is at head.
 6. Run `./scripts/production-check.sh` through the TLS URL by setting `HAPPYCONE_BASE_URL`.
-7. Complete a signed-in smoke test with a low-value controlled sale and confirm the ticket, preparation queue, stock movement, report and activity log.
+7. Complete a signed-in smoke test: create or edit a test product variation and recipe as a manager, make a low-value controlled sale, and confirm the receipt, preparation queue, stock movement, report and activity log. Archive the test item afterward if it is not part of the live menu.
 8. Record release version, operator, start/end time, migration result, backup identifier and smoke-test result.
 
 ## Backups and restore rehearsal

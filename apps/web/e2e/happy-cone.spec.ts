@@ -54,10 +54,30 @@ test('live cashier sale reaches preparation, stock, reporting and day close',asy
   await page.getByLabel('Cash received (K)').fill('50');
   await expect(page.getByRole('dialog').getByText('K8.00',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Confirm payment',exact:true}).click();
-  await expect(page.getByRole('dialog').getByText('A001',{exact:true})).toBeVisible();
+  const receipt=page.getByRole('dialog',{name:'Receipt A001'});
+  await expect(receipt.getByRole('heading',{name:'Customer Receipt'})).toBeVisible();
+  await expect(receipt.getByText('Order A001',{exact:true})).toBeVisible();
+  await expect(receipt.getByText('VANILLA-DOUBLE',{exact:true})).toBeVisible();
+  await expect(receipt.getByText('Mwansa Banda',{exact:true})).toBeVisible();
+  await expect(receipt.getByText('Operational customer receipt — fiscal integration not configured',{exact:true})).toBeVisible();
+  await expect(receipt.getByText(/Tax Invoice|TPIN|Smart Invoice|SDC|MRC|QR/i)).toHaveCount(0);
   await page.evaluate(()=>{window.print=()=>{throw new Error('Printer unavailable');};});
-  await page.getByRole('button',{name:'Print ticket',exact:true}).click();
+  await page.getByRole('button',{name:'Print receipt',exact:true}).click();
   await expect(page.getByText('Printing was unavailable. Your sale is saved; reprint it from Sales.')).toBeVisible();
+  for (const paper of [{name:'58mm',width:219},{name:'80mm',width:302}]) {
+    await page.setViewportSize({width:paper.width,height:900});
+    await page.emulateMedia({media:'print'});
+    await expect(page.locator('.receipt-print .receipt')).toBeVisible();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    expect(await page.locator('.receipt-print .receipt').evaluate((node) => {
+      const receipt=node.getBoundingClientRect();
+      return [...node.querySelectorAll('.receipt-item-head strong:last-child,.receipt-item-price span:last-child,.receipt-value-row dd')]
+        .every(cell=>cell.getBoundingClientRect().right <= receipt.right + 1);
+    })).toBe(true);
+    await page.screenshot({path:`test-results/happy-cone-receipt-${paper.name}.png`,fullPage:true});
+  }
+  await page.emulateMedia({media:'screen'});
+  await page.setViewportSize({width:1280,height:720});
   const orders=await (await page.request.get('/api/orders',{headers})).json();
   expect(orders).toHaveLength(1);expect(orders[0].total_ngwee).toBe(4200);
   const movements=await (await page.request.get('/api/inventory/movements',{headers})).json();
@@ -65,7 +85,15 @@ test('live cashier sale reaches preparation, stock, reporting and day close',asy
   expect(consumed.length).toBeGreaterThanOrEqual(3);
   const after=await (await page.request.get('/api/inventory',{headers})).json();
   expect(after.some((item:{id:string,on_hand:string})=>Number(item.on_hand)<Number(before.find((x:{id:string})=>x.id===item.id).on_hand))).toBe(true);
-  await page.getByRole('button',{name:'Next order'}).click();
+  await page.getByRole('button',{name:'Done'}).click();
+  await page.getByRole('button',{name:'Sales',exact:true}).click();
+  const saleRow=page.getByRole('row',{name:/A001/});
+  await saleRow.getByRole('button',{name:'Receipt',exact:true}).click();
+  const historicReceipt=page.getByRole('dialog',{name:'Receipt A001'});
+  await expect(historicReceipt.getByText('VANILLA-DOUBLE',{exact:true})).toBeVisible();
+  await expect(historicReceipt.getByText('Mwansa Banda',{exact:true})).toBeVisible();
+  await expect(historicReceipt.locator('.receipt-totals').getByText('K42.00',{exact:true})).toBeVisible();
+  await historicReceipt.getByRole('button',{name:'Done'}).click();
   await page.getByRole('button',{name:'Prepare',exact:true}).click();
   await page.getByRole('button',{name:'Start preparing'}).click();
   await page.getByRole('button',{name:'Mark ready'}).click();
@@ -142,8 +170,47 @@ test('owner manages staff access and changes their own password',async({page})=>
   await signIn(page,'owner');
   await page.getByRole('button',{name:'Settings and information'}).click();
   await expect(page.getByRole('heading',{name:'Staff accounts'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Menu and stock recipes'})).toBeVisible();
   expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze()).violations).toEqual([]);
   await page.screenshot({path:'test-results/happy-cone-owner-settings.png',fullPage:true});
+
+  await page.getByRole('button',{name:'Add category'}).click();
+  let catalogDialog=page.getByRole('dialog',{name:'Add category'});
+  await catalogDialog.getByLabel('Item code').fill('frozen-treats');
+  await catalogDialog.getByLabel('Category name').fill('Frozen treats');
+  await catalogDialog.getByRole('button',{name:'Create category'}).click();
+  await expect(page.getByRole('button',{name:/Frozen treats/})).toBeVisible();
+
+  await page.getByRole('button',{name:'Add product'}).click();
+  catalogDialog=page.getByRole('dialog',{name:'Add product'});
+  await catalogDialog.getByLabel('Item code').fill('mango');
+  await catalogDialog.getByLabel('Product name').fill('Mango sunshine');
+  await catalogDialog.getByLabel('Category').selectOption('frozen-treats');
+  await catalogDialog.getByLabel('Customer description').fill('Bright mango ice cream made for hot afternoons.');
+  await catalogDialog.getByRole('button',{name:'Create product'}).click();
+  await expect(page.getByText('Bright mango ice cream made for hot afternoons.',{exact:true})).toBeVisible();
+
+  await page.getByRole('button',{name:'Show Mango sunshine details'}).click();
+  await page.getByRole('button',{name:'Add variation'}).click();
+  catalogDialog=page.getByRole('dialog',{name:'Add variation'});
+  await catalogDialog.getByLabel('Item code').fill('mango-single');
+  await catalogDialog.getByLabel('Name').fill('Single scoop');
+  await catalogDialog.getByLabel('Selling price (K)').fill('28.00');
+  await catalogDialog.getByRole('button',{name:'Add ingredient'}).click();
+  await catalogDialog.getByLabel('Ingredient 1',{exact:true}).selectOption('vanilla-stock');
+  await catalogDialog.getByLabel('Quantity 1',{exact:true}).fill('90');
+  expect((await new AxeBuilder({page}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze()).violations).toEqual([]);
+  await catalogDialog.getByRole('button',{name:'Create variation'}).click();
+  await expect(page.getByText('K28.00',{exact:true})).toBeVisible();
+
+  await page.getByRole('button',{name:'Show Vanilla details'}).click();
+  const vanillaProduct=page.getByRole('article').filter({has:page.getByRole('button',{name:'Hide Vanilla details'})});
+  await vanillaProduct.getByRole('button',{name:'Edit Single scoop'}).click();
+  catalogDialog=page.getByRole('dialog',{name:'Edit variation'});
+  await catalogDialog.getByLabel('Selling price (K)').fill('35.00');
+  await catalogDialog.getByLabel('Quantity 1',{exact:true}).fill('120');
+  await catalogDialog.getByRole('button',{name:'Save variation'}).click();
+  await expect(page.getByText('K35.00',{exact:true})).toBeVisible();
 
   await page.getByRole('button',{name:'Add staff account'}).click();
   const create=page.getByRole('dialog');

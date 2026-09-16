@@ -1,6 +1,6 @@
 # Happy Cone POS
 
-Happy Cone is a responsive point-of-sale and stand-operations system for a quick-service ice-cream stand in Lusaka. One recorded sale drives payment status, the customer ticket, the live preparation queue, recipe-level stock consumption, business-day accounting, reporting, and audit history.
+Happy Cone is a responsive point-of-sale and stand-operations system for a quick-service ice-cream stand in Lusaka. One recorded sale drives payment status, the customer receipt, the live preparation queue, recipe-level stock consumption, business-day accounting, reporting, and audit history.
 
 The application uses a React/Vite PWA, a FastAPI service, and PostgreSQL 16. Nginx serves the built web app and proxies `/api`, `/api/events`, `/health`, and `/ready` to the API on the same origin.
 
@@ -87,7 +87,7 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml run --rm a
 unset HAPPYCONE_BOOTSTRAP_PASSWORD
 ```
 
-After sign-in, the owner can create staff accounts, change roles and active status, reset passwords, and revoke sessions from **Settings → Staff accounts**. Every live user can change their own password from the account menu.
+After sign-in, an owner can create staff accounts, change roles and active status, reset passwords, and revoke sessions from **Settings → Staff accounts**. Owners and managers maintain the sellable menu in **Settings → Menu and stock recipes**: categories, product descriptions, variations, prices, serving choices, extras, availability, and the stock quantity consumed by each choice. Permanent item codes keep older receipts and reports understandable. Every live user can change their own password from the account menu.
 
 Use `scripts/backup.sh` for verified PostgreSQL custom-format backups. Production scheduling must set `HAPPYCONE_BACKUP_AGE_RECIPIENT`, copy the encrypted backup and checksum off-host, and alert on failure. `scripts/restore.sh` requires an explicit confirmation value and should first be rehearsed on staging. The full procedure is in the [deployment and operations runbook](docs/implementation/deployment-runbook.md).
 
@@ -103,4 +103,4 @@ Use `scripts/backup.sh` for verified PostgreSQL custom-format backups. Productio
 - [Implementation roadmap](docs/superpowers/plans/2026-09-14-icecream-pos-roadmap.md)
 - [Implementation progress](docs/implementation/progress.md)
 
-The MVP records cash and manual external-payment confirmations. It does not process live mobile-money/card transactions and does not claim Zambia Revenue Authority fiscal compliance.
+The system records cash and manual external-payment confirmations. Its printed document is an operational customer receipt and does not claim Zambia Revenue Authority fiscal compliance. Live mobile-money/card processing and certified fiscal integration require separately approved integrations.
