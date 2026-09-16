@@ -3,6 +3,11 @@ import type {
   CartLine,
   CashMovement,
   Catalog,
+  CatalogItemCreate,
+  CatalogItemUpdate,
+  Category,
+  CategoryCreateInput,
+  CategoryUpdateInput,
   CheckoutCommand,
   CountInput,
   Day,
@@ -10,16 +15,24 @@ import type {
   LoginResult,
   Movement,
   MovementInput,
+  Modifier,
+  ModifierGroup,
+  ModifierGroupCreateInput,
+  ModifierGroupUpdateInput,
   Order,
   OrderStatus,
   POSClient,
+  Product,
   ProductActiveResult,
+  ProductCreateInput,
+  ProductUpdateInput,
   Quote,
   StockCount,
   Summary,
   User,
   UserCreateInput,
   UserUpdateInput,
+  Variant,
 } from "./types";
 
 export * from "./types";
@@ -139,6 +152,36 @@ export class ApiClient implements POSClient {
     method: "POST",
   });
   catalog = (includeInactive?: boolean) => this.request<Catalog>(`/catalog${includeInactive ? "?include_inactive=true" : ""}`);
+  createCategory = (input: CategoryCreateInput) => this.request<Category>("/catalog/categories", {
+    method: "POST", body: JSON.stringify(input),
+  });
+  updateCategory = (id: string, input: CategoryUpdateInput) => this.request<Category>(`/catalog/categories/${encodeURIComponent(id)}`, {
+    method: "PUT", body: JSON.stringify(input),
+  });
+  createProduct = (input: ProductCreateInput) => this.request<Product>("/catalog/products", {
+    method: "POST", body: JSON.stringify(input),
+  });
+  updateProduct = (id: string, input: ProductUpdateInput) => this.request<Product>(`/catalog/products/${encodeURIComponent(id)}`, {
+    method: "PUT", body: JSON.stringify(input),
+  });
+  createVariant = (productId: string, input: CatalogItemCreate) => this.request<Variant>(`/catalog/products/${encodeURIComponent(productId)}/variants`, {
+    method: "POST", body: JSON.stringify(input),
+  });
+  updateVariant = (id: string, input: CatalogItemUpdate) => this.request<Variant>(`/catalog/variants/${encodeURIComponent(id)}`, {
+    method: "PUT", body: JSON.stringify(input),
+  });
+  createModifierGroup = (input: ModifierGroupCreateInput) => this.request<ModifierGroup>("/catalog/modifier-groups", {
+    method: "POST", body: JSON.stringify(input),
+  });
+  updateModifierGroup = (id: string, input: ModifierGroupUpdateInput) => this.request<ModifierGroup>(`/catalog/modifier-groups/${encodeURIComponent(id)}`, {
+    method: "PUT", body: JSON.stringify(input),
+  });
+  createModifier = (groupId: string, input: CatalogItemCreate) => this.request<Modifier>(`/catalog/modifier-groups/${encodeURIComponent(groupId)}/modifiers`, {
+    method: "POST", body: JSON.stringify(input),
+  });
+  updateModifier = (id: string, input: CatalogItemUpdate) => this.request<Modifier>(`/catalog/modifiers/${encodeURIComponent(id)}`, {
+    method: "PUT", body: JSON.stringify(input),
+  });
   currentDay = () => this.request<Day | null>("/business-day/current");
   days = () => this.request<Day[]>("/business-day");
   openDay = (openingFloatNgwee: number) => this.request<Day>("/business-day/open", {

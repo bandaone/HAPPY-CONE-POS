@@ -10,7 +10,7 @@ import { AccountPassword, Audit, BusinessDay, Inventory, MenuAvailability, Prepa
 import { ProductTour } from './features/ProductTour';
 
 type Page = 'pos'|'preparation'|'sales'|'inventory'|'day'|'reports'|'audit'|'settings';
-const emptyCatalog:Catalog = {products:[],modifiers:[]};
+const emptyCatalog:Catalog = {categories:[],products:[],modifier_groups:[],modifiers:[]};
 function stored<T>(key:string, fallback:T, storage:Storage = localStorage):T {try {return JSON.parse(storage.getItem(key) ?? 'null') ?? fallback;} catch{return fallback;}}
 function save(key:string,value:unknown,storage:Storage=localStorage) {try {storage.setItem(key,JSON.stringify(value));} catch { /* Noncritical preferences must not stop checkout. */ }}
 const navigation = [{id:'pos',label:'Counter',icon:LayoutGrid},{id:'preparation',label:'Prepare',icon:BellRing},{id:'sales',label:'Sales',icon:ClipboardList},{id:'inventory',label:'Stock',icon:Package},{id:'day',label:'Cash day',icon:Wallet},{id:'reports',label:'Reports',icon:BarChart3}] as const;

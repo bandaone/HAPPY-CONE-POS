@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import App from "../App";
 import type { Catalog, User } from "../lib/types";
 
-const catalog: Catalog = { products: [], modifiers: [] };
+const catalog: Catalog = { categories: [], products: [], modifier_groups: [], modifiers: [] };
 const cashier: User = {
   id: "cashier-first-day",
   username: "cashier",

@@ -29,14 +29,19 @@ beforeEach(() => {
 describe("live checkout recovery", () => {
   it("reuses the original payment command after an unknown result, dialog close, and reload", async () => {
     const catalog: Catalog = {
-      products: [{ id: "vanilla", name: "Vanilla bean", category: "Scoops", description: "Small-batch ice cream", color: "#f5e7bd", active: true, variants: [
-        { id: "vanilla-single", name: "Single", price_ngwee: 2200, recipe: [] },
-        { id: "vanilla-double", name: "Double", price_ngwee: 3200, recipe: [] },
+      categories: [{ id: "scoops", name: "Scoops" }],
+      products: [{ id: "vanilla", category_id: "scoops", name: "Vanilla bean", category: "Scoops", description: "Small-batch ice cream", color: "#f5e7bd", active: true, variants: [
+        { id: "vanilla-single", product_id: "vanilla", name: "Single", price_ngwee: 2200, active: true, recipe: [] },
+        { id: "vanilla-double", product_id: "vanilla", name: "Double", price_ngwee: 3200, active: true, recipe: [] },
       ] }],
+      modifier_groups: [
+        { id: "serving", name: "Serving", minimum: 1, maximum: 1 },
+        { id: "topping", name: "Toppings", minimum: 0, maximum: 3 },
+      ],
       modifiers: [
-        { id: "cup", name: "Cup", group: "serving", price_ngwee: 0, active: true, recipe: [] },
-        { id: "cone", name: "Cone", group: "serving", price_ngwee: 500, active: true, recipe: [] },
-        { id: "oreo", name: "Oreo", group: "topping", price_ngwee: 500, active: true, recipe: [] },
+        { id: "cup", group_id: "serving", name: "Cup", group: "serving", price_ngwee: 0, active: true, recipe: [] },
+        { id: "cone", group_id: "serving", name: "Cone", group: "serving", price_ngwee: 500, active: true, recipe: [] },
+        { id: "oreo", group_id: "topping", name: "Oreo", group: "topping", price_ngwee: 500, active: true, recipe: [] },
       ],
     };
     const day: Day = { id: "live-day", status: "OPEN", opened_at: new Date().toISOString(), closed_at: null, opening_float_ngwee: 50_000, actual_cash_ngwee: null, expected_cash_ngwee: 50_000, variance_ngwee: null, summary: null };

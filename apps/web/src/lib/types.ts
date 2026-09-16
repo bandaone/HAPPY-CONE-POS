@@ -26,15 +26,22 @@ export interface RecipeComponent {
   quantity: string;
 }
 
+export interface Category { id: string; name: string }
+export interface CategoryCreateInput extends Category {}
+export interface CategoryUpdateInput { name: string }
+
 export interface Variant {
   id: string;
+  product_id: string;
   name: string;
   price_ngwee: number;
+  active: boolean;
   recipe: RecipeComponent[];
 }
 
 export interface Product {
   id: string;
+  category_id: string;
   name: string;
   category: string;
   description: string;
@@ -43,8 +50,38 @@ export interface Product {
   variants: Variant[];
 }
 
+export interface ProductUpdateInput {
+  category_id: string;
+  name: string;
+  description: string;
+  color: string;
+  active: boolean;
+}
+
+export interface ProductCreateInput extends ProductUpdateInput { id: string }
+
+export interface CatalogItemUpdate {
+  name: string;
+  price_ngwee: number;
+  active: boolean;
+  recipe: RecipeComponent[];
+}
+
+export interface CatalogItemCreate extends CatalogItemUpdate { id: string }
+
+export interface ModifierGroup {
+  id: string;
+  name: string;
+  minimum: number;
+  maximum: number;
+}
+
+export interface ModifierGroupCreateInput extends ModifierGroup {}
+export interface ModifierGroupUpdateInput { name: string; minimum: number; maximum: number }
+
 export interface Modifier {
   id: string;
+  group_id: string;
   name: string;
   group: string;
   price_ngwee: number;
@@ -53,7 +90,9 @@ export interface Modifier {
 }
 
 export interface Catalog {
+  categories: Category[];
   products: Product[];
+  modifier_groups: ModifierGroup[];
   modifiers: Modifier[];
 }
 
@@ -255,6 +294,16 @@ export interface POSClient {
   resetUserPassword(id: string, password: string): Promise<{ ok: true; sessions_revoked: number }>;
   revokeUserSessions(id: string): Promise<{ revoked: number }>;
   catalog(includeInactive?: boolean): Promise<Catalog>;
+  createCategory(input: CategoryCreateInput): Promise<Category>;
+  updateCategory(id: string, input: CategoryUpdateInput): Promise<Category>;
+  createProduct(input: ProductCreateInput): Promise<Product>;
+  updateProduct(id: string, input: ProductUpdateInput): Promise<Product>;
+  createVariant(productId: string, input: CatalogItemCreate): Promise<Variant>;
+  updateVariant(id: string, input: CatalogItemUpdate): Promise<Variant>;
+  createModifierGroup(input: ModifierGroupCreateInput): Promise<ModifierGroup>;
+  updateModifierGroup(id: string, input: ModifierGroupUpdateInput): Promise<ModifierGroup>;
+  createModifier(groupId: string, input: CatalogItemCreate): Promise<Modifier>;
+  updateModifier(id: string, input: CatalogItemUpdate): Promise<Modifier>;
   currentDay(): Promise<Day | null>;
   days(): Promise<Day[]>;
   openDay(openingFloatNgwee: number): Promise<Day>;
