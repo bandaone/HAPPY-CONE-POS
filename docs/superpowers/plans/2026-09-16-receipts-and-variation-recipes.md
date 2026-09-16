@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build an honest thermal customer receipt and let managers maintain variation and modifier prices, availability, and stock recipes.
+**Goal:** Build an honest thermal customer receipt and let managers create and maintain the complete sellable catalog, including categories, products, variations, modifier groups, prices, availability, and stock recipes.
 
 **Architecture:** Extend the existing FastAPI catalog domain with atomic manager-only replacement commands and expose inactive child records to authorised catalog reads. Snapshot the cashier display name on each order, then consume the expanded contracts in focused React receipt and catalog-editor components.
 
@@ -16,6 +16,7 @@
 - Prices remain non-negative integer ngwee and checkout pricing remains server-owned.
 - Recipe quantities are positive decimals with at most three fractional places; duplicate or unknown inventory items are rejected.
 - Only `MANAGER` and `OWNER_ADMIN` may mutate catalog price, availability, or recipes.
+- Catalog item codes are user-supplied lowercase identifiers at creation and immutable afterward; records used by sales are archived instead of deleted.
 - Catalog updates are atomic, branch-locked, and audited with structured before and after state.
 - Historical sale names, prices, cashier name, and stock movements never change after later catalog or staff-account edits.
 - Every visible control is keyboard operable, has a visible label, uses a minimum 44 by 44 CSS-pixel target, and does not communicate meaning by colour alone.
@@ -91,7 +92,7 @@ git add apps/api/alembic/versions/0002_order_cashier_name.py apps/api/app/models
 git commit -m "Store cashier identity on completed orders"
 ```
 
-### Task 2: Add atomic catalog recipe mutation APIs
+### Task 2: Add atomic full-catalog management APIs
 
 **Files:**
 - Modify: `apps/api/app/api/routes/catalog.py`
@@ -104,9 +105,9 @@ git commit -m "Store cashier identity on completed orders"
 
 **Interfaces:**
 - Consumes: `manager` dependency, `lock_branch(db)`, `commit_result`, `InventoryItem`, `Variant`, `Modifier`, and `RecipeComponent`.
-- Produces: `CatalogItemUpdate`, `RecipeInput`, `update_variant(db, actor, variant_id, command)`, `update_modifier(db, actor, modifier_id, command)`, and two PUT routes.
+- Produces strict create/update commands and audited services for categories, products, variations, modifier groups, modifiers, and recipes.
 
-- [ ] **Step 1: Write failing permission and update tests**
+- [ ] **Step 1: Write failing permission, creation, and update tests**
 
 Cover literal outcomes:
 
@@ -127,11 +128,11 @@ assert response.json()["recipe"] == command["recipe"]
 assert client.put("/api/catalog/variants/vanilla-single", headers=cashier_headers, json=command).status_code == 403
 ```
 
-Add the equivalent modifier update and owner permission case.
+Add the equivalent modifier update and owner permission case. Add creation cases for a category, fully described product, variation, modifier group, and modifier. Assert each new record appears in the manager catalog and becomes available to cashiers only when active.
 
 - [ ] **Step 2: Write failing validation tests**
 
-Use separate cases for negative price, blank name, zero quantity, negative quantity, four decimal places, duplicate `item_id`, missing inventory item, and unknown variant/modifier. After every rejected command, fetch the record and assert price, status, and complete recipe equal the original literal fixture.
+Use separate cases for malformed or duplicate item code, negative price, blank name or description overflow, missing category/product/group, invalid group selection limits, zero quantity, negative quantity, four decimal places, duplicate `item_id`, missing inventory item, and unknown variant/modifier. After every rejected command, fetch the record and assert the complete catalog and recipe state equals the original literal fixture.
 
 - [ ] **Step 3: Write failing inactive-read tests**
 
@@ -149,7 +150,7 @@ Expected: `405 Method Not Allowed` for update requests and missing `active` fiel
 
 - [ ] **Step 6: Define strict request schemas**
 
-In `routes/catalog.py`, add:
+In `routes/catalog.py`, add the following recipe/update schema plus focused category, product, modifier-group, and create schemas. Creation schemas require `id` matching `^[a-z0-9]+(?:-[a-z0-9]+)*$`; update schemas never accept `id`.
 
 ```python
 class RecipeInput(Command):
@@ -178,9 +179,9 @@ class CatalogItemUpdate(Command):
         return value
 ```
 
-- [ ] **Step 7: Implement one shared atomic update service**
+- [ ] **Step 7: Implement atomic create and update services**
 
-Add private helpers that serialize the current record, verify all referenced `InventoryItem` rows exist before mutation, delete existing recipe rows for the target, insert the submitted recipe, and call `record` with action `VARIANT_UPDATED` or `MODIFIER_UPDATED`. Public functions return the same catalog item shape used by catalog reads.
+Add private helpers that serialize records, validate parent and inventory references before mutation, replace recipes, and record structured before/after audit metadata. Use explicit actions for category, product, variation, modifier-group, and modifier creation/update. Public functions return the same shapes used by catalog reads.
 
 - [ ] **Step 8: Register manager-only routes**
 
@@ -195,6 +196,8 @@ def put_variant(variant_id: str, command: CatalogItemUpdate, user=Depends(manage
 def put_modifier(modifier_id: str, command: CatalogItemUpdate, user=Depends(manager), db=Depends(database)):
     return commit_result(db, service.update_modifier(db, user, modifier_id, command))
 ```
+
+Register the corresponding category, product, variation-create, modifier-group, and modifier-create routes described in the approved specification. All catalog mutations use the existing manager dependency and `commit_result`.
 
 - [ ] **Step 9: Make manager catalog reads complete**
 
@@ -219,7 +222,7 @@ git add apps/api/app/api/routes/catalog.py apps/api/app/domains/catalog/service.
 git commit -m "Add audited catalog recipe management"
 ```
 
-### Task 3: Add typed web-client catalog update methods
+### Task 3: Add typed full-catalog web-client methods
 
 **Files:**
 - Modify: `apps/web/src/lib/types.ts`
@@ -228,11 +231,11 @@ git commit -m "Add audited catalog recipe management"
 
 **Interfaces:**
 - Consumes: Task 2 HTTP endpoints.
-- Produces: `CatalogItemUpdate`, `Variant.active`, `POSClient.updateVariant(id, input)`, and `POSClient.updateModifier(id, input)`.
+- Produces typed create/update inputs, category and modifier-group contracts, `Variant.active`, and `POSClient` methods for every catalog mutation endpoint.
 
 - [ ] **Step 1: Write failing client contract tests**
 
-Assert that `updateVariant("vanilla-single", input)` sends `PUT /api/catalog/variants/vanilla-single` with the exact JSON command and returns the full updated variant. Add the equivalent modifier case. Use a complete response fixture including `id`, `name`, `price_ngwee`, `active`, and `recipe`.
+Assert that create and update methods use the exact endpoint, HTTP method, and JSON command for categories, products, variations, modifier groups, and modifiers. Use complete response fixtures including stable codes, parent identifiers, descriptions, active state, price, and recipe where applicable.
 
 - [ ] **Step 2: Run client tests and verify RED**
 
@@ -253,7 +256,7 @@ export interface CatalogItemUpdate {
 }
 ```
 
-Add `active: boolean` to `Variant`, then add update methods returning `Promise<Variant>` and `Promise<Modifier>`.
+Add category and modifier-group types, `category_id` to products, `product_id` and `active` to variants, and `group_id` to modifiers. Add create/update methods returning the corresponding complete type.
 
 - [ ] **Step 4: Implement `ApiClient` methods**
 
@@ -272,7 +275,7 @@ git add apps/web/src/lib/types.ts apps/web/src/lib/client.ts apps/web/src/lib/cl
 git commit -m "Add typed catalog update client"
 ```
 
-### Task 4: Build the accessible menu and stock recipe editor
+### Task 4: Build accessible full menu and stock recipe administration
 
 **Files:**
 - Create: `apps/web/src/features/CatalogRecipes.tsx`
@@ -287,7 +290,7 @@ git commit -m "Add typed catalog update client"
 
 - [ ] **Step 1: Write failing rendering and interaction tests**
 
-Render `CatalogRecipes` with a real in-memory test double implementing the `POSClient` contract. Assert an expandable Vanilla row exposes Single and Double, K22.00, existing ingredient names/quantities, and `aria-expanded`. Open Single, change price to `35.00`, replace `100.000` with `120.000`, add Napkins `1.000`, save, and assert the captured command is exactly:
+Render `CatalogRecipes` with a real in-memory test double implementing the `POSClient` contract. Assert an expandable Vanilla row exposes its description, Single and Double, K22.00, existing ingredient names/quantities, and `aria-expanded`. Open Single, change price to `35.00`, replace `100.000` with `120.000`, add Napkins `1.000`, save, and assert the captured command is exactly:
 
 ```ts
 {
@@ -301,9 +304,9 @@ Render `CatalogRecipes` with a real in-memory test double implementing the `POSC
 }
 ```
 
-- [ ] **Step 2: Write failing validation and modifier tests**
+- [ ] **Step 2: Write failing creation, validation, and modifier tests**
 
-Assert duplicate item selection produces an alert and no client call, a zero quantity prevents save, removing every row presents a non-blocking empty-recipe warning, and editing Waffle cone sends `updateModifier` rather than `updateVariant`.
+Create a new category, fully described product, variation, modifier group, and modifier through the component and assert exact client commands. Assert duplicate or malformed codes are blocked, duplicate item selection produces an alert and no client call, a zero quantity prevents save, removing every row presents a non-blocking empty-recipe warning, and editing Waffle cone sends `updateModifier` rather than `updateVariant`.
 
 - [ ] **Step 3: Run focused tests and verify RED**
 
@@ -313,7 +316,7 @@ Expected: module-not-found failure for `CatalogRecipes`.
 
 - [ ] **Step 4: Implement the focused component**
 
-Keep product expansion, selected item, draft recipe rows, loading, and save errors inside `CatalogRecipes.tsx`. Use stable draft row identifiers separate from inventory IDs so the user can change a selection without corrupting React keys. Normalize quantities to three decimals only when submitting.
+Keep product expansion, dialog type, selected item, draft recipe rows, loading, and save errors inside `CatalogRecipes.tsx`. Use stable draft row identifiers separate from inventory IDs so the user can change a selection without corrupting React keys. Normalize quantities to three decimals only when submitting. Explain item codes in create forms and render them read-only in edit forms.
 
 - [ ] **Step 5: Integrate with Settings**
 

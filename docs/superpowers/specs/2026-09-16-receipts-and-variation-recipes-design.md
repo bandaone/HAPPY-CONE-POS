@@ -14,7 +14,9 @@ The finished workflow will let a manager state that a Single Vanilla costs K35 a
 
 This release produces an operational customer receipt. It does not create or imitate a ZRA Smart Invoice. The receipt must not display a TPIN, Smart Invoice number, fiscal signature, SDC identifier, MRC identifier, tax calculation, verification QR code, or the heading `Tax Invoice` unless a later approved fiscal integration supplies authentic values.
 
-The catalog editor will update existing products, variations, modifiers, and inventory references. Creating arbitrary new products, categories, modifier groups, or inventory items is outside this release. Those records continue to be provisioned through controlled data administration until a separate catalog-creation workflow is designed.
+The catalog editor will create and update categories, products, variations, modifier groups, modifiers, and their inventory recipes. Inventory ingredients continue to be created through inventory administration; this release selects from those existing stock records when defining a sale recipe.
+
+Catalog records that may already appear in a sale are never hard-deleted. Managers archive products, variations, and modifiers by making them unavailable. Stable item codes cannot be changed after creation because they identify historical order lines, recipes, and audit records.
 
 ## Roles and access
 
@@ -23,8 +25,10 @@ The catalog editor will update existing products, variations, modifiers, and inv
 | View active products and prices | Yes | Yes | Yes | Yes |
 | Print or reprint an authorised receipt | Yes | No | Yes | Yes |
 | View inactive catalog records | No | No | Yes | Yes |
-| Edit variation price, availability, or recipe | No | No | Yes | Yes |
-| Edit modifier price, availability, or recipe | No | No | Yes | Yes |
+| Create and edit categories or modifier groups | No | No | Yes | Yes |
+| Create and edit products and descriptions | No | No | Yes | Yes |
+| Create or edit variation price, availability, or recipe | No | No | Yes | Yes |
+| Create or edit modifier price, availability, or recipe | No | No | Yes | Yes |
 
 The API remains the enforcement boundary. Hiding an editor in the web interface is not considered access control.
 
@@ -62,7 +66,7 @@ No QR code is included because the system has no public receipt-verification des
 
 ### Management interface
 
-Settings will replace the simple availability table with a `Menu and stock recipes` section. Products appear as compact expandable rows showing category, status, and variation count. Expanding a product reveals each variation with:
+Settings will replace the simple availability table with a `Menu and stock recipes` section. The section includes clear actions to add a category, product, variation, modifier group, or modifier. Products appear as compact expandable rows showing category, customer description, status, and variation count. Expanding a product reveals each variation with:
 
 - variation name;
 - active or unavailable status;
@@ -70,7 +74,9 @@ Settings will replace the simple availability table with a `Menu and stock recip
 - recipe summary using inventory item name, quantity, and unit;
 - an `Edit variation` action.
 
-Serving choices and toppings appear in a separate `Serving and extras` group because they contribute price and stock independently of the base variation. Each modifier uses the same price, status, recipe summary, and edit pattern.
+Product editing includes a stable item code, name, category, customer-facing description, display colour, and availability. Variation editing includes a stable item code, name, selling price, availability, and recipe. Creation forms explain where each value appears on the cashier screen and receipt. Item codes are trimmed, lowercase identifiers containing letters, numbers, and hyphens; they become read-only after creation.
+
+Serving choices and toppings appear in named modifier groups because they contribute price and stock independently of the base variation. Authorised staff can create and edit the group name and its minimum and maximum selections. Each modifier uses the same stable code, price, status, recipe summary, create, and edit pattern.
 
 The edit dialog contains the selling price, availability, and a recipe builder. A recipe row contains an inventory item selector, positive quantity input, unit label, and remove action. `Add ingredient` appends another row. The interface prevents selecting the same inventory item twice and gives a clear empty-recipe warning before submission. Empty recipes remain valid for items that intentionally consume no tracked stock.
 
@@ -78,12 +84,22 @@ The editor displays the current data from the API and submits one complete repla
 
 ### API
 
-Two manager-protected endpoints will be added:
+Manager-protected endpoints will be added:
 
 ```text
+POST /api/catalog/categories
+PUT  /api/catalog/categories/{category_id}
+POST /api/catalog/products
+PUT  /api/catalog/products/{product_id}
+POST /api/catalog/products/{product_id}/variants
 PUT /api/catalog/variants/{variant_id}
+POST /api/catalog/modifier-groups
+PUT  /api/catalog/modifier-groups/{group_id}
+POST /api/catalog/modifier-groups/{group_id}/modifiers
 PUT /api/catalog/modifiers/{modifier_id}
 ```
+
+Create commands include the stable item code. Update commands omit it. Duplicate codes return `409`. A product requires an existing category, a variation requires an existing product, and a modifier requires an existing modifier group. Group limits must satisfy `0 <= minimum <= maximum <= 20`. Products, variations, and modifiers use availability instead of deletion.
 
 Variation command:
 
@@ -105,7 +121,7 @@ Each update runs in one database transaction under the existing branch mutation 
 
 ### Catalog reads
 
-Normal `GET /api/catalog` responses continue to include active products, active variations, and active modifiers only. Manager and owner calls using `include_inactive=true` will include inactive variations and inactive modifiers as well as inactive products. Variant and modifier objects will include their `active` state so the editor can render it directly.
+Normal `GET /api/catalog` responses continue to include active products, active variations, and active modifiers only. Manager and owner calls using `include_inactive=true` will include category identifiers, modifier-group definitions, inactive variations, and inactive modifiers as well as inactive products. Product objects include `category_id`; variant and modifier objects include their `active` state so the editor can render it directly.
 
 ### Stock behaviour
 
@@ -137,6 +153,10 @@ If a variation becomes unavailable while it is already in a cashier's cart, the 
 ### API tests
 
 - Manager and owner can update a variation and modifier.
+- Manager and owner can create and edit categories, products, variations, modifier groups, and modifiers.
+- Cashier and server cannot call any catalog mutation endpoint.
+- Duplicate or malformed item codes and missing parent records are rejected without partial changes.
+- Existing item codes cannot be renamed, and catalog records used by sales are archived rather than deleted.
 - Cashier and server receive `403` for both update endpoints.
 - Invalid price, zero or negative quantity, excess precision, duplicate item, and missing inventory item are rejected without partial changes.
 - Manager catalog reads include inactive variants and modifiers; ordinary reads exclude them.
