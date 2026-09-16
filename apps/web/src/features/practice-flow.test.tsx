@@ -93,7 +93,7 @@ describe("live checkout recovery", () => {
     await user.click(screen.getByRole("button", { name: /Recover saved payment/ }));
     dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /Confirm payment/ }));
-    expect(await screen.findByText("A001")).toBeInTheDocument();
+    expect(await screen.findByText("Order A001")).toBeInTheDocument();
     expect(checkoutCalls).toHaveLength(2);
     expect(checkoutCalls[1]).toEqual(checkoutCalls[0]);
     vi.unstubAllGlobals();
