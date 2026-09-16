@@ -13,6 +13,7 @@ class Order(Base):
     number: Mapped[str] = mapped_column(String(20))
     business_day_id: Mapped[str] = mapped_column(ForeignKey('business_days.id'),index=True)
     actor_id: Mapped[str] = mapped_column(ForeignKey('users.id'))
+    cashier_name: Mapped[str] = mapped_column(String(120))
     status: Mapped[str] = mapped_column(String(20),default='NEW')
     total_ngwee: Mapped[int]
     idempotency_key: Mapped[str] = mapped_column(String(128),unique=True)

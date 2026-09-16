@@ -24,6 +24,7 @@ def test_cash_checkout_recipe_ticket_and_idempotency(client, login):
     assert sale['total_ngwee'] == 4200
     assert sale['payment']['change_ngwee'] == 800
     assert sale['number'] == 'A001'
+    assert sale['cashier_name'] == 'Chipo Phiri'
     assert client.post('/api/orders',headers=headers,json=data).json()['id'] == sale['id']
     with client.app.state.session_factory() as db:
         movements = db.scalars(select(StockMovement).where(StockMovement.reference==sale['id'])).all()
@@ -33,6 +34,25 @@ def test_cash_checkout_recipe_ticket_and_idempotency(client, login):
     ticket = client.get(f"/api/orders/{sale['id']}/ticket",headers=headers).json()
     assert ticket['number'] == sale['number']
     assert ticket['fiscal_status'] == 'NOT_CONFIGURED'
+
+
+def test_completed_order_keeps_cashier_name_after_staff_rename(client, login):
+    cashier = login('cashier')
+    sale = client.post('/api/orders', headers=cashier,
+                       json=command(open_day(client, cashier), key='cashier-snapshot')).json()
+    assert sale['cashier_name'] == 'Chipo Phiri'
+
+    owner = login('owner')
+    users = client.get('/api/users', headers=owner).json()
+    cashier_user = next(user for user in users if user['username'] == 'cashier')
+    renamed = client.patch(f"/api/users/{cashier_user['id']}", headers=owner, json={
+        'name': 'Chipo Tembo', 'role': 'CASHIER', 'active': True,
+    })
+    assert renamed.status_code == 200
+
+    historic = client.get('/api/orders', headers=login('manager')).json()[0]
+    assert historic['id'] == sale['id']
+    assert historic['cashier_name'] == 'Chipo Phiri'
 
 
 def test_checkout_rejections(client,login):

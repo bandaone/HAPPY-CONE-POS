@@ -114,6 +114,7 @@ export interface Order {
   business_day_id: string;
   status: OrderStatus;
   created_at: string;
+  cashier_name: string;
   lines: PricedLine[];
   total_ngwee: number;
   payment: OrderPayment;

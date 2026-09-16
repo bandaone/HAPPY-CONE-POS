@@ -54,7 +54,7 @@ describe("live checkout recovery", () => {
         const command = JSON.parse(String(init.body)) as CheckoutCommand;
         checkoutCalls.push(command);
         if (unknownResult) { unknownResult = false; throw new DOMException("Timed out", "AbortError"); }
-        const order: Order = { id: "accepted-order", number: "A001", business_day_id: day.id, status: "NEW", created_at: new Date().toISOString(), lines: [{ variant_id: "vanilla-double", name: "Vanilla bean · Double", quantity: 1, unit_price_ngwee: 4200, total_ngwee: 4200, modifier_names: ["Cone", "Oreo"], notes: "" }], total_ngwee: 4200, payment: { method: "CASH", status: "CONFIRMED", amount_ngwee: 4200, tendered_ngwee: 5000, change_ngwee: 800, provider: null, reference: null }, refunded: false, refund_reason: null, offline: false };
+        const order: Order = { id: "accepted-order", number: "A001", business_day_id: day.id, status: "NEW", created_at: new Date().toISOString(), cashier_name: "Chipo Phiri", lines: [{ variant_id: "vanilla-double", name: "Vanilla bean · Double", quantity: 1, unit_price_ngwee: 4200, total_ngwee: 4200, modifier_names: ["Cone", "Oreo"], notes: "" }], total_ngwee: 4200, payment: { method: "CASH", status: "CONFIRMED", amount_ngwee: 4200, tendered_ngwee: 5000, change_ngwee: 800, provider: null, reference: null }, refunded: false, refund_reason: null, offline: false };
         return json(order);
       }
       throw new Error(`Unexpected request: ${url}`);

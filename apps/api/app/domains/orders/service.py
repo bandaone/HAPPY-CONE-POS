@@ -29,7 +29,8 @@ def order_dto(db,order):
     refund=db.scalar(select(Refund).where(Refund.order_id==order.id))
     lines=db.scalars(select(OrderLine).where(OrderLine.order_id==order.id).order_by(OrderLine.position))
     return dict(id=order.id,number=order.number,business_day_id=order.business_day_id,status=order.status,
-                created_at=order.created_at,lines=[line_dto(line) for line in lines],total_ngwee=order.total_ngwee,
+                created_at=order.created_at,cashier_name=order.cashier_name,
+                lines=[line_dto(line) for line in lines],total_ngwee=order.total_ngwee,
                 payment=payment_dto(payment),refunded=refund is not None,refund_reason=refund.reason if refund else None,offline=order.offline)
 
 
@@ -52,6 +53,7 @@ def checkout(db,actor,command):
         if inventory.expected_on_hand(db,item_id)<quantity:
             raise HTTPException(409,'Insufficient stock for this order')
     order=Order(id=new_id(),number=f'A{day.next_order_number:03d}',business_day_id=day.id,actor_id=actor.id,
+                cashier_name=actor.name,
                 total_ngwee=quote['total_ngwee'],idempotency_key=command.idempotency_key,payload_hash=digest,offline=command.offline)
     day.next_order_number+=1
     db.add(order)
