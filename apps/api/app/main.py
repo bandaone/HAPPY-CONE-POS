@@ -72,7 +72,7 @@ def create_app(settings: Settings | None = None, *, initialize: bool = False) ->
     api.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
     api.add_middleware(RequestContextMiddleware, log_level=settings.log_level)
     api.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,
-                       allow_methods=['GET', 'POST', 'PATCH', 'OPTIONS'],
+                       allow_methods=['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS'],
                        allow_headers=['Authorization', 'Content-Type', 'X-Request-ID'],
                        expose_headers=['X-Request-ID'])
 
