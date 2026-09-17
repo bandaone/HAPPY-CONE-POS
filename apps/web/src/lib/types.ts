@@ -324,10 +324,12 @@ export interface POSClient {
   updateProduct(id: string, input: ProductUpdateInput): Promise<Product>;
   createVariant(productId: string, input: CatalogItemCreate): Promise<Variant>;
   updateVariant(id: string, input: CatalogItemUpdate): Promise<Variant>;
+  deleteVariant(id: string): Promise<{ id: string; deleted: true }>;
   createModifierGroup(input: ModifierGroupCreateInput): Promise<ModifierGroup>;
   updateModifierGroup(id: string, input: ModifierGroupUpdateInput): Promise<ModifierGroup>;
   createModifier(groupId: string, input: CatalogItemCreate): Promise<Modifier>;
   updateModifier(id: string, input: CatalogItemUpdate): Promise<Modifier>;
+  deleteModifier(id: string): Promise<{ id: string; deleted: true }>;
   currentDay(): Promise<Day | null>;
   days(): Promise<Day[]>;
   openDay(openingFloatNgwee: number): Promise<Day>;

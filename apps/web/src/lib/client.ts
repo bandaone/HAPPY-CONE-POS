@@ -183,6 +183,9 @@ export class ApiClient implements POSClient {
   updateVariant = (id: string, input: CatalogItemUpdate) => this.request<Variant>(`/catalog/variants/${encodeURIComponent(id)}`, {
     method: "PUT", body: JSON.stringify(input),
   });
+  deleteVariant = (id: string) => this.request<{ id: string; deleted: true }>(`/catalog/variants/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
   createModifierGroup = (input: ModifierGroupCreateInput) => this.request<ModifierGroup>("/catalog/modifier-groups", {
     method: "POST", body: JSON.stringify(input),
   });
@@ -194,6 +197,9 @@ export class ApiClient implements POSClient {
   });
   updateModifier = (id: string, input: CatalogItemUpdate) => this.request<Modifier>(`/catalog/modifiers/${encodeURIComponent(id)}`, {
     method: "PUT", body: JSON.stringify(input),
+  });
+  deleteModifier = (id: string) => this.request<{ id: string; deleted: true }>(`/catalog/modifiers/${encodeURIComponent(id)}`, {
+    method: "DELETE",
   });
   currentDay = () => this.request<Day | null>("/business-day/current");
   days = () => this.request<Day[]>("/business-day");

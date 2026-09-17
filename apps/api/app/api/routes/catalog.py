@@ -125,6 +125,11 @@ def put_variant(variant_id: str, command: CatalogItemUpdate, user=Depends(manage
     return commit_result(db, service.update_variant(db, user, variant_id, command))
 
 
+@router.delete('/variants/{variant_id}')
+def delete_variant(variant_id: str, user=Depends(manager), db=Depends(database)):
+    return commit_result(db, service.delete_variant(db, user, variant_id))
+
+
 @router.post('/modifier-groups', status_code=201)
 def post_modifier_group(command: ModifierGroupCreate, user=Depends(manager), db=Depends(database)):
     return commit_result(db, service.create_modifier_group(db, user, command))
@@ -143,3 +148,8 @@ def post_modifier(group_id: str, command: CatalogItemCreate, user=Depends(manage
 @router.put('/modifiers/{modifier_id}')
 def put_modifier(modifier_id: str, command: CatalogItemUpdate, user=Depends(manager), db=Depends(database)):
     return commit_result(db, service.update_modifier(db, user, modifier_id, command))
+
+
+@router.delete('/modifiers/{modifier_id}')
+def delete_modifier(modifier_id: str, user=Depends(manager), db=Depends(database)):
+    return commit_result(db, service.delete_modifier(db, user, modifier_id))

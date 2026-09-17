@@ -15,6 +15,7 @@ from app.models.catalog import (
     Variant,
 )
 from app.models.inventory import InventoryItem
+from app.models.order import OrderLine
 
 
 def recipe(db, *, variant_id=None, modifier_id=None):
@@ -191,6 +192,20 @@ def update_variant(db, actor, variant_id, command):
     return after
 
 
+def delete_variant(db, actor, variant_id):
+    lock_branch(db)
+    variant = _required(db, Variant, variant_id, 'Variation')
+    if variant.active:
+        raise HTTPException(409, 'Archive this variation before deleting it')
+    if db.scalar(select(OrderLine.id).where(OrderLine.variant_id == variant_id).limit(1)):
+        raise HTTPException(409, 'This variation appears in sales history and cannot be deleted. Keep it archived.')
+    before = variant_dto(db, variant)
+    db.execute(delete(RecipeComponent).where(RecipeComponent.variant_id == variant_id))
+    db.delete(variant)
+    record(db, actor, 'VARIANT_DELETED', 'variant', variant_id, {'before': before})
+    return {'id': variant_id, 'deleted': True}
+
+
 def create_modifier_group(db, actor, command):
     lock_branch(db)
     _existing_or_conflict(db, ModifierGroup, command.id, 'Modifier group')
@@ -238,6 +253,18 @@ def update_modifier(db, actor, modifier_id, command):
     after = modifier_dto(db, modifier)
     record(db, actor, 'MODIFIER_UPDATED', 'modifier', modifier.id, {'before': before, 'after': after})
     return after
+
+
+def delete_modifier(db, actor, modifier_id):
+    lock_branch(db)
+    modifier = _required(db, Modifier, modifier_id, 'Extra')
+    if modifier.active:
+        raise HTTPException(409, 'Archive this extra before deleting it')
+    before = modifier_dto(db, modifier)
+    db.execute(delete(RecipeComponent).where(RecipeComponent.modifier_id == modifier_id))
+    db.delete(modifier)
+    record(db, actor, 'MODIFIER_DELETED', 'modifier', modifier_id, {'before': before})
+    return {'id': modifier_id, 'deleted': True}
 
 
 def price_lines(db, lines):

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
-import { ChevronDown, PackagePlus, Pencil, Plus } from "lucide-react";
+import { ChevronDown, PackagePlus, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 
 import { Badge, Empty, ErrorMessage, Modal, SubmitButton } from "../components/ui";
 import { currencySymbol, money, parseMoney } from "../lib/client";
@@ -138,6 +138,7 @@ function ItemForm({ client, kind, parentId, item, inventory, finish }: {
     : [{ key: `${prefix}-0`, item_id: "", quantity: "" }]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const addRow = () => setRows(current => [...current, { key: `${prefix}-${Date.now()}-${current.length}`, item_id: "", quantity: "" }]);
   const updateRow = (key: string, change: Partial<DraftRecipe>) => setRows(current => current.map(row => row.key === key ? { ...row, ...change } : row));
   const removeRow = (key: string) => setRows(current => current.filter(row => row.key !== key));
@@ -174,6 +175,16 @@ function ItemForm({ client, kind, parentId, item, inventory, finish }: {
     finally { setBusy(false); }
   };
   const label = kind === "variant" ? "variation" : "extra";
+  const remove = async () => {
+    if (!item) return;
+    setBusy(true); setError("");
+    try {
+      if (kind === "variant") await client.deleteVariant(item.id);
+      else await client.deleteModifier(item.id);
+      await finish();
+    } catch (reason) { const message = errorText(reason); setError(message); await finish(message); }
+    finally { setBusy(false); }
+  };
   return <form onSubmit={submit}><div className="modal-body">
     <label className="field">Name<input aria-label="Name" required maxLength={100} value={name} onChange={event => setName(event.target.value)}/></label>
     <label className="field">Selling price ({currencySymbol()})<input aria-label={`Selling price (${currencySymbol()})`} inputMode="decimal" required value={price} onChange={event => setPrice(event.target.value)}/></label>
@@ -188,8 +199,14 @@ function ItemForm({ client, kind, parentId, item, inventory, finish }: {
       </div>;
     })}
     {!rows.length && <div className="notice">Archive this item or add the stock it uses before saving.</div>}
+    {confirmDelete && <div className="catalog-delete-confirm" role="alert"><strong>Delete this {label} permanently?</strong><p>This cannot be undone. If it appears in sales history, the system will keep it archived instead.</p></div>}
     <ErrorMessage error={error}/>
-  </div><div className="modal-footer"><SubmitButton busy={busy}>{item ? `Save ${label}` : `Create ${label}`}</SubmitButton></div></form>;
+  </div><div className="modal-footer catalog-form-footer">
+    {item && !item.active && (confirmDelete
+      ? <><button className="button" type="button" disabled={busy} onClick={() => setConfirmDelete(false)}>Cancel</button><button className="button danger" type="button" disabled={busy} onClick={() => void remove()}><Trash2 size={16}/> Yes, delete {label}</button></>
+      : <button className="button danger" type="button" disabled={busy} onClick={() => setConfirmDelete(true)}><Trash2 size={16}/> Delete {label}</button>)}
+    {!confirmDelete && <SubmitButton busy={busy}>{item ? `Save ${label}` : `Create ${label}`}</SubmitButton>}
+  </div></form>;
 }
 
 export function CatalogRecipes({ client, onChanged, onError }: Props) {
@@ -199,6 +216,7 @@ export function CatalogRecipes({ client, onChanged, onError }: Props) {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [restoring, setRestoring] = useState<string | null>(null);
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -215,6 +233,24 @@ export function CatalogRecipes({ client, onChanged, onError }: Props) {
   const toggle = (id: string) => setExpanded(current => {
     const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next;
   });
+  const restore = async (kind: "variant" | "modifier", item: Variant | Modifier) => {
+    if (!item.recipe.length) {
+      if (kind === "variant") setDialog({ kind, productId: (item as Variant).product_id, item: item as Variant });
+      else setDialog({ kind, groupId: (item as Modifier).group_id, item: item as Modifier });
+      onError(`Add the stock used by this ${kind === "variant" ? "variation" : "extra"} before restoring it.`);
+      return;
+    }
+    setRestoring(item.id); setError("");
+    const values: CatalogItemUpdate = {
+      name: item.name, price_ngwee: item.price_ngwee, active: true, recipe: item.recipe,
+    };
+    try {
+      if (kind === "variant") await client.updateVariant(item.id, values);
+      else await client.updateModifier(item.id, values);
+      await load(); await onChanged();
+    } catch (reason) { const message = errorText(reason); setError(message); onError(message); }
+    finally { setRestoring(null); }
+  };
 
   return <section className="panel catalog-admin"><div className="panel-head catalog-admin-head"><div><h2>Menu and stock recipes</h2><p className="hint-inline">Build what the counter sells, set prices, and define the stock used by every option.</p></div><div className="catalog-actions"><button className="button" type="button" onClick={() => setDialog({ kind: "category" })}><Plus size={16}/> Add category</button><button className="button primary" type="button" disabled={!catalog.categories.length} onClick={() => setDialog({ kind: "product" })}><Plus size={16}/> Add product</button><button className="button" type="button" onClick={() => setDialog({ kind: "group" })}><Plus size={16}/> Add choice group</button></div></div>
     <ErrorMessage error={error}/>
@@ -224,12 +260,12 @@ export function CatalogRecipes({ client, onChanged, onError }: Props) {
         const open = expanded.has(product.id);
         const sellable = product.active && product.variants.some(variant => variant.active);
         return <article className="catalog-product" key={product.id}><div className="catalog-product-main"><button className="catalog-product-toggle" type="button" aria-expanded={open} aria-label={`${open ? "Hide" : "Show"} ${product.name} details`} onClick={() => toggle(product.id)}><span className="catalog-swatch" style={{ background: product.color }}/><span><strong>{product.name}</strong><small>{product.category} · {product.id}</small><p>{product.description}</p></span><ChevronDown className={open ? "open" : ""} size={19}/></button><Badge tone={!product.active ? "red" : sellable ? "green" : "orange"}>{!product.active ? "Archived" : sellable ? "Available" : "Needs variation"}</Badge><button className="button" type="button" aria-label={`Edit ${product.name}`} onClick={() => setDialog({ kind: "product", item: product })}><Pencil size={15}/> Edit product</button></div>
-          {open && <div className="catalog-children"><div className="catalog-child-head"><h3>Variations</h3><button className="button" type="button" onClick={() => setDialog({ kind: "variant", productId: product.id })}><Plus size={15}/> Add variation</button></div>{product.variants.length ? product.variants.map(variant => <div className="catalog-item-row" key={variant.id}><div><strong>{variant.name}</strong><small>{variant.id}</small></div><strong className="catalog-price">{money(variant.price_ngwee)}</strong><Badge tone={variant.active ? "green" : "red"}>{variant.active ? "Available" : "Archived"}</Badge><div className="catalog-recipe"><RecipeSummary recipe={variant.recipe} inventory={inventory}/></div><button className="button" type="button" aria-label={`Edit ${variant.name}`} onClick={() => setDialog({ kind: "variant", productId: product.id, item: variant })}>Edit</button></div>) : <Empty title="No variations yet">Add a sellable size or format for this product.</Empty>}</div>}
+          {open && <div className="catalog-children"><div className="catalog-child-head"><h3>Variations</h3><button className="button" type="button" onClick={() => setDialog({ kind: "variant", productId: product.id })}><Plus size={15}/> Add variation</button></div>{product.variants.length ? product.variants.map(variant => <div className="catalog-item-row" key={variant.id}><div><strong>{variant.name}</strong><small>{variant.id}</small></div><strong className="catalog-price">{money(variant.price_ngwee)}</strong><Badge tone={variant.active ? "green" : "red"}>{variant.active ? "Available" : "Archived"}</Badge><div className="catalog-recipe"><RecipeSummary recipe={variant.recipe} inventory={inventory}/></div><div className="catalog-row-actions">{!variant.active && <button className="button" type="button" disabled={restoring === variant.id} aria-label={`${variant.recipe.length ? "Restore" : "Add recipe to restore"} ${variant.name}`} onClick={() => variant.recipe.length ? void restore("variant", variant) : setDialog({ kind: "variant", productId: product.id, item: variant })}><RotateCcw size={15}/>{restoring === variant.id ? "Restoring…" : variant.recipe.length ? "Restore" : "Complete"}</button>}<button className="button" type="button" aria-label={`Edit ${variant.name}`} onClick={() => setDialog({ kind: "variant", productId: product.id, item: variant })}>Edit</button></div></div>) : <Empty title="No variations yet">Add a sellable size or format for this product.</Empty>}</div>}
         </article>;
       })}{!catalog.products.length && <Empty icon={<PackagePlus/>} title="No products yet">Add a category, then create the first product and variation.</Empty>}</div>
       <div className="catalog-groups"><div className="catalog-section-title"><div><h3>Serving choices and extras</h3><p>These options add their own price and stock recipe.</p></div></div>{catalog.modifier_groups.map(group => {
         const modifiers = catalog.modifiers.filter(item => item.group_id === group.id);
-        return <section className="catalog-group" key={group.id}><div className="catalog-group-head"><div><strong>{group.name}</strong><small>{group.minimum === group.maximum ? `${group.minimum} required` : `${group.minimum}–${group.maximum} choices`} · {group.id}</small></div><div><button className="button" type="button" aria-label={`Edit ${group.name} group`} onClick={() => setDialog({ kind: "group", item: group })}><Pencil size={15}/> Edit group</button><button className="button" type="button" onClick={() => setDialog({ kind: "modifier", groupId: group.id })}><Plus size={15}/> Add extra</button></div></div>{modifiers.map(modifier => <div className="catalog-item-row" key={modifier.id}><div><strong>{modifier.name}</strong><small>{modifier.id}</small></div><strong className="catalog-price">{money(modifier.price_ngwee)}</strong><Badge tone={modifier.active ? "green" : "red"}>{modifier.active ? "Available" : "Archived"}</Badge><div className="catalog-recipe"><RecipeSummary recipe={modifier.recipe} inventory={inventory}/></div><button className="button" type="button" aria-label={`Edit ${modifier.name}`} onClick={() => setDialog({ kind: "modifier", groupId: group.id, item: modifier })}>Edit</button></div>)}</section>;
+        return <section className="catalog-group" key={group.id}><div className="catalog-group-head"><div><strong>{group.name}</strong><small>{group.minimum === group.maximum ? `${group.minimum} required` : `${group.minimum}–${group.maximum} choices`} · {group.id}</small></div><div><button className="button" type="button" aria-label={`Edit ${group.name} group`} onClick={() => setDialog({ kind: "group", item: group })}><Pencil size={15}/> Edit group</button><button className="button" type="button" onClick={() => setDialog({ kind: "modifier", groupId: group.id })}><Plus size={15}/> Add extra</button></div></div>{modifiers.map(modifier => <div className="catalog-item-row" key={modifier.id}><div><strong>{modifier.name}</strong><small>{modifier.id}</small></div><strong className="catalog-price">{money(modifier.price_ngwee)}</strong><Badge tone={modifier.active ? "green" : "red"}>{modifier.active ? "Available" : "Archived"}</Badge><div className="catalog-recipe"><RecipeSummary recipe={modifier.recipe} inventory={inventory}/></div><div className="catalog-row-actions">{!modifier.active && <button className="button" type="button" disabled={restoring === modifier.id} aria-label={`${modifier.recipe.length ? "Restore" : "Add recipe to restore"} ${modifier.name}`} onClick={() => modifier.recipe.length ? void restore("modifier", modifier) : setDialog({ kind: "modifier", groupId: group.id, item: modifier })}><RotateCcw size={15}/>{restoring === modifier.id ? "Restoring…" : modifier.recipe.length ? "Restore" : "Complete"}</button>}<button className="button" type="button" aria-label={`Edit ${modifier.name}`} onClick={() => setDialog({ kind: "modifier", groupId: group.id, item: modifier })}>Edit</button></div></div>)}</section>;
       })}</div>
     </div>}
     {dialog?.kind === "category" && <Modal title={dialog.item ? "Edit category" : "Add category"} eyebrow="Menu structure" onClose={() => setDialog(null)}><CategoryForm client={client} item={dialog.item} finish={finish}/></Modal>}

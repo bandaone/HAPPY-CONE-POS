@@ -66,6 +66,7 @@ describe("catalog administration client", () => {
     await client.updateVariant("mango-single", {
       name: "Single scoop", price_ngwee: 3000, active: false, recipe: [],
     });
+    await client.deleteVariant("mango-single");
 
     expect(fetch.mock.calls[0][0]).toBe("/api/catalog/products/mango/variants");
     expect(fetch.mock.calls[0][1].method).toBe("POST");
@@ -74,6 +75,8 @@ describe("catalog administration client", () => {
     expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({
       name: "Single scoop", price_ngwee: 3000, active: false, recipe: [],
     });
+    expect(fetch.mock.calls[2][0]).toBe("/api/catalog/variants/mango-single");
+    expect(fetch.mock.calls[2][1].method).toBe("DELETE");
   });
 
   it("uses the category, modifier-group and modifier endpoints", async () => {
@@ -95,6 +98,7 @@ describe("catalog administration client", () => {
       name: "Cherry", price_ngwee: 250, active: true,
       recipe: [{ item_id: "cherries", quantity: "1.000" }],
     });
+    await client.deleteModifier("cherry");
 
     expect(fetch.mock.calls.map(([url, request]) => [url, request.method])).toEqual([
       ["/api/catalog/categories", "POST"],
@@ -103,6 +107,7 @@ describe("catalog administration client", () => {
       ["/api/catalog/modifier-groups/extras", "PUT"],
       ["/api/catalog/modifier-groups/extras/modifiers", "POST"],
       ["/api/catalog/modifiers/cherry", "PUT"],
+      ["/api/catalog/modifiers/cherry", "DELETE"],
     ]);
   });
 });

@@ -138,6 +138,66 @@ def test_manager_updates_prices_recipes_and_inactive_children(client, login):
     assert client.get('/api/catalog?include_inactive=true', headers=login('cashier')).status_code == 403
 
 
+def test_manager_can_delete_an_unused_archived_variation(client, login):
+    manager = login('manager')
+    created = client.post('/api/catalog/products/vanilla/variants', headers=manager, json={
+        'id': 'vanilla-test-size', 'name': 'Test size', 'price_ngwee': 100,
+        'active': False, 'recipe': [],
+    })
+    assert created.status_code == 201
+
+    assert client.delete('/api/catalog/variants/vanilla-test-size', headers=login('cashier')).status_code == 403
+    deleted = client.delete('/api/catalog/variants/vanilla-test-size', headers=manager)
+    assert deleted.status_code == 200
+    assert deleted.json() == {'id': 'vanilla-test-size', 'deleted': True}
+    complete = client.get('/api/catalog?include_inactive=true', headers=manager).json()
+    vanilla = next(product for product in complete['products'] if product['id'] == 'vanilla')
+    assert 'vanilla-test-size' not in {entry['id'] for entry in vanilla['variants']}
+
+    actions = {event['action'] for event in client.get('/api/audit', headers=login('owner')).json()}
+    assert 'VARIANT_DELETED' in actions
+
+
+def test_variation_delete_requires_archive_and_preserves_sales_history(client, login):
+    manager = login('manager')
+    active = client.delete('/api/catalog/variants/vanilla-single', headers=manager)
+    assert active.status_code == 409
+    assert 'archive' in active.json()['detail'].lower()
+
+    cashier = login('cashier')
+    day = client.post('/api/business-day/open', headers=cashier,
+                      json={'opening_float_ngwee': 50000}).json()['id']
+    sale = client.post('/api/orders', headers=cashier, json={
+        'business_day_id': day, 'idempotency_key': 'sale-before-delete-attempt',
+        'lines': [{'variant_id': 'vanilla-single', 'quantity': 1,
+                   'modifier_ids': ['cone'], 'notes': ''}],
+        'payment': {'method': 'CASH', 'tendered_ngwee': 5000}, 'offline': False,
+    })
+    assert sale.status_code == 201
+    archived = client.put('/api/catalog/variants/vanilla-single', headers=manager, json={
+        'name': 'Single scoop', 'price_ngwee': 2200, 'active': False,
+        'recipe': recipe('vanilla-stock', '80.000'),
+    })
+    assert archived.status_code == 200
+
+    blocked = client.delete('/api/catalog/variants/vanilla-single', headers=manager)
+    assert blocked.status_code == 409
+    assert 'sales history' in blocked.json()['detail'].lower()
+    assert client.get(f"/api/orders/{sale.json()['id']}", headers=manager).status_code == 200
+
+
+def test_manager_can_delete_an_unused_archived_extra(client, login):
+    manager = login('manager')
+    created = client.post('/api/catalog/modifier-groups/serving/modifiers', headers=manager, json={
+        'id': 'paper-spoon-test', 'name': 'Paper spoon test', 'price_ngwee': 0,
+        'active': False, 'recipe': [],
+    })
+    assert created.status_code == 201
+    assert client.delete('/api/catalog/modifiers/paper-spoon-test', headers=manager).json() == {
+        'id': 'paper-spoon-test', 'deleted': True,
+    }
+
+
 def test_catalog_rejects_invalid_creation_and_recipe_without_partial_change(client, login):
     manager = login('manager')
     original = client.get('/api/catalog?include_inactive=true', headers=manager).json()

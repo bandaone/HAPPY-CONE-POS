@@ -19,6 +19,8 @@ const catalog: Catalog = {
         recipe: [{ item_id: "vanilla-stock", quantity: "80.000" }] },
       { id: "vanilla-double", product_id: "vanilla", name: "Double scoop", price_ngwee: 3200, active: true,
         recipe: [{ item_id: "vanilla-stock", quantity: "160.000" }] },
+      { id: "vanilla-sample", product_id: "vanilla", name: "Sample cup", price_ngwee: 500, active: false,
+        recipe: [{ item_id: "vanilla-stock", quantity: "25.000" }] },
     ],
   }],
   modifier_groups: [{ id: "serving", name: "Serving", minimum: 1, maximum: 1 }],
@@ -36,6 +38,7 @@ class CatalogClient extends ApiClient {
   updateCommands: Array<{ id: string; input: CatalogItemUpdate }> = [];
   createdProducts: ProductCreateInput[] = [];
   createdModifiers: Array<{ groupId: string; input: CatalogItemCreate }> = [];
+  deletedVariants: string[] = [];
 
   override catalog = vi.fn(async () => structuredClone(catalog));
   override inventory = vi.fn(async () => structuredClone(inventory));
@@ -50,6 +53,10 @@ class CatalogClient extends ApiClient {
   override createModifier = vi.fn(async (groupId: string, input: CatalogItemCreate) => {
     this.createdModifiers.push({ groupId, input });
     return { ...input, group_id: groupId, group: groupId };
+  });
+  override deleteVariant = vi.fn(async (id: string) => {
+    this.deletedVariants.push(id);
+    return { id, deleted: true as const };
   });
 }
 
@@ -138,5 +145,37 @@ describe("menu and stock recipe administration", () => {
 
     expect(within(dialog).getByRole("alert")).toHaveTextContent(/stock ingredient/i);
     expect(client.updateCommands).toHaveLength(0);
+  });
+
+  it("restores an archived variation directly from its row", async () => {
+    const user = userEvent.setup();
+    const client = new CatalogClient();
+    render(<CatalogRecipes client={client} onChanged={vi.fn()} onError={vi.fn()}/>);
+    await screen.findByText("Vanilla");
+    await user.click(screen.getByRole("button", { name: "Show Vanilla details" }));
+    await user.click(screen.getByRole("button", { name: "Restore Sample cup" }));
+
+    expect(client.updateCommands).toContainEqual({
+      id: "vanilla-sample",
+      input: {
+        name: "Sample cup", price_ngwee: 500, active: true,
+        recipe: [{ item_id: "vanilla-stock", quantity: "25.000" }],
+      },
+    });
+  });
+
+  it("permanently deletes an unused archived variation after confirmation", async () => {
+    const user = userEvent.setup();
+    const client = new CatalogClient();
+    render(<CatalogRecipes client={client} onChanged={vi.fn()} onError={vi.fn()}/>);
+    await screen.findByText("Vanilla");
+    await user.click(screen.getByRole("button", { name: "Show Vanilla details" }));
+    await user.click(screen.getByRole("button", { name: "Edit Sample cup" }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Delete variation" }));
+    expect(within(dialog).getByText(/cannot be undone/i)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Yes, delete variation" }));
+
+    expect(client.deletedVariants).toEqual(["vanilla-sample"]);
   });
 });
