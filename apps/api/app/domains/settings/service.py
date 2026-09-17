@@ -20,6 +20,10 @@ def dto(settings: StandSettings) -> dict:
         'currency_code': settings.currency_code,
         'currency_symbol': settings.currency_symbol,
         'timezone': settings.timezone,
+        'tax_id': settings.tax_id,
+        'contact_number': settings.contact_number,
+        'tax_label': settings.tax_label,
+        'tax_rate_basis_points': settings.tax_rate_basis_points,
         'payment_guidance': settings.payment_guidance,
         'ticket_guidance': settings.ticket_guidance,
         'receipt_footer': settings.receipt_footer,
@@ -43,4 +47,3 @@ def update_settings(db, actor, command) -> dict:
            {'changed_fields': sorted(changes)})
     db.flush()
     return dto(settings)
-

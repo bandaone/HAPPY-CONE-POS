@@ -29,6 +29,10 @@ export interface StandProfile {
   currency_code: string;
   currency_symbol: string;
   timezone: string;
+  tax_id: string;
+  contact_number: string;
+  tax_label: string;
+  tax_rate_basis_points: number;
   payment_guidance: string;
   ticket_guidance: string;
   receipt_footer: string;

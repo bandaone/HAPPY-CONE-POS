@@ -10,7 +10,7 @@ The intended flow is:
 2. The cashier selects products, variants, a required serving option, and optional toppings. The API calculates prices from the active catalog; client totals are never trusted.
 3. The cashier records cash or a manually confirmed external mobile-money/card payment. An offline checkout may use cash only.
 4. Checkout writes the order, confirmed payment, audit entry, and recipe-component stock movements as one transaction. An idempotency key prevents a retry from creating a second sale.
-5. The browser presents an operational customer receipt with the item codes, quantities, unit prices, payment details, cashier and change. Printing is optional and a print failure does not undo the sale.
+5. The browser presents an operational receipt with the business identity, TPIN, contact number, item codes, quantities, unit prices, payment details, cashier, change, and VAT-inclusive tax breakdown. Printing is optional and a print failure does not undo the sale.
 6. The order appears in the preparation queue. A server, manager, or owner moves it through `NEW -> PREPARING -> READY -> SERVED`.
 7. Managers record receipts, waste, staff use, returns, and adjustments as immutable ledger movements. A stock count records expected, counted, and variance values; it never silently changes the ledger balance.
 8. A manager or owner closes the day with actual cash. The API freezes a summary including net sales, payment totals, expected cash, actual cash, and variance.
@@ -37,13 +37,13 @@ Create the stock item in **Stock** before adding it to a recipe. Recipe quantiti
 
 Item codes are permanent because receipts, reports and audit records use them. To stop selling an item, edit it and turn off **Available for sale**. Earlier receipts remain unchanged. Cashiers and servers can read the active menu but cannot change descriptions, prices, availability or recipes.
 
-Owners and managers edit the stand profile in **Settings**. The saved profile controls the business and stand names, location, displayed currency and timezone, payment and ticket guidance, receipt thank-you line, activity introduction, and the operating guide. Each update is audited. Runtime connection status, signed-in identity, historical audit events, and fiscal status are read-only system facts.
+Owners and managers edit the stand profile in **Settings**. The dedicated **Receipt details** editor controls the legal business name, shop or branch name, location, TPIN, contact number, tax category, VAT rate, and thank-you line. The saved profile also controls the displayed currency and timezone, payment and ticket guidance, activity introduction, and operating guide. Each update is audited. Runtime connection status, signed-in identity, historical audit events, and fiscal status are read-only system facts.
 
 ## Receipt status
 
-The current printout is an operational customer receipt sized for common 58 mm and 80 mm thermal printers. It records the order number, stable sale reference, date and time, item and variation codes, modifiers, quantities, unit prices, total, payment details, cashier, item count and payment status. The cashier name is copied onto the order at checkout, so a later staff-account rename does not alter an earlier receipt.
+The current printout is an operational receipt sized for common 58 mm and 80 mm thermal printers. Below the logo it prints the saved legal name, shop or branch, location, TPIN, and contact number. It then records the order number, stable sale reference, date and time, item and variation codes, modifiers, quantities, unit prices, total, payment details, cashier, and item count. A final tax section extracts the configured VAT amount from VAT-inclusive prices and shows taxable sales and VAT without duplicating the sale total. The cashier name is copied onto the order at checkout, so a later staff-account rename does not alter an earlier receipt.
 
-The receipt deliberately carries the statement **Operational customer receipt — fiscal integration not configured**. It must not be presented as a tax invoice. TPIN, Smart Invoice/VSDC identifiers, fiscal signatures and QR verification must come from a separately approved fiscal integration rather than invented fields.
+The receipt does not use the redundant **Customer Receipt** heading or add internal system messages to the customer-facing footer. It identifies the saved TPIN and tax breakdown but must not be presented as a certified Smart Invoice. Smart Invoice/VSDC identifiers, fiscal signatures, SDC/MRC values, and QR verification must come from a separately approved fiscal integration rather than invented fields. Staff can review this boundary in the protected **Fiscal status** section in Settings.
 
 ## Architecture
 

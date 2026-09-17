@@ -12,13 +12,17 @@ class StandSettings(Base):
     __tablename__ = 'stand_settings'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
-    business_name: Mapped[str] = mapped_column(String(120), default='Happy Cone Ice Cream')
+    business_name: Mapped[str] = mapped_column(String(120), default='CREAMY HEAVEN LIMITED')
     stand_name: Mapped[str] = mapped_column(String(120), default='Lusaka stand')
     location: Mapped[str] = mapped_column(String(160), default='Lusaka')
     currency_name: Mapped[str] = mapped_column(String(80), default='Zambian kwacha')
     currency_code: Mapped[str] = mapped_column(String(3), default='ZMW')
     currency_symbol: Mapped[str] = mapped_column(String(6), default='K')
     timezone: Mapped[str] = mapped_column(String(80), default='Africa/Lusaka')
+    tax_id: Mapped[str] = mapped_column(String(40), default='1002681530')
+    contact_number: Mapped[str] = mapped_column(String(40), default='0771450074')
+    tax_label: Mapped[str] = mapped_column(String(80), default='STANDARD RATED (A)')
+    tax_rate_basis_points: Mapped[int] = mapped_column(Integer, default=1600)
     payment_guidance: Mapped[str] = mapped_column(Text, default='Cash change is calculated at checkout. Staff must confirm mobile money and card payments and record the provider reference before completing a sale.')
     ticket_guidance: Mapped[str] = mapped_column(Text, default='Tickets use the browser print dialog. A printer problem never removes a completed sale; staff can reprint from Sales.')
     receipt_footer: Mapped[str] = mapped_column(Text, default='Thank you for choosing Happy Cone.')

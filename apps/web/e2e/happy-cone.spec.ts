@@ -61,12 +61,18 @@ test('live cashier sale reaches preparation, stock, reporting and day close',asy
   await expect(page.getByRole('dialog').getByText('K8.00',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Confirm payment',exact:true}).click();
   const receipt=page.getByRole('dialog',{name:'Receipt A001'});
-  await expect(receipt.getByRole('heading',{name:'Customer Receipt'})).toBeVisible();
+  await expect(receipt.getByRole('heading',{name:'Customer Receipt'})).toHaveCount(0);
+  await expect(receipt.getByText('CREAMY HEAVEN LIMITED',{exact:true})).toBeVisible();
+  await expect(receipt.getByText('TPIN: 1002681530',{exact:true})).toBeVisible();
+  await expect(receipt.getByText('Tel: 0771450074',{exact:true})).toBeVisible();
   await expect(receipt.getByText('Order A001',{exact:true})).toBeVisible();
   await expect(receipt.getByText('VANILLA-DOUBLE',{exact:true})).toBeVisible();
   await expect(receipt.getByText('Mwansa Banda',{exact:true})).toBeVisible();
-  await expect(receipt.getByText('Operational customer receipt — fiscal integration not configured',{exact:true})).toBeVisible();
-  await expect(receipt.getByText(/Tax Invoice|TPIN|Smart Invoice|SDC|MRC|QR/i)).toHaveCount(0);
+  await expect(receipt.getByRole('heading',{name:'Tax details'})).toBeVisible();
+  await expect(receipt.getByText('STANDARD RATED (A) · 16%',{exact:true})).toBeVisible();
+  await expect(receipt.getByText('K36.21',{exact:true})).toBeVisible();
+  await expect(receipt.getByText('K5.79',{exact:true})).toBeVisible();
+  await expect(receipt.getByText(/Tax Invoice|Smart Invoice|SDC|MRC|QR/i)).toHaveCount(0);
   await page.evaluate(()=>{window.print=()=>{throw new Error('Printer unavailable');};});
   await page.getByRole('button',{name:'Print receipt',exact:true}).click();
   await expect(page.getByText('Printing was unavailable. Your sale is saved; reprint it from Sales.')).toBeVisible();
@@ -188,10 +194,22 @@ test('owner manages staff access and changes their own password',async({page})=>
   await expect(page.locator('.location').getByText('Arcades stand',{exact:true})).toBeVisible();
   await expect(page.getByText('Great East Road, Lusaka',{exact:true})).toBeVisible();
 
+  await page.getByRole('button',{name:'Edit receipt details'}).click();
+  settingsDialog=page.getByRole('dialog',{name:'Edit receipt details'});
+  await settingsDialog.getByLabel('Legal business name').fill('CREAMY HEAVEN LIMITED');
+  await settingsDialog.getByLabel('TPIN').fill('1002681530');
+  await settingsDialog.getByLabel('Contact number').fill('0771450074');
+  await settingsDialog.getByLabel('Tax category').fill('STANDARD RATED (A)');
+  await settingsDialog.getByLabel('VAT rate (%)').fill('16');
+  await settingsDialog.getByLabel('Receipt footer').fill('Thank you. We hope to scoop for you again.');
+  expect((await new AxeBuilder({page}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze()).violations).toEqual([]);
+  await settingsDialog.getByRole('button',{name:'Save changes'}).click();
+  await expect(page.getByText('1002681530',{exact:true})).toBeVisible();
+  await expect(page.getByText('STANDARD RATED (A) · 16%',{exact:true})).toBeVisible();
+
   await page.getByRole('button',{name:'Edit payment wording'}).click();
   settingsDialog=page.getByRole('dialog',{name:'Edit payment and ticket wording'});
   await settingsDialog.getByLabel('Payment instructions').fill('Confirm every external payment before the sale is completed.');
-  await settingsDialog.getByLabel('Receipt thank-you line').fill('Thank you. We hope to scoop for you again.');
   await settingsDialog.getByRole('button',{name:'Save changes'}).click();
   await expect(page.getByText('Confirm every external payment before the sale is completed.')).toBeVisible();
 

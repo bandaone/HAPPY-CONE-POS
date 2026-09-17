@@ -1,8 +1,14 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import type { Order } from "../lib/types";
+import type { Order, StandProfile } from "../lib/types";
 import { Receipt } from "./Receipt";
+
+const profile = {
+  business_name: "CREAMY HEAVEN LIMITED", stand_name: "Cairo shop", location: "Lusaka",
+  tax_id: "1002681530", contact_number: "0771450074", tax_label: "STANDARD RATED (A)",
+  tax_rate_basis_points: 1600, receipt_footer: "Thank you for choosing Happy Cone.",
+} as StandProfile;
 
 function order(overrides: Partial<Order> = {}): Order {
   return {
@@ -31,20 +37,30 @@ function order(overrides: Partial<Order> = {}): Order {
 
 describe("operational customer receipt", () => {
   it("prints item codes, quantities, prices, payment and cashier details", () => {
-    render(<Receipt order={order()}/>);
+    render(<Receipt order={order()} profile={profile}/>);
 
-    expect(screen.getByRole("heading", { name: "Customer Receipt" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Customer Receipt" })).not.toBeInTheDocument();
+    expect(screen.getByText("CREAMY HEAVEN LIMITED")).toBeInTheDocument();
+    expect(screen.getByText("Cairo shop")).toBeInTheDocument();
+    expect(screen.getByText("Lusaka")).toBeInTheDocument();
+    expect(screen.getByText("TPIN: 1002681530")).toBeInTheDocument();
+    expect(screen.getByText("Tel: 0771450074")).toBeInTheDocument();
     expect(screen.getByText("Order A001")).toBeInTheDocument();
     expect(screen.getByText("2F8C40AB")).toBeInTheDocument();
     expect(screen.getByText("VANILLA-SINGLE")).toBeInTheDocument();
     expect(screen.getByText("2 × K35.00")).toBeInTheDocument();
-    expect(screen.getAllByText("K70.00").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("K70.00")).toHaveLength(2);
     expect(screen.getByText("K100.00")).toBeInTheDocument();
     expect(screen.getByText("K30.00")).toBeInTheDocument();
     expect(screen.getByText("Mwamba Manager")).toBeInTheDocument();
     expect(screen.getByText("2 units")).toBeInTheDocument();
-    expect(screen.getByText("Operational customer receipt — fiscal integration not configured")).toBeInTheDocument();
-    expect(screen.queryByText(/Tax Invoice|TPIN|Smart Invoice|SDC|MRC|QR/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Tax details" })).toBeInTheDocument();
+    expect(screen.getByText("STANDARD RATED (A) · 16%")).toBeInTheDocument();
+    expect(screen.getByText("K60.34")).toBeInTheDocument();
+    expect(screen.getByText("K9.66")).toBeInTheDocument();
+    expect(screen.queryByText(/Smart Invoice|SDC|MRC|QR/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/fiscal identifiers/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Payment status")).not.toBeInTheDocument();
   });
 
   it("shows confirmed external payment details without cash fields", () => {

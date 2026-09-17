@@ -13,6 +13,10 @@ class StandSettingsCommand(BaseModel):
     currency_code: str = Field(min_length=3, max_length=3, pattern=r'^[A-Za-z]{3}$')
     currency_symbol: str = Field(min_length=1, max_length=6)
     timezone: str = Field(min_length=1, max_length=80)
+    tax_id: str = Field(min_length=5, max_length=40, pattern=r'^[A-Za-z0-9 ./-]+$')
+    contact_number: str = Field(min_length=5, max_length=40)
+    tax_label: str = Field(min_length=2, max_length=80)
+    tax_rate_basis_points: int = Field(ge=0, le=10_000)
     payment_guidance: str = Field(min_length=10, max_length=1000)
     ticket_guidance: str = Field(min_length=10, max_length=1000)
     receipt_footer: str = Field(min_length=2, max_length=240)
@@ -35,4 +39,3 @@ class StandSettingsCommand(BaseModel):
         except (ZoneInfoNotFoundError, ValueError) as error:
             raise ValueError('Enter a valid IANA timezone, such as Africa/Lusaka') from error
         return value
-

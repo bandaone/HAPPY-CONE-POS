@@ -7,6 +7,10 @@ def settings_payload(**overrides):
         'currency_code': 'ZMW',
         'currency_symbol': 'K',
         'timezone': 'Africa/Lusaka',
+        'tax_id': '1002681530',
+        'contact_number': '0771450074',
+        'tax_label': 'STANDARD RATED (A)',
+        'tax_rate_basis_points': 1600,
         'payment_guidance': 'Confirm mobile money and card payments before completing a sale.',
         'ticket_guidance': 'Give the numbered ticket to the customer after payment.',
         'receipt_footer': 'Thank you for choosing Happy Cone.',
@@ -23,8 +27,10 @@ def settings_payload(**overrides):
 def test_authenticated_staff_can_read_stand_settings(client, login):
     response = client.get('/api/stand-settings', headers=login('cashier'))
     assert response.status_code == 200
-    assert response.json()['business_name'] == 'Happy Cone Ice Cream'
+    assert response.json()['business_name'] == 'CREAMY HEAVEN LIMITED'
     assert response.json()['timezone'] == 'Africa/Lusaka'
+    assert response.json()['tax_id'] == '1002681530'
+    assert response.json()['tax_rate_basis_points'] == 1600
 
 
 def test_manager_updates_settings_and_change_is_audited(client, login):
@@ -42,3 +48,5 @@ def test_cashier_cannot_update_settings_and_invalid_timezone_is_rejected(client,
     assert client.put('/api/stand-settings', headers=login('cashier'), json=settings_payload()).status_code == 403
     invalid = client.put('/api/stand-settings', headers=login('manager'), json=settings_payload(timezone='Lusaka local time'))
     assert invalid.status_code == 422
+    invalid_tax = client.put('/api/stand-settings', headers=login('manager'), json=settings_payload(tax_rate_basis_points=10001))
+    assert invalid_tax.status_code == 422

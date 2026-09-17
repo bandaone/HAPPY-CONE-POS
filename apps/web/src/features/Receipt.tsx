@@ -1,10 +1,14 @@
 import { CheckCircle2, Printer } from "lucide-react";
 
-import { BrandLogo, Modal, dateOf, readable, timeOf } from "../components/ui";
+import { BrandLogo, Modal, dateOf, timeOf } from "../components/ui";
 import { money } from "../lib/client";
 import type { Order, StandProfile } from "../lib/types";
 
-const receiptDefaults = { business_name: "Happy Cone Ice Cream", stand_name: "Lusaka stand", receipt_footer: "Thank you for choosing Happy Cone." };
+const receiptDefaults = { business_name: "CREAMY HEAVEN LIMITED", stand_name: "Lusaka stand", location: "Lusaka", tax_id: "1002681530", contact_number: "0771450074", tax_label: "STANDARD RATED (A)", tax_rate_basis_points: 1600, receipt_footer: "Thank you for choosing Happy Cone." };
+
+function rateLabel(basisPoints: number) {
+  return `${Number.isInteger(basisPoints / 100) ? basisPoints / 100 : (basisPoints / 100).toFixed(2)}%`;
+}
 
 function ReceiptRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return <div className={`receipt-value-row ${strong ? "receipt-value-strong" : ""}`}><dt>{label}</dt><dd>{value}</dd></div>;
@@ -14,12 +18,17 @@ export function Receipt({ order, profile }: { order: Order; profile?: StandProfi
   const identity = profile ?? receiptDefaults;
   const units = order.lines.reduce((sum, line) => sum + line.quantity, 0);
   const saleReference = order.id.slice(0, 8).toUpperCase();
-  return <article className="receipt" aria-label={`Customer receipt for order ${order.number}`}>
+  const taxNgwee = Math.round(order.total_ngwee * identity.tax_rate_basis_points / (10_000 + identity.tax_rate_basis_points));
+  const taxableNgwee = order.total_ngwee - taxNgwee;
+  const taxRate = rateLabel(identity.tax_rate_basis_points);
+  return <article className="receipt" aria-label={`Receipt for order ${order.number}`}>
     <header className="receipt-header">
       <BrandLogo variant="receipt"/>
-      <p>{identity.business_name}</p>
+      <strong className="receipt-business-name">{identity.business_name}</strong>
       <p>{identity.stand_name}</p>
-      <h2>Customer Receipt</h2>
+      <p>{identity.location}</p>
+      <p>TPIN: {identity.tax_id}</p>
+      <p>Tel: {identity.contact_number}</p>
     </header>
     <dl className="receipt-details">
       <ReceiptRow label="Date" value={dateOf(order.created_at)}/>
@@ -30,7 +39,7 @@ export function Receipt({ order, profile }: { order: Order; profile?: StandProfi
     {order.refunded && <section className="receipt-refund" aria-label="Refund details"><strong>Refunded</strong><span>{order.refund_reason}</span></section>}
     <section className="receipt-lines" aria-label="Items bought">
       {order.lines.map((line, index) => <div className="receipt-line-block" key={`${line.variant_id}-${index}`}>
-        <div className="receipt-item-head"><strong>{line.name}</strong><strong>{money(line.total_ngwee)}</strong></div>
+        <div className="receipt-item-head"><strong>{line.name}</strong></div>
         <div className="receipt-item-code">{line.variant_id.toUpperCase()}</div>
         <div className="receipt-item-price"><span>{line.quantity} × {money(line.unit_price_ngwee)}</span><span>{money(line.total_ngwee)}</span></div>
         {line.modifier_names.length > 0 && <p>{line.modifier_names.join(" · ")}</p>}
@@ -51,12 +60,14 @@ export function Receipt({ order, profile }: { order: Order; profile?: StandProfi
     <dl className="receipt-details receipt-service-details">
       <ReceiptRow label="Cashier" value={order.cashier_name}/>
       <ReceiptRow label="Units bought" value={`${units} ${units === 1 ? "unit" : "units"}`}/>
-      <ReceiptRow label="Payment status" value={readable(order.payment.status)}/>
     </dl>
+    <section className="receipt-tax" aria-labelledby="receipt-tax-title">
+      <h2 id="receipt-tax-title">Tax details</h2>
+      <p>{identity.tax_label} · {taxRate}</p>
+      <dl><ReceiptRow label="Taxable sales" value={money(taxableNgwee)}/><ReceiptRow label={`VAT (${taxRate})`} value={money(taxNgwee)}/></dl>
+    </section>
     <footer className="receipt-footer">
       <strong>{identity.receipt_footer}</strong>
-      <p>Keep this receipt for order enquiries.</p>
-      <p>Operational customer receipt — fiscal integration not configured</p>
     </footer>
   </article>;
 }
