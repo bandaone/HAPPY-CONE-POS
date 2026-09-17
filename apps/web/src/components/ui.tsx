@@ -17,6 +17,8 @@ export function ErrorMessage({ error }: { error: string }) { return error ? <div
 export function Empty({ icon, title, children }: { icon?: ReactNode; title: string; children?: ReactNode }) { return <div className="empty-state">{icon && <div className="empty-icon">{icon}</div>}<h3>{title}</h3><p>{children}</p></div>; }
 export function SubmitButton({ busy, children, disabled = false }: { busy: boolean; children: ReactNode; disabled?: boolean }) { return <button className="button primary" type="submit" disabled={busy || disabled}>{busy ? <LoaderCircle className="spin" size={18}/> : null}{children}{!busy && <ArrowRight size={18}/>}</button>; }
 export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'green' | 'orange' | 'red' }) { return <span className={`badge ${tone}`}>{tone === 'green' && <Check size={12}/>} {children}</span>; }
-export function timeOf(iso: string) { return new Date(iso).toLocaleTimeString('en-GB', { timeZone: 'Africa/Lusaka', hour: '2-digit', minute: '2-digit' }); }
-export function dateOf(iso: string) { return new Date(iso).toLocaleDateString('en-GB', { timeZone: 'Africa/Lusaka', day: 'numeric', month: 'short', year: 'numeric' }); }
+let displayTimezone = 'Africa/Lusaka';
+export function configureTimezone(timezone: string) { displayTimezone = timezone || 'Africa/Lusaka'; }
+export function timeOf(iso: string) { return new Date(iso).toLocaleTimeString('en-GB', { timeZone: displayTimezone, hour: '2-digit', minute: '2-digit' }); }
+export function dateOf(iso: string) { return new Date(iso).toLocaleDateString('en-GB', { timeZone: displayTimezone, day: 'numeric', month: 'short', year: 'numeric' }); }
 export function readable(value: string) { return value.toLowerCase().replaceAll('_', ' ').replace(/^./, letter => letter.toUpperCase()); }

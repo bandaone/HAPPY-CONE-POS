@@ -37,6 +37,8 @@ Create the stock item in **Stock** before adding it to a recipe. Recipe quantiti
 
 Item codes are permanent because receipts, reports and audit records use them. To stop selling an item, edit it and turn off **Available for sale**. Earlier receipts remain unchanged. Cashiers and servers can read the active menu but cannot change descriptions, prices, availability or recipes.
 
+Owners and managers edit the stand profile in **Settings**. The saved profile controls the business and stand names, location, displayed currency and timezone, payment and ticket guidance, receipt thank-you line, activity introduction, and the operating guide. Each update is audited. Runtime connection status, signed-in identity, historical audit events, and fiscal status are read-only system facts.
+
 ## Receipt status
 
 The current printout is an operational customer receipt sized for common 58 mm and 80 mm thermal printers. It records the order number, stable sale reference, date and time, item and variation codes, modifiers, quantities, unit prices, total, payment details, cashier, item count and payment status. The cashier name is copied onto the order at checkout, so a later staff-account rename does not alter an earlier receipt.
@@ -74,7 +76,7 @@ Copy `.env.example` to `.env` for Docker Compose. The checked-in example contain
 | `POSTGRES_PORT` | Host-only database port | `5432` |
 | `API_PORT` | Host-only direct API port | `8000` |
 | `WEB_PORT` | Host-only Nginx port | `8080` |
-| `BRANCH_TIMEZONE` | Business reporting/display timezone | `Africa/Lusaka` |
+| `BRANCH_TIMEZONE` | Startup timezone fallback before the saved stand profile loads | `Africa/Lusaka` |
 | `SESSION_HOURS` | Opaque database-backed session lifetime | `12` |
 | `CORS_ORIGINS` | JSON list for direct browser-to-API development calls | Local Vite and Nginx origins |
 | `APP_ENV` | Enables strict production checks when set to `production` | `development` |

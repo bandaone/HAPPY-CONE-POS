@@ -6,3 +6,4 @@ from .inventory import InventoryItem, StockMovement, StockCount
 from .business_day import BusinessDay, CashMovement
 from .order import Order, OrderLine
 from .payment import Payment, Refund
+from .stand_settings import StandSettings

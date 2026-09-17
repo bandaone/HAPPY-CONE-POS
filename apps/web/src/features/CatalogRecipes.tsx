@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
 import { ChevronDown, PackagePlus, Pencil, Plus } from "lucide-react";
 
 import { Badge, Empty, ErrorMessage, Modal, SubmitButton } from "../components/ui";
-import { money, parseMoney } from "../lib/client";
+import { currencySymbol, money, parseMoney } from "../lib/client";
 import type {
   Catalog, CatalogItemCreate, CatalogItemUpdate, Category, InventoryItem, Modifier,
   ModifierGroup, POSClient, Product, ProductCreateInput, ProductUpdateInput,
@@ -174,7 +174,7 @@ function ItemForm({ client, kind, parentId, item, inventory, finish }: {
     {!item && <label className="field">Item code<input aria-label="Item code" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={code} onChange={event => setCode(event.target.value.toLowerCase())}/><small>Permanent code printed on receipts.</small></label>}
     {item && <div className="catalog-code"><span>Item code</span><strong>{item.id}</strong></div>}
     <label className="field">Name<input aria-label="Name" required maxLength={100} value={name} onChange={event => setName(event.target.value)}/></label>
-    <label className="field">Selling price (K)<input aria-label="Selling price (K)" inputMode="decimal" required value={price} onChange={event => setPrice(event.target.value)}/></label>
+    <label className="field">Selling price ({currencySymbol()})<input aria-label={`Selling price (${currencySymbol()})`} inputMode="decimal" required value={price} onChange={event => setPrice(event.target.value)}/></label>
     <label className="choice"><span><strong>Available for sale</strong><small>Archived items remain on earlier receipts and reports.</small></span><input aria-label="Available for sale" type="checkbox" checked={active} onChange={event => setActive(event.target.checked)}/></label>
     <div className="recipe-heading"><div><h3>Stock recipe</h3><p>Stock deducted each time one {label} is sold.</p></div><button className="button" type="button" onClick={addRow}><Plus size={16}/> Add ingredient</button></div>
     {rows.map((row, index) => {

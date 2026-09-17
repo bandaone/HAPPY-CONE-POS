@@ -180,6 +180,36 @@ test('owner manages staff access and changes their own password',async({page})=>
   expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze()).violations).toEqual([]);
   await page.screenshot({path:'test-results/happy-cone-owner-settings.png',fullPage:true});
 
+  await page.getByRole('button',{name:'Edit details'}).click();
+  let settingsDialog=page.getByRole('dialog',{name:'Edit stand details'});
+  await settingsDialog.getByLabel('Stand name').fill('Arcades stand');
+  await settingsDialog.getByLabel('Location').fill('Great East Road, Lusaka');
+  await settingsDialog.getByRole('button',{name:'Save changes'}).click();
+  await expect(page.locator('.location').getByText('Arcades stand',{exact:true})).toBeVisible();
+  await expect(page.getByText('Great East Road, Lusaka',{exact:true})).toBeVisible();
+
+  await page.getByRole('button',{name:'Edit payment wording'}).click();
+  settingsDialog=page.getByRole('dialog',{name:'Edit payment and ticket wording'});
+  await settingsDialog.getByLabel('Payment instructions').fill('Confirm every external payment before the sale is completed.');
+  await settingsDialog.getByLabel('Receipt thank-you line').fill('Thank you. We hope to scoop for you again.');
+  await settingsDialog.getByRole('button',{name:'Save changes'}).click();
+  await expect(page.getByText('Confirm every external payment before the sale is completed.')).toBeVisible();
+
+  await page.getByRole('button',{name:'Edit activity wording'}).click();
+  settingsDialog=page.getByRole('dialog',{name:'Edit activity wording'});
+  await settingsDialog.getByLabel('Activity record introduction').fill('Review signed actions for sales, stock, staff and cash.');
+  await settingsDialog.getByRole('button',{name:'Save changes'}).click();
+  await expect(page.getByText('Review signed actions for sales, stock, staff and cash.')).toBeVisible();
+
+  await page.getByRole('button',{name:'Edit guide'}).click();
+  settingsDialog=page.getByRole('dialog',{name:'Edit counter guide'});
+  await settingsDialog.getByLabel('From order to served').fill('Take the order, confirm payment, prepare it and call the ticket number.');
+  expect((await new AxeBuilder({page}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze()).violations).toEqual([]);
+  await settingsDialog.getByRole('button',{name:'Save changes'}).click();
+  await page.getByRole('button',{name:'Open counter guide'}).click();
+  await expect(page.getByRole('dialog',{name:'Counter guide'}).getByText('Take the order, confirm payment, prepare it and call the ticket number.')).toBeVisible();
+  await page.getByRole('dialog',{name:'Counter guide'}).getByRole('button',{name:'Close dialog'}).click();
+
   await page.getByRole('button',{name:'Add category'}).click();
   let catalogDialog=page.getByRole('dialog',{name:'Add category'});
   await catalogDialog.getByLabel('Item code').fill('frozen-treats');

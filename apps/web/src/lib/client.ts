@@ -29,6 +29,7 @@ import type {
   Quote,
   StockCount,
   Summary,
+  StandProfile,
   User,
   UserCreateInput,
   UserUpdateInput,
@@ -45,13 +46,21 @@ export function money(valueNgwee: number): string {
   if (!Number.isSafeInteger(valueNgwee)) throw new Error("Money must be an integer number of ngwee");
   const sign = valueNgwee < 0 ? "-" : "";
   const digits = String(Math.abs(valueNgwee)).padStart(3, "0");
-  return `${sign}K${digits.slice(0, -2)}.${digits.slice(-2)}`;
+  return `${sign}${displayCurrencySymbol}${digits.slice(0, -2)}.${digits.slice(-2)}`;
+}
+
+let displayCurrencySymbol = "K";
+export function configureMoney(symbol: string): void { displayCurrencySymbol = symbol.trim() || "K"; }
+export function currencySymbol(): string { return displayCurrencySymbol; }
+export function moneyInput(valueNgwee: number): string {
+  const digits = String(Math.abs(valueNgwee)).padStart(3, "0");
+  return `${valueNgwee < 0 ? "-" : ""}${digits.slice(0, -2)}.${digits.slice(-2)}`;
 }
 
 export function parseMoney(value: string, options: ParseMoneyOptions | boolean = {}): number {
   const allowNegative = typeof options === "boolean" ? options : options.allowNegative === true;
   const match = value.trim().match(/^(-)?(?:K\s*)?((?:\d{1,3}(?:,\d{3})*)|\d+)(?:\.(\d{1,2}))?$/i);
-  if (!match) throw new Error("Enter a valid kwacha amount with no more than two decimal places");
+  if (!match) throw new Error("Enter a valid amount with no more than two decimal places");
   if (match[1] && !allowNegative) throw new Error("Amount cannot be negative");
   const whole = match[2].replaceAll(",", "").replace(/^0+(?=\d)/, "");
   const fraction = (match[3] ?? "").padEnd(2, "0");
@@ -135,6 +144,10 @@ export class ApiClient implements POSClient {
   }
 
   session = () => this.request<User>("/session");
+  standSettings = () => this.request<StandProfile>("/stand-settings");
+  updateStandSettings = (input: StandProfile) => this.request<StandProfile>("/stand-settings", {
+    method: "PUT", body: JSON.stringify(input),
+  });
   changePassword = (currentPassword: string, newPassword: string) => this.request<{ ok: true; other_sessions_revoked: number }>("/auth/change-password", {
     method: "POST", body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
   });

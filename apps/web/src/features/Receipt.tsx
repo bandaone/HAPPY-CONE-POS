@@ -2,20 +2,23 @@ import { CheckCircle2, Printer } from "lucide-react";
 
 import { BrandLogo, Modal, dateOf, readable, timeOf } from "../components/ui";
 import { money } from "../lib/client";
-import type { Order } from "../lib/types";
+import type { Order, StandProfile } from "../lib/types";
+
+const receiptDefaults = { business_name: "Happy Cone Ice Cream", stand_name: "Lusaka stand", receipt_footer: "Thank you for choosing Happy Cone." };
 
 function ReceiptRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return <div className={`receipt-value-row ${strong ? "receipt-value-strong" : ""}`}><dt>{label}</dt><dd>{value}</dd></div>;
 }
 
-export function Receipt({ order }: { order: Order }) {
+export function Receipt({ order, profile }: { order: Order; profile?: StandProfile }) {
+  const identity = profile ?? receiptDefaults;
   const units = order.lines.reduce((sum, line) => sum + line.quantity, 0);
   const saleReference = order.id.slice(0, 8).toUpperCase();
   return <article className="receipt" aria-label={`Customer receipt for order ${order.number}`}>
     <header className="receipt-header">
       <BrandLogo variant="receipt"/>
-      <p>Happy Cone Ice Cream</p>
-      <p>Lusaka stand</p>
+      <p>{identity.business_name}</p>
+      <p>{identity.stand_name}</p>
       <h2>Customer Receipt</h2>
     </header>
     <dl className="receipt-details">
@@ -51,16 +54,16 @@ export function Receipt({ order }: { order: Order }) {
       <ReceiptRow label="Payment status" value={readable(order.payment.status)}/>
     </dl>
     <footer className="receipt-footer">
-      <strong>Thank you for choosing Happy Cone.</strong>
+      <strong>{identity.receipt_footer}</strong>
       <p>Keep this receipt for order enquiries.</p>
       <p>Operational customer receipt — fiscal integration not configured</p>
     </footer>
   </article>;
 }
 
-export function ReceiptModal({ order, onClose, onPrint }: { order: Order; onClose: () => void; onPrint: () => void }) {
+export function ReceiptModal({ order, profile, onClose, onPrint }: { order: Order; profile?: StandProfile; onClose: () => void; onPrint: () => void }) {
   return <Modal title={`Receipt ${order.number}`} eyebrow={order.refunded ? "Refunded sale" : "Sale saved"} onClose={onClose}>
-    <Receipt order={order}/>
+    <Receipt order={order} profile={profile}/>
     <div className="modal-footer"><button className="button" type="button" onClick={onPrint}><Printer size={16}/>Print receipt</button><button className="button primary" type="button" onClick={onClose}><CheckCircle2 size={16}/>Done</button></div>
   </Modal>;
 }

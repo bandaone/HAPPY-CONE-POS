@@ -15,7 +15,7 @@ describe("money", () => {
   });
 
   it("rejects malformed and negative values unless explicitly allowed", () => {
-    expect(() => parseMoney("1.234")).toThrow(/valid kwacha/i);
+    expect(() => parseMoney("1.234")).toThrow(/valid amount/i);
     expect(() => parseMoney("-2.00")).toThrow(/negative/i);
     expect(parseMoney("-2.00", { allowNegative: true })).toBe(-200);
   });

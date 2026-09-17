@@ -42,7 +42,7 @@ Create the first `OWNER_ADMIN` with `python -m app.cli create-user` and the `--p
 2. Close the business day if the release could interrupt service.
 3. Run an encrypted backup and verify its checksum and off-host copy.
 4. Pull or check out the reviewed release tag and build immutable images.
-5. Run the migration command once, then replace the API and web services. The current migration adds the cashier name snapshot used by historical receipts; confirm migration `0002_order_cashier_name` is at head.
+5. Run the migration command once, then replace the API and web services. Migration `0002_order_cashier_name` preserves cashier names on historical receipts and migration `0003` adds the editable stand profile; confirm `0003` is at head.
 6. Run `./scripts/production-check.sh` through the TLS URL by setting `HAPPYCONE_BASE_URL`.
 7. Complete a signed-in smoke test: create or edit a test product variation and recipe as a manager, make a low-value controlled sale, and confirm the receipt, preparation queue, stock movement, report and activity log. Archive the test item afterward if it is not part of the live menu.
 8. Record release version, operator, start/end time, migration result, backup identifier and smoke-test result.

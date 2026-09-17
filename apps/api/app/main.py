@@ -17,6 +17,7 @@ from app.api.routes.business_day import router as day_router
 from app.api.routes.orders import router as orders_router
 from app.api.routes.reports import router as reports_router
 from app.api.routes.users import router as users_router
+from app.api.routes.stand_settings import router as stand_settings_router
 from app.realtime.orders import router as events_router
 
 
@@ -83,6 +84,7 @@ def create_app(settings: Settings | None = None, *, initialize: bool = False) ->
     api.include_router(orders_router)
     api.include_router(reports_router)
     api.include_router(users_router)
+    api.include_router(stand_settings_router)
     api.include_router(events_router)
 
     @api.get('/health')

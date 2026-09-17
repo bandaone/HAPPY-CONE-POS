@@ -21,6 +21,24 @@ export interface UserUpdateInput {
   active: boolean;
 }
 
+export interface StandProfile {
+  business_name: string;
+  stand_name: string;
+  location: string;
+  currency_name: string;
+  currency_code: string;
+  currency_symbol: string;
+  timezone: string;
+  payment_guidance: string;
+  ticket_guidance: string;
+  receipt_footer: string;
+  activity_guidance: string;
+  guide_workflow: string;
+  guide_controls: string;
+  guide_offline: string;
+  guide_printing: string;
+}
+
 export interface RecipeComponent {
   item_id: string;
   quantity: string;
@@ -287,6 +305,8 @@ export interface POSClient {
   login(username: string, password: string): Promise<LoginResult>;
   logout(): Promise<{ ok: true }>;
   session(): Promise<User>;
+  standSettings(): Promise<StandProfile>;
+  updateStandSettings(input: StandProfile): Promise<StandProfile>;
   changePassword(currentPassword: string, newPassword: string): Promise<{ ok: true; other_sessions_revoked: number }>;
   users(): Promise<User[]>;
   createUser(input: UserCreateInput): Promise<User>;

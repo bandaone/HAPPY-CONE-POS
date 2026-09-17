@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import App from "../App";
+import App, { defaultStandProfile } from "../App";
 import type { Catalog, CheckoutCommand, Day, Order, User } from "../lib/types";
 
 const originalShowModal = HTMLDialogElement.prototype.showModal;
@@ -52,6 +52,7 @@ describe("live checkout recovery", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
       if (url.endsWith("/api/session")) return json(currentUser);
+      if (url.endsWith("/api/stand-settings")) return json(defaultStandProfile);
       if (url.includes("/api/catalog")) return json(catalog);
       if (url.endsWith("/api/business-day/current")) return json(day);
       if (url.endsWith("/api/orders/quote")) return json({ lines: [{ variant_id: "vanilla-double", name: "Vanilla bean · Double", quantity: 1, unit_price_ngwee: 4200, total_ngwee: 4200, modifier_names: ["Cone", "Oreo"], notes: "" }], total_ngwee: 4200 });

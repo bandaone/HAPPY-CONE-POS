@@ -110,7 +110,8 @@ def test_cashier_name_migration_backfills_populated_database_and_retries(tmp_pat
     assert upgraded.returncode == 0, upgraded.stderr
     with engine.connect() as db:
         assert db.scalar(text("SELECT cashier_name FROM orders WHERE id = 'order-id'")) == 'Original Cashier'
-        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0002_order_cashier_name'
+        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0003'
+        assert db.scalar(text('SELECT stand_name FROM stand_settings WHERE id = 1')) == 'Lusaka stand'
     checks = {constraint['sqltext'] for constraint in inspect(engine).get_check_constraints('orders')}
     assert any("statusIN('NEW','PREPARING','READY','SERVED')" in check.replace(' ', '') for check in checks)
     assert any('total_ngwee>=0' in check.replace(' ', '') for check in checks)

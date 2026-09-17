@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import App from "../App";
+import App, { defaultStandProfile } from "../App";
 import type { Catalog, User } from "../lib/types";
 
 const catalog: Catalog = { categories: [], products: [], modifier_groups: [], modifiers: [] };
@@ -29,6 +29,7 @@ beforeEach(() => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     if (url.endsWith("/api/auth/login")) return json({ token: "cashier-token", user: cashier });
     if (url.endsWith("/api/session")) return json(cashier);
+    if (url.endsWith("/api/stand-settings")) return json(defaultStandProfile);
     if (url.includes("/api/catalog")) return json(catalog);
     if (url.endsWith("/api/business-day/current")) return json(null);
     if (url.endsWith("/api/auth/logout")) return new Response(null, { status: 204 });
@@ -103,6 +104,7 @@ describe("first-time guidance", () => {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
       if (url.endsWith("/api/session")) return json(cashier);
+      if (url.endsWith("/api/stand-settings")) return json(defaultStandProfile);
       if (url.includes("/api/catalog")) return json(incompleteCatalog);
       if (url.endsWith("/api/business-day/current")) return json(null);
       throw new Error(`Unexpected request: ${url}`);

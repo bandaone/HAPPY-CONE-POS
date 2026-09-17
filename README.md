@@ -89,6 +89,8 @@ unset HAPPYCONE_BOOTSTRAP_PASSWORD
 
 After sign-in, an owner can create staff accounts, change roles and active status, reset passwords, and revoke sessions from **Settings → Staff accounts**. Owners and managers maintain the sellable menu in **Settings → Menu and stock recipes**: categories, product descriptions, variations, prices, serving choices, extras, availability, and the stock quantity consumed by each choice. Permanent item codes keep older receipts and reports understandable. Every live user can change their own password from the account menu.
 
+Owners and managers can also edit the stand profile from **Settings**: business and stand names, location, display currency, timezone, payment and ticket instructions, receipt thank-you line, activity introduction, and the counter guide. These values are stored in the database and used by the signed-in workspace, money and date display, offline cache, counter guide, and customer receipts. Live connection state, the signed-in identity, audit entries, and fiscal-integration status remain system controlled.
+
 Use `scripts/backup.sh` for verified PostgreSQL custom-format backups. Production scheduling must set `HAPPYCONE_BACKUP_AGE_RECIPIENT`, copy the encrypted backup and checksum off-host, and alert on failure. `scripts/restore.sh` requires an explicit confirmation value and should first be rehearsed on staging. The full procedure is in the [deployment and operations runbook](docs/implementation/deployment-runbook.md).
 
 ## Documentation
