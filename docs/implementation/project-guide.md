@@ -31,7 +31,7 @@ The API owns authorization. Hiding a browser control is a usability measure and 
 
 ## Menu and price ownership
 
-Owners and managers set prices and item details in **Settings → Menu and stock recipes**. A product holds the customer-facing name, category, description, display colour and availability. Each variation is the actual sellable choice and holds its permanent item code, name, selling price and stock recipe. Serving choices and extras are maintained in modifier groups; each extra has its own item code, price, availability and optional stock recipe.
+Owners and managers set prices and item details in **Settings → Menu and stock recipes**. A product holds the customer-facing name, category, description, display colour and availability. It appears on the cashier counter only after it has at least one active variation, so an item being configured cannot interrupt the counter. Each variation is the actual sellable choice and holds its permanent item code, name, selling price and stock recipe. Serving choices and extras are maintained in modifier groups; each extra has its own item code, price, availability and optional stock recipe.
 
 Create the stock item in **Stock** before adding it to a recipe. Recipe quantities use the unit shown beside the field. For example, a single scoop can consume `90 g` of an ice-cream stock item and a waffle-cone extra can consume `1 each`. The system rejects duplicate ingredients and quantities that are zero or negative. A variation or extra may be saved without a recipe, but the editor warns that its sales will not reduce stock until a recipe is added.
 

@@ -43,6 +43,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .login-page .login-story h1{font-family:Georgia,serif;font-size:clamp(46px,5.3vw,72px);letter-spacing:-2.7px;line-height:1.03;font-weight:400;margin:42px 0 20px}
 .login-welcome{font-weight:650;letter-spacing:.01em}
 .login-form .button.primary{width:100%;min-height:50px;margin-top:3px}
+.password-input{position:relative;display:block}.field .password-input input{padding-right:52px}.password-input button{position:absolute;top:0;right:0;width:46px;height:45px;border:0;border-left:1px solid var(--line);border-radius:0 8px 8px 0;background:transparent;color:var(--muted);display:grid;place-items:center}.password-input button:hover{background:#f8f1ed;color:var(--ink)}
 .login-support{margin:24px 0 0!important;padding-top:20px;border-top:1px solid var(--line);font-size:11px!important;line-height:1.65}
 .tour-body{padding:25px}
 .tour-icon{width:54px;height:54px;border-radius:17px;display:grid;place-items:center;background:#f9e3e3;color:var(--accent);margin-bottom:18px}

@@ -75,4 +75,45 @@ describe("first-time guidance", () => {
     await user.click(within(guide).getByRole("button", { name: "Take product tour" }));
     expect(await screen.findByRole("dialog", { name: "Welcome to your counter" })).toBeInTheDocument();
   });
+
+  it("lets staff reveal and hide the password before sign-in", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const password = await screen.findByLabelText("Password");
+    expect(password).toHaveAttribute("type", "password");
+    await user.type(password, "first-day-password");
+    await user.click(screen.getByRole("button", { name: "Show password" }));
+    expect(password).toHaveAttribute("type", "text");
+    expect(password).toHaveValue("first-day-password");
+    await user.click(screen.getByRole("button", { name: "Hide password" }));
+    expect(password).toHaveAttribute("type", "password");
+  });
+
+  it("keeps an incomplete product off the cashier counter", async () => {
+    const incompleteCatalog: Catalog = {
+      categories: [{ id: "ice-cream", name: "Ice cream" }],
+      products: [{
+        id: "unfinished", category_id: "ice-cream", name: "Unfinished item",
+        category: "Ice cream", description: "Still being configured", color: "#F4B942",
+        active: true, variants: [],
+      }],
+      modifier_groups: [], modifiers: [],
+    };
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.endsWith("/api/session")) return json(cashier);
+      if (url.includes("/api/catalog")) return json(incompleteCatalog);
+      if (url.endsWith("/api/business-day/current")) return json(null);
+      throw new Error(`Unexpected request: ${url}`);
+    }));
+    sessionStorage.setItem("happy-cone:session-token", JSON.stringify("cashier-token"));
+    localStorage.setItem(`happy-cone:tour:v1:${cashier.id}`, "complete");
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "A little scoop of happy." })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Customize Unfinished item" })).not.toBeInTheDocument();
+    expect(screen.getByText("No treats found")).toBeInTheDocument();
+  });
 });

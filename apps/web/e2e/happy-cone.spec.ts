@@ -33,6 +33,12 @@ test('login is accessible and reflows on phone and desktop',async({page})=>{
   await page.goto('/');
   await expect(page.getByRole('heading',{name:'Staff sign-in'})).toBeVisible();
   await expect(page.getByRole('navigation',{name:'Main navigation'})).toHaveCount(0);
+  const password=page.getByLabel('Password',{exact:true});
+  await password.fill('visible-password-check');
+  await page.getByRole('button',{name:'Show password'}).click();
+  await expect(password).toHaveAttribute('type','text');
+  await page.getByRole('button',{name:'Hide password'}).click();
+  await expect(password).toHaveAttribute('type','password');
   expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze()).violations).toEqual([]);
   await page.screenshot({path:'test-results/happy-cone-desktop.png',fullPage:true});
   await page.setViewportSize({width:375,height:812});

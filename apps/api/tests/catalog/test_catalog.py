@@ -57,6 +57,10 @@ def test_manager_builds_complete_sellable_item_and_owner_can_edit_it(client, log
     assert product.status_code == 201
     assert product.json()['description'] == 'Bright mango ice cream made for hot afternoons.'
     assert product.json()['category_id'] == 'frozen-treats'
+    cashier_catalog = client.get('/api/catalog', headers=login('cashier')).json()
+    assert 'mango' not in {entry['id'] for entry in cashier_catalog['products']}
+    manager_catalog = client.get('/api/catalog?include_inactive=true', headers=manager).json()
+    assert any(entry['id'] == 'mango' for entry in manager_catalog['products'])
 
     variant = client.post('/api/catalog/products/mango/variants', headers=manager, json={
         'id': 'mango-single', 'name': 'Single scoop', 'price_ngwee': 2800,

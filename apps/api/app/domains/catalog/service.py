@@ -61,10 +61,13 @@ def catalog(db, include_inactive=False):
     modifier_query = select(Modifier).order_by(Modifier.group_id, Modifier.name)
     if not include_inactive:
         modifier_query = modifier_query.where(Modifier.active.is_(True))
+    products = [product_dto(db, row, include_inactive=include_inactive)
+                for row in db.scalars(product_query)]
+    if not include_inactive:
+        products = [product for product in products if product['variants']]
     return {
         'categories': [category_dto(row) for row in db.scalars(select(Category).order_by(Category.name))],
-        'products': [product_dto(db, row, include_inactive=include_inactive)
-                     for row in db.scalars(product_query)],
+        'products': products,
         'modifier_groups': [modifier_group_dto(row) for row in db.scalars(
             select(ModifierGroup).order_by(ModifierGroup.name))],
         'modifiers': [modifier_dto(db, row) for row in db.scalars(modifier_query)],
