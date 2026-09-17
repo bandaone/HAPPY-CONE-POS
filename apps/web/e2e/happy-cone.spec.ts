@@ -69,9 +69,9 @@ test('live cashier sale reaches preparation, stock, reporting and day close',asy
   await expect(receipt.getByText('VANILLA-DOUBLE',{exact:true})).toBeVisible();
   await expect(receipt.getByText('Mwansa Banda',{exact:true})).toBeVisible();
   await expect(receipt.getByRole('heading',{name:'Tax details'})).toBeVisible();
-  await expect(receipt.getByText('STANDARD RATED (A) · 16%',{exact:true})).toBeVisible();
-  await expect(receipt.getByText('K36.21',{exact:true})).toBeVisible();
-  await expect(receipt.getByText('K5.79',{exact:true})).toBeVisible();
+  await expect(receipt.getByText('TURNOVER TAX (TOT)',{exact:true})).toBeVisible();
+  await expect(receipt.getByText('5% of gross sale',{exact:true})).toBeVisible();
+  await expect(receipt.getByText('K2.10',{exact:true})).toBeVisible();
   await expect(receipt.getByText(/Tax Invoice|Smart Invoice|SDC|MRC|QR/i)).toHaveCount(0);
   await page.evaluate(()=>{window.print=()=>{throw new Error('Printer unavailable');};});
   await page.getByRole('button',{name:'Print receipt',exact:true}).click();
@@ -182,7 +182,7 @@ test('owner manages staff access and changes their own password',async({page})=>
   await signIn(page,'owner');
   await page.getByRole('button',{name:'Settings and information'}).click();
   await expect(page.getByRole('heading',{name:'Staff accounts'})).toBeVisible();
-  await expect(page.getByRole('heading',{name:'Menu and stock recipes'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Menu and stock recipes'})).toHaveCount(0);
   expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze()).violations).toEqual([]);
   await page.screenshot({path:'test-results/happy-cone-owner-settings.png',fullPage:true});
 
@@ -199,13 +199,13 @@ test('owner manages staff access and changes their own password',async({page})=>
   await settingsDialog.getByLabel('Legal business name').fill('CREAMY HEAVEN LIMITED');
   await settingsDialog.getByLabel('TPIN').fill('1002681530');
   await settingsDialog.getByLabel('Contact number').fill('0771450074');
-  await settingsDialog.getByLabel('Tax category').fill('STANDARD RATED (A)');
-  await settingsDialog.getByLabel('VAT rate (%)').fill('16');
+  await settingsDialog.getByLabel('Tax category').fill('TURNOVER TAX (TOT)');
+  await settingsDialog.getByLabel('Tax rate (%)').fill('5');
   await settingsDialog.getByLabel('Receipt footer').fill('Thank you. We hope to scoop for you again.');
   expect((await new AxeBuilder({page}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze()).violations).toEqual([]);
   await settingsDialog.getByRole('button',{name:'Save changes'}).click();
   await expect(page.getByText('1002681530',{exact:true})).toBeVisible();
-  await expect(page.getByText('STANDARD RATED (A) · 16%',{exact:true})).toBeVisible();
+  await expect(page.getByText('TURNOVER TAX (TOT) · 5%',{exact:true})).toBeVisible();
 
   await page.getByRole('button',{name:'Edit payment wording'}).click();
   settingsDialog=page.getByRole('dialog',{name:'Edit payment and ticket wording'});
@@ -228,29 +228,31 @@ test('owner manages staff access and changes their own password',async({page})=>
   await expect(page.getByRole('dialog',{name:'Counter guide'}).getByText('Take the order, confirm payment, prepare it and call the ticket number.')).toBeVisible();
   await page.getByRole('dialog',{name:'Counter guide'}).getByRole('button',{name:'Close dialog'}).click();
 
+  await page.getByRole('button',{name:'Stock',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Stock',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Menu and stock recipes'})).toBeVisible();
+  await page.screenshot({path:'test-results/happy-cone-owner-stock.png',fullPage:true});
+
   await page.getByRole('button',{name:'Add category'}).click();
   let catalogDialog=page.getByRole('dialog',{name:'Add category'});
-  await catalogDialog.getByLabel('Item code').fill('frozen-treats');
   await catalogDialog.getByLabel('Category name').fill('Frozen treats');
   await catalogDialog.getByRole('button',{name:'Create category'}).click();
   await expect(page.getByRole('button',{name:/Frozen treats/})).toBeVisible();
 
   await page.getByRole('button',{name:'Add product'}).click();
   catalogDialog=page.getByRole('dialog',{name:'Add product'});
-  await catalogDialog.getByLabel('Item code').fill('mango');
   await catalogDialog.getByLabel('Product name').fill('Mango sunshine');
   await catalogDialog.getByLabel('Category').selectOption('frozen-treats');
-  await catalogDialog.getByLabel('Customer description').fill('Bright mango ice cream made for hot afternoons.');
+  await catalogDialog.getByText('Optional menu details',{exact:true}).click();
+  await catalogDialog.getByLabel('Short description').fill('Bright mango ice cream made for hot afternoons.');
   await catalogDialog.getByRole('button',{name:'Create product'}).click();
   await expect(page.getByText('Bright mango ice cream made for hot afternoons.',{exact:true})).toBeVisible();
 
   await page.getByRole('button',{name:'Show Mango sunshine details'}).click();
   await page.getByRole('button',{name:'Add variation'}).click();
   catalogDialog=page.getByRole('dialog',{name:'Add variation'});
-  await catalogDialog.getByLabel('Item code').fill('mango-single');
   await catalogDialog.getByLabel('Name').fill('Single scoop');
   await catalogDialog.getByLabel('Selling price (K)').fill('28.00');
-  await catalogDialog.getByRole('button',{name:'Add ingredient'}).click();
   await catalogDialog.getByLabel('Ingredient 1',{exact:true}).selectOption('vanilla-stock');
   await catalogDialog.getByLabel('Quantity 1',{exact:true}).fill('90');
   expect((await new AxeBuilder({page}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze()).violations).toEqual([]);
@@ -266,6 +268,8 @@ test('owner manages staff access and changes their own password',async({page})=>
   await catalogDialog.getByRole('button',{name:'Save variation'}).click();
   await expect(page.getByText('K35.00',{exact:true})).toBeVisible();
 
+  await page.getByRole('button',{name:'Settings and information'}).click();
+  await expect(page.getByRole('heading',{name:'Staff accounts'})).toBeVisible();
   await page.getByRole('button',{name:'Add staff account'}).click();
   const create=page.getByRole('dialog');
   await create.getByLabel('Full name').fill('Evening Server');

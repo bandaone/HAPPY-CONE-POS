@@ -56,6 +56,12 @@ class CatalogItemUpdate(Command):
             raise ValueError('Each inventory item may appear only once')
         return value
 
+    @model_validator(mode='after')
+    def available_items_have_recipe(self):
+        if self.active and not self.recipe:
+            raise ValueError('Available items require at least one stock recipe ingredient')
+        return self
+
 
 class CatalogItemCreate(CatalogItemUpdate):
     id: ItemCode

@@ -13,7 +13,7 @@ Do not move a release to the live stand until all of these checks are recorded:
 - Owner, manager, cashier and server accounts are tested; shared production passwords are prohibited.
 - Keyboard-only, 200% zoom, narrow-screen, screen-reader, offline-cash and physical-printer checks pass on the devices used at the stand. Test both 58 mm and 80 mm paper if both widths will be used.
 - The chosen payment procedure is approved. Any direct provider integration must separately pass provider sandbox, webhook and reconciliation tests.
-- The saved legal name, branch, location, TPIN, contact number, tax category, and VAT rate have been confirmed by the business. The receipt states that ZRA fiscal identifiers are not connected and must not be represented as a certified Smart Invoice.
+- The saved legal name, branch, location, TPIN, contact number, Turnover Tax category, and tax rate have been confirmed by the business. The receipt omits ZRA fiscal identifiers and must not be represented as a certified Smart Invoice.
 
 ## Host and secrets
 
@@ -42,7 +42,7 @@ Create the first `OWNER_ADMIN` with `python -m app.cli create-user` and the `--p
 2. Close the business day if the release could interrupt service.
 3. Run an encrypted backup and verify its checksum and off-host copy.
 4. Pull or check out the reviewed release tag and build immutable images.
-5. Run the migration command once, then replace the API and web services. Migration `0002_order_cashier_name` preserves cashier names on historical receipts, migration `0003` adds the editable stand profile, and migration `0004_receipt_tax_details` adds the editable tax and contact fields; confirm `0004` is at head.
+5. Run the migration command once, then replace the API and web services. Migration `0002_order_cashier_name` preserves cashier names on historical receipts, migration `0003` adds the editable stand profile, migration `0004_receipt_tax_details` adds the editable tax and contact fields, migration `0005_turnover_tax_defaults` corrects the configured tax treatment to TOT, and migration `0006_archive_untracked_catalog_items` archives any sellable variation or extra that has no stock recipe; confirm `0006` is at head.
 6. Run `./scripts/production-check.sh` through the TLS URL by setting `HAPPYCONE_BASE_URL`.
 7. Complete a signed-in smoke test: create or edit a test product variation and recipe as a manager, make a low-value controlled sale, and confirm the receipt, preparation queue, stock movement, report and activity log. Archive the test item afterward if it is not part of the live menu.
 8. Record release version, operator, start/end time, migration result, backup identifier and smoke-test result.

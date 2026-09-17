@@ -66,9 +66,9 @@ function roleSteps(role: Role): TourStep[] {
       eyebrow: role === "CASHIER" ? "Start serving" : "Daily oversight",
       copy: role === "CASHIER"
         ? "Sales keeps every completed ticket available. Cash day shows the opening float and the information needed at handover."
-        : "Use Stock, Reports and Cash day to review the stand. In Settings, you can create menu items, set prices and define the stock used by every variation and extra.",
-      note: "The connection indicator shows when cash orders need to wait on this device before syncing.",
-      page: role === "CASHIER" ? "sales" : "reports",
+        : "Use Stock to create menu items, set prices, define recipes and manage inventory. Reports and Cash day cover performance and reconciliation.",
+      note: "Settings holds staff access, receipt details and operating guidance. The connection indicator shows when cash orders need to wait before syncing.",
+      page: role === "CASHIER" ? "sales" : "inventory",
       icon: role === "CASHIER" ? WifiOff : ListChecks,
     },
   ];

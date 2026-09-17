@@ -6,8 +6,8 @@ import { Receipt } from "./Receipt";
 
 const profile = {
   business_name: "CREAMY HEAVEN LIMITED", stand_name: "Cairo shop", location: "Lusaka",
-  tax_id: "1002681530", contact_number: "0771450074", tax_label: "STANDARD RATED (A)",
-  tax_rate_basis_points: 1600, receipt_footer: "Thank you for choosing Happy Cone.",
+  tax_id: "1002681530", contact_number: "0771450074", tax_label: "TURNOVER TAX (TOT)",
+  tax_rate_basis_points: 500, receipt_footer: "Thank you for choosing Happy Cone.",
 } as StandProfile;
 
 function order(overrides: Partial<Order> = {}): Order {
@@ -55,9 +55,11 @@ describe("operational customer receipt", () => {
     expect(screen.getByText("Mwamba Manager")).toBeInTheDocument();
     expect(screen.getByText("2 units")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Tax details" })).toBeInTheDocument();
-    expect(screen.getByText("STANDARD RATED (A) · 16%")).toBeInTheDocument();
-    expect(screen.getByText("K60.34")).toBeInTheDocument();
-    expect(screen.getByText("K9.66")).toBeInTheDocument();
+    expect(screen.getByText("TURNOVER TAX (TOT)")).toBeInTheDocument();
+    expect(screen.getByText("5% of gross sale")).toBeInTheDocument();
+    expect(screen.getByText("K3.50")).toBeInTheDocument();
+    expect(screen.queryByText("Taxable sales")).not.toBeInTheDocument();
+    expect(screen.queryByText(/VAT/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Smart Invoice|SDC|MRC|QR/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/fiscal identifiers/i)).not.toBeInTheDocument();
     expect(screen.queryByText("Payment status")).not.toBeInTheDocument();

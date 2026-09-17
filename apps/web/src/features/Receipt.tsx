@@ -4,7 +4,7 @@ import { BrandLogo, Modal, dateOf, timeOf } from "../components/ui";
 import { money } from "../lib/client";
 import type { Order, StandProfile } from "../lib/types";
 
-const receiptDefaults = { business_name: "CREAMY HEAVEN LIMITED", stand_name: "Lusaka stand", location: "Lusaka", tax_id: "1002681530", contact_number: "0771450074", tax_label: "STANDARD RATED (A)", tax_rate_basis_points: 1600, receipt_footer: "Thank you for choosing Happy Cone." };
+const receiptDefaults = { business_name: "CREAMY HEAVEN LIMITED", stand_name: "Lusaka stand", location: "Lusaka", tax_id: "1002681530", contact_number: "0771450074", tax_label: "TURNOVER TAX (TOT)", tax_rate_basis_points: 500, receipt_footer: "Thank you for choosing Happy Cone." };
 
 function rateLabel(basisPoints: number) {
   return `${Number.isInteger(basisPoints / 100) ? basisPoints / 100 : (basisPoints / 100).toFixed(2)}%`;
@@ -18,8 +18,7 @@ export function Receipt({ order, profile }: { order: Order; profile?: StandProfi
   const identity = profile ?? receiptDefaults;
   const units = order.lines.reduce((sum, line) => sum + line.quantity, 0);
   const saleReference = order.id.slice(0, 8).toUpperCase();
-  const taxNgwee = Math.round(order.total_ngwee * identity.tax_rate_basis_points / (10_000 + identity.tax_rate_basis_points));
-  const taxableNgwee = order.total_ngwee - taxNgwee;
+  const taxNgwee = Math.round(order.total_ngwee * identity.tax_rate_basis_points / 10_000);
   const taxRate = rateLabel(identity.tax_rate_basis_points);
   return <article className="receipt" aria-label={`Receipt for order ${order.number}`}>
     <header className="receipt-header">
@@ -63,8 +62,8 @@ export function Receipt({ order, profile }: { order: Order; profile?: StandProfi
     </dl>
     <section className="receipt-tax" aria-labelledby="receipt-tax-title">
       <h2 id="receipt-tax-title">Tax details</h2>
-      <p>{identity.tax_label} · {taxRate}</p>
-      <dl><ReceiptRow label="Taxable sales" value={money(taxableNgwee)}/><ReceiptRow label={`VAT (${taxRate})`} value={money(taxNgwee)}/></dl>
+      <p>{identity.tax_label}</p>
+      <dl><ReceiptRow label={`${taxRate} of gross sale`} value={money(taxNgwee)}/></dl>
     </section>
     <footer className="receipt-footer">
       <strong>{identity.receipt_footer}</strong>

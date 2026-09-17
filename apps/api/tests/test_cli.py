@@ -100,6 +100,23 @@ def test_cashier_name_migration_backfills_populated_database_and_retries(tmp_pat
             "('payment-id', 'order-id', 'CASH', 'CONFIRMED', 2800, 3000, 200, "
             "'cashier-id', '2026-09-17 08:30:00')"
         ))
+        db.execute(text("INSERT INTO categories (id, name) VALUES ('test', 'Test')"))
+        db.execute(text(
+            "INSERT INTO products (id, category_id, name, description, color, active) "
+            "VALUES ('untracked-product', 'test', 'Untracked', '', '#FFFFFF', 1)"
+        ))
+        db.execute(text(
+            "INSERT INTO variants (id, product_id, name, price_ngwee, active) "
+            "VALUES ('untracked-variant', 'untracked-product', 'Untracked size', 1000, 1)"
+        ))
+        db.execute(text(
+            "INSERT INTO modifier_groups (id, name, minimum, maximum) "
+            "VALUES ('test-options', 'Test options', 0, 1)"
+        ))
+        db.execute(text(
+            "INSERT INTO modifiers (id, group_id, name, price_ngwee, active) "
+            "VALUES ('untracked-extra', 'test-options', 'Untracked extra', 100, 1)"
+        ))
         if partial_upgrade:
             db.execute(text('ALTER TABLE orders ADD COLUMN cashier_name VARCHAR(120)'))
             db.execute(text(
@@ -110,9 +127,13 @@ def test_cashier_name_migration_backfills_populated_database_and_retries(tmp_pat
     assert upgraded.returncode == 0, upgraded.stderr
     with engine.connect() as db:
         assert db.scalar(text("SELECT cashier_name FROM orders WHERE id = 'order-id'")) == 'Original Cashier'
-        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0004'
+        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0006'
         assert db.scalar(text('SELECT stand_name FROM stand_settings WHERE id = 1')) == 'Lusaka stand'
         assert db.scalar(text('SELECT tax_id FROM stand_settings WHERE id = 1')) == '1002681530'
+        assert db.scalar(text('SELECT tax_label FROM stand_settings WHERE id = 1')) == 'TURNOVER TAX (TOT)'
+        assert db.scalar(text('SELECT tax_rate_basis_points FROM stand_settings WHERE id = 1')) == 500
+        assert not db.scalar(text("SELECT active FROM variants WHERE id = 'untracked-variant'"))
+        assert not db.scalar(text("SELECT active FROM modifiers WHERE id = 'untracked-extra'"))
     checks = {constraint['sqltext'] for constraint in inspect(engine).get_check_constraints('orders')}
     assert any("statusIN('NEW','PREPARING','READY','SERVED')" in check.replace(' ', '') for check in checks)
     assert any('total_ngwee>=0' in check.replace(' ', '') for check in checks)

@@ -9,8 +9,8 @@ def settings_payload(**overrides):
         'timezone': 'Africa/Lusaka',
         'tax_id': '1002681530',
         'contact_number': '0771450074',
-        'tax_label': 'STANDARD RATED (A)',
-        'tax_rate_basis_points': 1600,
+        'tax_label': 'TURNOVER TAX (TOT)',
+        'tax_rate_basis_points': 500,
         'payment_guidance': 'Confirm mobile money and card payments before completing a sale.',
         'ticket_guidance': 'Give the numbered ticket to the customer after payment.',
         'receipt_footer': 'Thank you for choosing Happy Cone.',
@@ -30,7 +30,8 @@ def test_authenticated_staff_can_read_stand_settings(client, login):
     assert response.json()['business_name'] == 'CREAMY HEAVEN LIMITED'
     assert response.json()['timezone'] == 'Africa/Lusaka'
     assert response.json()['tax_id'] == '1002681530'
-    assert response.json()['tax_rate_basis_points'] == 1600
+    assert response.json()['tax_label'] == 'TURNOVER TAX (TOT)'
+    assert response.json()['tax_rate_basis_points'] == 500
 
 
 def test_manager_updates_settings_and_change_is_audited(client, login):

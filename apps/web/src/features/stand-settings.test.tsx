@@ -34,9 +34,9 @@ it('lets a manager maintain the details printed on receipts', async () => {
   const dialog = screen.getByRole('dialog', { name: 'Edit receipt details' });
   await user.clear(within(dialog).getByLabelText('TPIN'));
   await user.type(within(dialog).getByLabelText('TPIN'), '1002003004');
-  await user.clear(within(dialog).getByLabelText('VAT rate (%)'));
-  await user.type(within(dialog).getByLabelText('VAT rate (%)'), '16');
+  await user.clear(within(dialog).getByLabelText('Tax rate (%)'));
+  await user.type(within(dialog).getByLabelText('Tax rate (%)'), '5');
   await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
 
-  expect(updateStandSettings).toHaveBeenCalledWith(expect.objectContaining({ tax_id: '1002003004', tax_rate_basis_points: 1600 }));
+  expect(updateStandSettings).toHaveBeenCalledWith(expect.objectContaining({ tax_id: '1002003004', tax_rate_basis_points: 500 }));
 });

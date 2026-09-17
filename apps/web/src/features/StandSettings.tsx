@@ -68,7 +68,7 @@ export function StandSettingsCards({ profile, user, client, onSaved, onAudit, on
           <label className="field">TPIN<input required minLength={5} maxLength={40} value={draft.tax_id} onChange={e=>field('tax_id',e.target.value)}/></label>
           <label className="field">Contact number<input required minLength={5} maxLength={40} value={draft.contact_number} onChange={e=>field('contact_number',e.target.value)}/></label>
           <label className="field">Tax category<input required maxLength={80} value={draft.tax_label} onChange={e=>field('tax_label',e.target.value)}/></label>
-          <label className="field">VAT rate (%)<input aria-label="VAT rate (%)" required type="number" min="0" max="100" step="0.01" value={draft.tax_rate_basis_points / 100} onChange={e=>field('tax_rate_basis_points',Math.round(Number(e.target.value) * 100))}/><small>VAT is extracted from the VAT-inclusive sale total.</small></label>
+          <label className="field">Tax rate (%)<input aria-label="Tax rate (%)" required type="number" min="0" max="100" step="0.01" value={draft.tax_rate_basis_points / 100} onChange={e=>field('tax_rate_basis_points',Math.round(Number(e.target.value) * 100))}/><small>For TOT, tax is calculated from the gross sale total.</small></label>
           <label className="field field-wide">Receipt footer<input required maxLength={240} value={draft.receipt_footer} onChange={e=>field('receipt_footer',e.target.value)}/></label>
         </div>}
         {editing === 'payments' && <>

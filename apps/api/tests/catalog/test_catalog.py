@@ -161,6 +161,10 @@ def test_catalog_rejects_invalid_creation_and_recipe_without_partial_change(clie
     }).status_code == 422
     assert client.put('/api/catalog/variants/vanilla-single', headers=manager, json={
         'name': 'Single scoop', 'price_ngwee': 3500, 'active': True,
+        'recipe': [],
+    }).status_code == 422
+    assert client.put('/api/catalog/variants/vanilla-single', headers=manager, json={
+        'name': 'Single scoop', 'price_ngwee': 3500, 'active': True,
         'recipe': recipe('missing-stock', '1.000'),
     }).status_code == 422
     assert client.get('/api/catalog?include_inactive=true', headers=manager).json() == original

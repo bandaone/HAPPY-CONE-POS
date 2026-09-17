@@ -72,7 +72,7 @@ describe("menu and stock recipe administration", () => {
     await user.type(within(dialog).getByLabelText("Selling price (K)"), "35.00");
     await user.clear(within(dialog).getByLabelText("Quantity 1"));
     await user.type(within(dialog).getByLabelText("Quantity 1"), "120");
-    await user.click(within(dialog).getByRole("button", { name: "Add ingredient" }));
+    await user.click(within(dialog).getByRole("button", { name: "Add stock item" }));
     await user.selectOptions(within(dialog).getByLabelText("Ingredient 2"), "napkins");
     await user.type(within(dialog).getByLabelText("Quantity 2"), "1");
     await user.click(within(dialog).getByRole("button", { name: "Save variation" }));
@@ -89,7 +89,7 @@ describe("menu and stock recipe administration", () => {
     }]);
   });
 
-  it("creates a fully described product with a stable item code", async () => {
+  it("creates a product from the essential fields and generates its stable code", async () => {
     const user = userEvent.setup();
     const client = new CatalogClient();
     render(<CatalogRecipes client={client} onChanged={vi.fn()} onError={vi.fn()}/>);
@@ -97,14 +97,13 @@ describe("menu and stock recipe administration", () => {
 
     await user.click(screen.getByRole("button", { name: "Add product" }));
     const dialog = screen.getByRole("dialog");
-    await user.type(within(dialog).getByLabelText("Item code"), "mango");
+    expect(within(dialog).queryByLabelText("Item code")).not.toBeInTheDocument();
     await user.type(within(dialog).getByLabelText("Product name"), "Mango sunshine");
-    await user.type(within(dialog).getByLabelText("Customer description"), "Bright mango ice cream made for hot afternoons.");
     await user.click(within(dialog).getByRole("button", { name: "Create product" }));
 
     expect(client.createdProducts).toEqual([{
-      id: "mango", category_id: "ice-cream", name: "Mango sunshine",
-      description: "Bright mango ice cream made for hot afternoons.",
+      id: "mango-sunshine", category_id: "ice-cream", name: "Mango sunshine",
+      description: "",
       color: "#F6E4AB", active: true,
     }]);
   });
@@ -117,12 +116,27 @@ describe("menu and stock recipe administration", () => {
     await user.click(screen.getByRole("button", { name: "Show Vanilla details" }));
     await user.click(screen.getByRole("button", { name: "Edit Single scoop" }));
     const dialog = screen.getByRole("dialog");
-    await user.click(within(dialog).getByRole("button", { name: "Add ingredient" }));
+    await user.click(within(dialog).getByRole("button", { name: "Add stock item" }));
     await user.selectOptions(within(dialog).getByLabelText("Ingredient 2"), "vanilla-stock");
     await user.type(within(dialog).getByLabelText("Quantity 2"), "1");
     await user.click(within(dialog).getByRole("button", { name: "Save variation" }));
 
     expect(within(dialog).getByRole("alert")).toHaveTextContent(/ingredient can only appear once/i);
+    expect(client.updateCommands).toHaveLength(0);
+  });
+
+  it("requires a stock recipe while a variation is available for sale", async () => {
+    const user = userEvent.setup();
+    const client = new CatalogClient();
+    render(<CatalogRecipes client={client} onChanged={vi.fn()} onError={vi.fn()}/>);
+    await screen.findByText("Vanilla");
+    await user.click(screen.getByRole("button", { name: "Show Vanilla details" }));
+    await user.click(screen.getByRole("button", { name: "Edit Single scoop" }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Remove recipe row 1" }));
+    await user.click(within(dialog).getByRole("button", { name: "Save variation" }));
+
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(/stock ingredient/i);
     expect(client.updateCommands).toHaveLength(0);
   });
 });

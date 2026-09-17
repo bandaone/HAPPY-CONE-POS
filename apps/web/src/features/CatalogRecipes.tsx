@@ -28,6 +28,13 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : "The change could not be saved. Please try again.";
 }
 
+function generatedCode(name: string, parentId = ""): string {
+  const slug = name.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "item";
+  const prefix = parentId ? `${parentId.slice(0, 35).replace(/-+$/g, "")}-` : "";
+  return `${prefix}${slug}`.slice(0, 60).replace(/-+$/g, "");
+}
+
 function RecipeSummary({ recipe, inventory }: { recipe: RecipeComponent[]; inventory: InventoryItem[] }) {
   if (!recipe.length) return <span className="catalog-recipe-empty">No stock recipe</span>;
   return <span>{recipe.map(component => {
@@ -39,7 +46,6 @@ function RecipeSummary({ recipe, inventory }: { recipe: RecipeComponent[]; inven
 function CategoryForm({ client, item, finish }: {
   client: POSClient; item?: Category; finish: (error?: string) => Promise<void>;
 }) {
-  const [code, setCode] = useState(item?.id ?? "");
   const [name, setName] = useState(item?.name ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -47,13 +53,12 @@ function CategoryForm({ client, item, finish }: {
     event.preventDefault(); setBusy(true); setError("");
     try {
       if (item) await client.updateCategory(item.id, { name });
-      else await client.createCategory({ id: code, name });
+      else await client.createCategory({ id: generatedCode(name), name });
       await finish();
     } catch (reason) { const message = errorText(reason); setError(message); await finish(message); }
     finally { setBusy(false); }
   };
   return <form onSubmit={submit}><div className="modal-body">
-    {!item && <label className="field">Item code<input aria-label="Item code" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" maxLength={60} value={code} onChange={event => setCode(event.target.value.toLowerCase())}/><small>Permanent code using lowercase letters, numbers and hyphens.</small></label>}
     <label className="field">Category name<input aria-label="Category name" required maxLength={100} value={name} onChange={event => setName(event.target.value)}/></label>
     <ErrorMessage error={error}/>
   </div><div className="modal-footer"><SubmitButton busy={busy}>{item ? "Save category" : "Create category"}</SubmitButton></div></form>;
@@ -62,7 +67,6 @@ function CategoryForm({ client, item, finish }: {
 function ProductForm({ client, categories, item, finish }: {
   client: POSClient; categories: Category[]; item?: Product; finish: (error?: string) => Promise<void>;
 }) {
-  const [code, setCode] = useState(item?.id ?? "");
   const [name, setName] = useState(item?.name ?? "");
   const [categoryId, setCategoryId] = useState(item?.category_id ?? categories[0]?.id ?? "");
   const [description, setDescription] = useState(item?.description ?? "");
@@ -75,19 +79,19 @@ function ProductForm({ client, categories, item, finish }: {
     const values: ProductUpdateInput = { category_id: categoryId, name, description, color, active };
     try {
       if (item) await client.updateProduct(item.id, values);
-      else await client.createProduct({ id: code, ...values } as ProductCreateInput);
+      else await client.createProduct({ id: generatedCode(name), ...values } as ProductCreateInput);
       await finish();
     } catch (reason) { const message = errorText(reason); setError(message); await finish(message); }
     finally { setBusy(false); }
   };
   return <form onSubmit={submit}><div className="modal-body">
-    {!item && <label className="field">Item code<input aria-label="Item code" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" maxLength={60} value={code} onChange={event => setCode(event.target.value.toLowerCase())}/><small>Permanent code used by receipts and reports.</small></label>}
-    {item && <div className="catalog-code"><span>Item code</span><strong>{item.id}</strong><small>Codes stay fixed to protect sale history.</small></div>}
     <label className="field">Product name<input aria-label="Product name" required maxLength={100} value={name} onChange={event => setName(event.target.value)}/></label>
     <label className="field">Category<select aria-label="Category" required value={categoryId} onChange={event => setCategoryId(event.target.value)}>{categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
-    <label className="field">Customer description<textarea aria-label="Customer description" required maxLength={300} rows={3} value={description} onChange={event => setDescription(event.target.value)}/><small>Shown on the cashier menu to help staff explain the item.</small></label>
-    <label className="field">Display colour<input aria-label="Display colour" type="color" value={color} onChange={event => setColor(event.target.value.toUpperCase())}/></label>
-    <label className="choice"><span><strong>Available for sale</strong><small>An active product appears at the counter after it has at least one active variation. Turn this off to archive it.</small></span><input type="checkbox" aria-label="Available for sale" checked={active} onChange={event => setActive(event.target.checked)}/></label>
+    <details className="catalog-optional"><summary>Optional menu details</summary><div>
+      <label className="field">Short description<textarea aria-label="Short description" maxLength={300} rows={3} value={description} onChange={event => setDescription(event.target.value)}/><small>Helps cashiers describe the item. Leave blank if the name is enough.</small></label>
+      <label className="field">Menu colour<input aria-label="Menu colour" type="color" value={color} onChange={event => setColor(event.target.value.toUpperCase())}/></label>
+    </div></details>
+    {item && <label className="choice"><span><strong>Available for sale</strong><small>Turn this off to archive the product while keeping its sales history.</small></span><input type="checkbox" aria-label="Available for sale" checked={active} onChange={event => setActive(event.target.checked)}/></label>}
     <ErrorMessage error={error}/>
   </div><div className="modal-footer"><SubmitButton busy={busy}>{item ? "Save product" : "Create product"}</SubmitButton></div></form>;
 }
@@ -95,7 +99,6 @@ function ProductForm({ client, categories, item, finish }: {
 function GroupForm({ client, item, finish }: {
   client: POSClient; item?: ModifierGroup; finish: (error?: string) => Promise<void>;
 }) {
-  const [code, setCode] = useState(item?.id ?? "");
   const [name, setName] = useState(item?.name ?? "");
   const [minimum, setMinimum] = useState(String(item?.minimum ?? 0));
   const [maximum, setMaximum] = useState(String(item?.maximum ?? 1));
@@ -108,13 +111,12 @@ function GroupForm({ client, item, finish }: {
     setBusy(true); setError("");
     try {
       if (item) await client.updateModifierGroup(item.id, limits);
-      else await client.createModifierGroup({ id: code, ...limits });
+      else await client.createModifierGroup({ id: generatedCode(name), ...limits });
       await finish();
     } catch (reason) { const message = errorText(reason); setError(message); await finish(message); }
     finally { setBusy(false); }
   };
   return <form onSubmit={submit}><div className="modal-body">
-    {!item && <label className="field">Item code<input aria-label="Item code" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={code} onChange={event => setCode(event.target.value.toLowerCase())}/></label>}
     <label className="field">Group name<input aria-label="Group name" required value={name} onChange={event => setName(event.target.value)}/></label>
     <div className="catalog-field-grid"><label className="field">Minimum choices<input aria-label="Minimum choices" type="number" min="0" max="20" required value={minimum} onChange={event => setMinimum(event.target.value)}/></label><label className="field">Maximum choices<input aria-label="Maximum choices" type="number" min="0" max="20" required value={maximum} onChange={event => setMaximum(event.target.value)}/></label></div>
     <ErrorMessage error={error}/>
@@ -128,11 +130,12 @@ function ItemForm({ client, kind, parentId, item, inventory, finish }: {
   inventory: InventoryItem[]; finish: (error?: string) => Promise<void>;
 }) {
   const prefix = useId();
-  const [code, setCode] = useState(item?.id ?? "");
   const [name, setName] = useState(item?.name ?? "");
   const [price, setPrice] = useState(item ? (item.price_ngwee / 100).toFixed(2) : "0.00");
   const [active, setActive] = useState(item?.active ?? true);
-  const [rows, setRows] = useState<DraftRecipe[]>(() => (item?.recipe ?? []).map((row, index) => ({ key: `${prefix}-${index}`, ...row })));
+  const [rows, setRows] = useState<DraftRecipe[]>(() => item
+    ? item.recipe.map((row, index) => ({ key: `${prefix}-${index}`, ...row }))
+    : [{ key: `${prefix}-0`, item_id: "", quantity: "" }]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const addRow = () => setRows(current => [...current, { key: `${prefix}-${Date.now()}-${current.length}`, item_id: "", quantity: "" }]);
@@ -140,6 +143,7 @@ function ItemForm({ client, kind, parentId, item, inventory, finish }: {
   const removeRow = (key: string) => setRows(current => current.filter(row => row.key !== key));
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setError("");
+    if (active && !rows.length) { setError("Add at least one stock ingredient before making this item available for sale."); return; }
     const selected = rows.map(row => row.item_id).filter(Boolean);
     if (new Set(selected).size !== selected.length) { setError("Each ingredient can only appear once in a recipe."); return; }
     const recipe: RecipeComponent[] = [];
@@ -161,7 +165,7 @@ function ItemForm({ client, kind, parentId, item, inventory, finish }: {
         if (kind === "variant") await client.updateVariant(item.id, values);
         else await client.updateModifier(item.id, values);
       } else {
-        const create: CatalogItemCreate = { id: code, ...values };
+        const create: CatalogItemCreate = { id: generatedCode(name, parentId), ...values };
         if (kind === "variant") await client.createVariant(parentId, create);
         else await client.createModifier(parentId, create);
       }
@@ -171,12 +175,10 @@ function ItemForm({ client, kind, parentId, item, inventory, finish }: {
   };
   const label = kind === "variant" ? "variation" : "extra";
   return <form onSubmit={submit}><div className="modal-body">
-    {!item && <label className="field">Item code<input aria-label="Item code" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={code} onChange={event => setCode(event.target.value.toLowerCase())}/><small>Permanent code printed on receipts.</small></label>}
-    {item && <div className="catalog-code"><span>Item code</span><strong>{item.id}</strong></div>}
     <label className="field">Name<input aria-label="Name" required maxLength={100} value={name} onChange={event => setName(event.target.value)}/></label>
     <label className="field">Selling price ({currencySymbol()})<input aria-label={`Selling price (${currencySymbol()})`} inputMode="decimal" required value={price} onChange={event => setPrice(event.target.value)}/></label>
-    <label className="choice"><span><strong>Available for sale</strong><small>Archived items remain on earlier receipts and reports.</small></span><input aria-label="Available for sale" type="checkbox" checked={active} onChange={event => setActive(event.target.checked)}/></label>
-    <div className="recipe-heading"><div><h3>Stock recipe</h3><p>Stock deducted each time one {label} is sold.</p></div><button className="button" type="button" onClick={addRow}><Plus size={16}/> Add ingredient</button></div>
+    {item && <label className="choice"><span><strong>Available for sale</strong><small>Archived items remain on earlier receipts and reports.</small></span><input aria-label="Available for sale" type="checkbox" checked={active} onChange={event => setActive(event.target.checked)}/></label>}
+    <div className="recipe-heading"><div><h3>Stock used per sale</h3><p>Every available {label} needs a recipe so each sale reduces stock correctly.</p></div><button className="button" type="button" onClick={addRow}><Plus size={16}/> Add stock item</button></div>
     {rows.map((row, index) => {
       const stock = inventory.find(entry => entry.id === row.item_id);
       return <div className="recipe-row" key={row.key}>
@@ -185,7 +187,7 @@ function ItemForm({ client, kind, parentId, item, inventory, finish }: {
         <button className="button danger" type="button" aria-label={`Remove recipe row ${index + 1}`} onClick={() => removeRow(row.key)}>Remove</button>
       </div>;
     })}
-    {!rows.length && <div className="notice">No stock will be deducted for this item. Save only if that is intentional.</div>}
+    {!rows.length && <div className="notice">Archive this item or add the stock it uses before saving.</div>}
     <ErrorMessage error={error}/>
   </div><div className="modal-footer"><SubmitButton busy={busy}>{item ? `Save ${label}` : `Create ${label}`}</SubmitButton></div></form>;
 }
