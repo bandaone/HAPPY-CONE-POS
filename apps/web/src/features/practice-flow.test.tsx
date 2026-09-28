@@ -60,7 +60,7 @@ describe("live checkout recovery", () => {
         const command = JSON.parse(String(init.body)) as CheckoutCommand;
         checkoutCalls.push(command);
         if (unknownResult) { unknownResult = false; throw new DOMException("Timed out", "AbortError"); }
-        const order: Order = { id: "accepted-order", number: "A001", business_day_id: day.id, status: "NEW", created_at: new Date().toISOString(), cashier_name: "Chipo Phiri", lines: [{ variant_id: "vanilla-double", name: "Vanilla bean · Double", quantity: 1, unit_price_ngwee: 4200, total_ngwee: 4200, modifier_names: ["Cone", "Oreo"], notes: "" }], total_ngwee: 4200, payment: { method: "CASH", status: "CONFIRMED", amount_ngwee: 4200, tendered_ngwee: 5000, change_ngwee: 800, provider: null, reference: null }, refunded: false, refund_reason: null, offline: false };
+        const order: Order = { id: "accepted-order", number: "A001", business_day_id: day.id, status: "SERVED", created_at: new Date().toISOString(), cashier_name: "Chipo Phiri", lines: [{ variant_id: "vanilla-double", name: "Vanilla bean · Double", quantity: 1, unit_price_ngwee: 4200, total_ngwee: 4200, modifier_names: ["Cone", "Oreo"], notes: "" }], total_ngwee: 4200, payment: { method: "CASH", status: "CONFIRMED", amount_ngwee: 4200, tendered_ngwee: 5000, change_ngwee: 800, provider: null, reference: null }, refunded: false, refund_reason: null, offline: false };
         return json(order);
       }
       throw new Error(`Unexpected request: ${url}`);
@@ -77,7 +77,7 @@ describe("live checkout recovery", () => {
     await user.click(within(dialog).getByRole("button", { name: /Double/ }));
     await user.click(within(dialog).getByRole("button", { name: /Cone/ }));
     await user.click(within(dialog).getByRole("button", { name: /Oreo/ }));
-    await user.click(within(dialog).getByRole("button", { name: /Add to order/ }));
+    await user.click(within(dialog).getByRole("button", { name: /Add to sale/ }));
     await user.click(screen.getByRole("button", { name: /Take payment/ }));
     dialog = await screen.findByRole("dialog");
     await user.type(within(dialog).getByLabelText("Cash received (K)"), "50.00");
@@ -94,7 +94,11 @@ describe("live checkout recovery", () => {
     await user.click(screen.getByRole("button", { name: /Recover saved payment/ }));
     dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /Confirm payment/ }));
-    expect(await screen.findByText("Order A001")).toBeInTheDocument();
+    expect(await screen.findByRole("article", { name: "Receipt A001" })).toHaveTextContent(/Receipt No\.\s*A001/);
+    vi.stubGlobal("print", vi.fn(() => { throw new Error("Printer unavailable"); }));
+    await user.click(screen.getByRole("button", { name: "Print receipt" }));
+    expect(await screen.findByText(/Printing was unavailable/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Print receipt" })).toBeInTheDocument();
     expect(checkoutCalls).toHaveLength(2);
     expect(checkoutCalls[1]).toEqual(checkoutCalls[0]);
     vi.unstubAllGlobals();

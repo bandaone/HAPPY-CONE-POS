@@ -31,7 +31,7 @@ function stable(value: unknown): string {
 }
 
 function openDatabase(): Promise<IDBDatabase> {
-  if (typeof indexedDB === "undefined") return Promise.reject(new Error("Offline storage unavailable; order has not been saved"));
+  if (typeof indexedDB === "undefined") return Promise.reject(new Error("Offline storage unavailable; sale has not been saved"));
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
     request.onupgradeneeded = () => {

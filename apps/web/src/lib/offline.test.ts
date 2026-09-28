@@ -56,7 +56,7 @@ describe("offline checkout queue", () => {
   it("refuses a sale when durable browser storage is unavailable", async () => {
     vi.stubGlobal("indexedDB", undefined);
     try {
-      await expect(enqueueCheckout("cashier", command("no-storage"))).rejects.toThrow("Offline storage unavailable; order has not been saved");
+      await expect(enqueueCheckout("cashier", command("no-storage"))).rejects.toThrow("Offline storage unavailable; sale has not been saved");
     } finally {
       vi.unstubAllGlobals();
     }

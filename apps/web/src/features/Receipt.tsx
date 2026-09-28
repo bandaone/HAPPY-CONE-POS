@@ -17,10 +17,9 @@ function ReceiptRow({ label, value, strong = false }: { label: string; value: st
 export function Receipt({ order, profile }: { order: Order; profile?: StandProfile }) {
   const identity = profile ?? receiptDefaults;
   const units = order.lines.reduce((sum, line) => sum + line.quantity, 0);
-  const saleReference = order.id.slice(0, 8).toUpperCase();
   const taxNgwee = Math.round(order.total_ngwee * identity.tax_rate_basis_points / 10_000);
   const taxRate = rateLabel(identity.tax_rate_basis_points);
-  return <article className="receipt" aria-label={`Receipt for order ${order.number}`}>
+  return <article className="receipt" aria-label={`Receipt ${order.number}`}>
     <header className="receipt-header">
       <BrandLogo variant="receipt"/>
       <strong className="receipt-business-name">{identity.business_name}</strong>
@@ -32,14 +31,12 @@ export function Receipt({ order, profile }: { order: Order; profile?: StandProfi
     <dl className="receipt-details">
       <ReceiptRow label="Date" value={dateOf(order.created_at)}/>
       <ReceiptRow label="Time" value={timeOf(order.created_at)}/>
-      <ReceiptRow label="Order" value={`Order ${order.number}`}/>
-      <ReceiptRow label="Sale reference" value={saleReference}/>
+      <ReceiptRow label="Receipt No." value={order.number}/>
     </dl>
     {order.refunded && <section className="receipt-refund" aria-label="Refund details"><strong>Refunded</strong><span>{order.refund_reason}</span></section>}
     <section className="receipt-lines" aria-label="Items bought">
       {order.lines.map((line, index) => <div className="receipt-line-block" key={`${line.variant_id}-${index}`}>
         <div className="receipt-item-head"><strong>{line.name}</strong></div>
-        <div className="receipt-item-code">{line.variant_id.toUpperCase()}</div>
         <div className="receipt-item-price"><span>{line.quantity} × {money(line.unit_price_ngwee)}</span><span>{money(line.total_ngwee)}</span></div>
         {line.modifier_names.length > 0 && <p>{line.modifier_names.join(" · ")}</p>}
         {line.notes && <p>Note: {line.notes}</p>}
@@ -74,6 +71,6 @@ export function Receipt({ order, profile }: { order: Order; profile?: StandProfi
 export function ReceiptModal({ order, profile, onClose, onPrint }: { order: Order; profile?: StandProfile; onClose: () => void; onPrint: () => void }) {
   return <Modal title={`Receipt ${order.number}`} eyebrow={order.refunded ? "Refunded sale" : "Sale saved"} onClose={onClose}>
     <Receipt order={order} profile={profile}/>
-    <div className="modal-footer"><button className="button" type="button" onClick={onPrint}><Printer size={16}/>Print receipt</button><button className="button primary" type="button" onClick={onClose}><CheckCircle2 size={16}/>Done</button></div>
+    <div className="modal-footer"><button className="button primary" type="button" autoFocus onClick={onPrint}><Printer size={16}/>Print receipt</button><button className="button" type="button" onClick={onClose}><CheckCircle2 size={16}/>Done</button></div>
   </Modal>;
 }
