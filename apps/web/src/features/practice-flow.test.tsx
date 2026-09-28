@@ -80,6 +80,11 @@ describe("live checkout recovery", () => {
     await user.click(within(dialog).getByRole("button", { name: /Add to sale/ }));
     await user.click(screen.getByRole("button", { name: /Take payment/ }));
     dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Cash received (K)"), "1.00");
+    await user.click(within(dialog).getByRole("button", { name: /Confirm payment/ }));
+    expect(await within(dialog).findByText("Cash received must cover the sale total.")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/order total/i)).not.toBeInTheDocument();
+    await user.clear(within(dialog).getByLabelText("Cash received (K)"));
     await user.type(within(dialog).getByLabelText("Cash received (K)"), "50.00");
     await user.click(within(dialog).getByRole("button", { name: /Confirm payment/ }));
     expect(await within(dialog).findByText(/request timed out/i)).toBeInTheDocument();
