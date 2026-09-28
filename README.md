@@ -1,6 +1,6 @@
 # Happy Cone POS
 
-Happy Cone is a responsive point-of-sale and stand-operations system for a quick-service ice-cream stand in Lusaka. One recorded sale drives payment status, the customer receipt, the live preparation queue, recipe-level stock consumption, business-day accounting, reporting, and audit history.
+Happy Cone is a responsive point-of-sale and stand-operations system for a quick-service ice-cream stand in Lusaka. One recorded sale drives payment status, a single customer receipt, recipe-level stock consumption, business-day accounting, reporting, and audit history.
 
 The application uses a React/Vite PWA, a FastAPI service, and PostgreSQL 16. Nginx serves the built web app and proxies `/api`, `/api/events`, `/health`, and `/ready` to the API on the same origin.
 
@@ -16,7 +16,7 @@ cp .env.example .env
 HAPPYCONE_SEED_PASSWORD='choose-a-dev-password' ./scripts/seed-dev.sh
 ```
 
-The seed password must be at least 12 characters. The seed command creates development-only `manager`, `cashier`, `server`, and `owner` users with that password, plus the example catalog and opening stock. It does not create a business day or demo sales.
+The seed password must be at least 12 characters. The seed command creates development-only `manager`, `cashier`, and `owner` users with that password, plus the example catalog and opening stock. It does not create a business day or demo sales.
 
 Open <http://localhost:8080>. The liveness check is at <http://localhost:8080/health> and the database readiness check is at <http://localhost:8080/ready>. All published ports bind to `127.0.0.1` by default.
 
@@ -40,6 +40,12 @@ HAPPYCONE_SEED_PASSWORD='choose-a-dev-password' ./scripts/demo-seed.sh
 ```
 
 Open <http://127.0.0.1:5173>. The SQLite file, migration, and seed are separate from the PostgreSQL stack. `demo.sh` starts the API and Vite server; it does not initialize or seed data.
+
+## Counter workflow
+
+The cashier opens the business day, selects products and options, takes payment, and prints one customer receipt. An accepted checkout is complete immediately: stock recipes are deducted once, reports update, and the receipt remains available from **Sales** if printing fails. The small sequential value is displayed as **Receipt No.**; staff do not manage a separate order number, serving ticket, server notice, or digital preparation queue.
+
+Printing uses the browser print dialog and supports narrow 58 mm and 80 mm receipt layouts. Browsers cannot silently control a receipt printer without an approved hardware integration, so staff confirm the print dialog and can reprint any saved sale.
 
 ## Test and build
 
@@ -89,7 +95,7 @@ unset HAPPYCONE_BOOTSTRAP_PASSWORD
 
 After sign-in, an owner can create staff accounts, change roles and active status, reset passwords, and revoke sessions from **Settings → Staff accounts**. Owners and managers maintain the sellable menu in **Stock → Menu and stock recipes**: categories, product descriptions, variations, prices, serving choices, extras, availability, and the stock quantity consumed by each choice. Keeping menu setup beside inventory makes the link between each sellable option and its stock recipe clear. The forms generate permanent item codes automatically, keep descriptions and menu colour optional, and require every available variation or extra to have a stock recipe so completed sales reduce inventory. Every live user can change their own password from the account menu.
 
-Owners and managers can also edit the stand profile from **Settings**. The dedicated **Receipt details** editor controls the legal name, shop or branch name, location, TPIN, contact number, tax category, tax rate, and thank-you line printed on receipts. Happy Cone is configured for **Turnover Tax (TOT) at 5% of gross sales**. The remaining profile fields control display currency, timezone, payment and ticket instructions, activity introduction, and the counter guide. These values are stored in the database and used by the signed-in workspace, money and date display, offline cache, counter guide, and customer receipts. Live connection state, the signed-in identity, audit entries, and fiscal-integration status remain system controlled.
+Owners and managers can also edit the stand profile from **Settings**. The dedicated **Receipt details** editor controls the legal name, shop or branch name, location, TPIN, contact number, tax category, tax rate, and thank-you line printed on receipts. Happy Cone is configured for **Turnover Tax (TOT) at 5% of gross sales**. The remaining profile fields control display currency, timezone, payment and receipt instructions, activity introduction, and the counter guide. These values are stored in the database and used by the signed-in workspace, money and date display, offline cache, counter guide, and customer receipts. Live connection state, the signed-in identity, audit entries, and fiscal-integration status remain system controlled.
 
 Use `scripts/backup.sh` for verified PostgreSQL custom-format backups. Production scheduling must set `HAPPYCONE_BACKUP_AGE_RECIPIENT`, copy the encrypted backup and checksum off-host, and alert on failure. `scripts/restore.sh` requires an explicit confirmation value and should first be rehearsed on staging. The full procedure is in the [deployment and operations runbook](docs/implementation/deployment-runbook.md).
 

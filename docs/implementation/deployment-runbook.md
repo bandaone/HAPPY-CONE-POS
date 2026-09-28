@@ -42,9 +42,9 @@ Create the first `OWNER_ADMIN` with `python -m app.cli create-user` and the `--p
 2. Close the business day if the release could interrupt service.
 3. Run an encrypted backup and verify its checksum and off-host copy.
 4. Pull or check out the reviewed release tag and build immutable images.
-5. Run the migration command once, then replace the API and web services. Migration `0002_order_cashier_name` preserves cashier names on historical receipts, migration `0003` adds the editable stand profile, migration `0004_receipt_tax_details` adds the editable tax and contact fields, migration `0005_turnover_tax_defaults` corrects the configured tax treatment to TOT, and migration `0006_archive_untracked_catalog_items` archives any sellable variation or extra that has no stock recipe; confirm `0006` is at head.
+5. Run the migration command once, then replace the API and web services. Migration `0002_order_cashier_name` preserves cashier names on historical receipts, migration `0003` adds the editable stand profile, migration `0004_receipt_tax_details` adds the editable tax and contact fields, migration `0005_turnover_tax_defaults` corrects the configured tax treatment to TOT, migration `0006_archive_untracked_catalog_items` archives any sellable variation or extra that has no stock recipe, and migration `0007_cashier_only_guidance` updates unchanged supplied guidance while preserving owner-customized wording; confirm `0007` is at head.
 6. Run `./scripts/production-check.sh` through the TLS URL by setting `HAPPYCONE_BASE_URL`.
-7. Complete a signed-in smoke test: create or edit a test product variation and recipe as a manager, make a low-value controlled sale, and confirm the receipt, preparation queue, stock movement, report and activity log. Archive the test item afterward if it is not part of the live menu.
+7. Complete a signed-in smoke test: create or edit a test product variation and recipe as a manager, make a low-value controlled sale, and confirm one receipt, the completed sale in Sales, the stock movement, report, and activity log. Archive the test item afterward if it is not part of the live menu.
 8. Record release version, operator, start/end time, migration result, backup identifier and smoke-test result.
 
 ## Backups and restore rehearsal

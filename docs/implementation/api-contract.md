@@ -3,11 +3,11 @@
 Base `/api`; JSON. All except login require `Authorization: Bearer <token>`. Money is integer **ngwee** (K42 = 4200); quantities are decimal strings. Errors `{detail: string}`. Times UTC ISO 8601. Database initialized only by CLI migrate/seed (test create_app initializes isolated DB).
 
 ## Identity
-- `POST /auth/login` `{username,password}` -> `{token,user:{id,username,name,role,active}}`. Seed command creates `manager`, `cashier`, `server`, `owner`; explicit password argument required. The production proxy rate-limits repeated login attempts.
+- `POST /auth/login` `{username,password}` -> `{token,user:{id,username,name,role,active}}`. Seed command creates `manager`, `cashier`, and `owner`; explicit password argument required. The production proxy rate-limits repeated login attempts.
 - `GET /session` -> `{id,username,name,role,active}`.
 - `POST /auth/logout` -> `{ok:true}`.
 - `POST /auth/change-password` `{current_password,new_password}` -> `{ok:true,other_sessions_revoked}`. Keeps the current session and revokes the user's other sessions.
-- Owner only: `GET /users`, `POST /users`, `PATCH /users/{id}`, `POST /users/{id}/reset-password`, and `POST /users/{id}/revoke-sessions`. Role or active-status changes revoke the affected user's sessions. The last active owner cannot be deactivated or demoted.
+- Owner only: `GET /users`, `POST /users`, `PATCH /users/{id}`, `POST /users/{id}/reset-password`, and `POST /users/{id}/revoke-sessions`. New role assignments accept only `CASHIER`, `MANAGER`, or `OWNER_ADMIN`. Historic `SERVER` rows remain listable and can be reassigned; role or active-status changes revoke the affected user's sessions. The last active owner cannot be deactivated or demoted.
 
 ## Service status
 - `GET /health` is a process liveness check and does not access the database.
@@ -15,7 +15,7 @@ Base `/api`; JSON. All except login require `Authorization: Bearer <token>`. Mon
 - Every HTTP response includes `X-Request-ID`. A valid caller-provided identifier is preserved; otherwise the API assigns one. Structured request logs include the same identifier, response status, path and duration.
 
 ## Catalog
-- `GET /catalog` -> `{categories:[{id,name}],products:[{id,category_id,name,category,description,color,active,variants:[{id,product_id,name,price_ngwee,active,recipe:[{item_id,quantity}]}]}],modifier_groups:[{id,name,minimum,maximum}],modifiers:[{id,group_id,group,name,price_ngwee,active,recipe:[{item_id,quantity}]}]}`. Normal reads include active products only after they have at least one active sellable variation. Manager/owner `?include_inactive=true` includes unfinished and archived products, variations and modifiers; cashier/server use of that flag returns 403.
+- `GET /catalog` -> `{categories:[{id,name}],products:[{id,category_id,name,category,description,color,active,variants:[{id,product_id,name,price_ngwee,active,recipe:[{item_id,quantity}]}]}],modifier_groups:[{id,name,minimum,maximum}],modifiers:[{id,group_id,group,name,price_ngwee,active,recipe:[{item_id,quantity}]}]}`. Normal reads include active products only after they have at least one active sellable variation. Manager/owner `?include_inactive=true` includes unfinished and archived products, variations and modifiers; cashier use of that flag returns 403.
 - Manager/owner creation: `POST /catalog/categories`, `POST /catalog/products`, `POST /catalog/products/{product_id}/variants`, `POST /catalog/modifier-groups`, and `POST /catalog/modifier-groups/{group_id}/modifiers`.
 - Manager/owner editing: `PUT /catalog/categories/{id}`, `PUT /catalog/products/{id}`, `PUT /catalog/variants/{id}`, `PUT /catalog/modifier-groups/{id}`, and `PUT /catalog/modifiers/{id}`. `PATCH /catalog/products/{id}` remains available for a quick `{active:boolean}` change.
 - Create commands require a permanent lowercase item code containing letters, numbers and hyphens. Codes cannot be renamed. Duplicate codes return 409. Blank/oversized fields, invalid colours, invalid group limits, unknown parents, negative prices, duplicate recipe ingredients, unknown stock items, and non-positive or over-precision recipe quantities return 422 without committing partial changes.
@@ -34,14 +34,14 @@ Base `/api`; JSON. All except login require `Authorization: Bearer <token>`. Mon
 
 ## Orders and checkout
 - `POST /orders/quote` cashier/manager/owner `{lines:[{variant_id,quantity:1,modifier_ids:["cone","oreo"],notes:""}]}` -> `{lines:[{variant_id,name,quantity,unit_price_ngwee,total_ngwee,modifier_names,notes}],total_ngwee}`. Variant and modifier IDs are strings from catalog; server always prices.
-- `POST /orders` cashier/manager/owner `{idempotency_key:"UUID",business_day_id:"...",lines:[...],payment:{method:"CASH",tendered_ngwee:5000,provider:null,reference:null},offline:false}` -> Order, HTTP 201 (also replay). `business_day_id` REQUIRED binds offline sale to its originating day. `offline:true` permits CASH only. Manual methods `MOBILE_MONEY_MANUAL` and `CARD_MANUAL` require provider and reference; tendered omitted. Key replay with changed payload returns 409. No client supplied prices.
-- `GET /orders?active=true` -> Order[] oldest first for active queue; omit active for recent sales (newest first, up to 200).
+- `POST /orders` cashier/manager/owner `{idempotency_key:"UUID",business_day_id:"...",lines:[...],payment:{method:"CASH",tendered_ngwee:5000,provider:null,reference:null},offline:false}` -> completed Order with `status:"SERVED"`, HTTP 201 (also replay). `business_day_id` REQUIRED binds offline sale to its originating day. `offline:true` permits CASH only. Manual methods `MOBILE_MONEY_MANUAL` and `CARD_MANUAL` require provider and reference; tendered omitted. Key replay with changed payload returns 409. No client supplied prices.
+- `GET /orders?active=true` -> historic non-completed Order[] oldest first; new cashier-only sales do not enter this list. Omit active for recent sales (newest first, up to 200).
 - `GET /orders/{id}` -> Order.
-- `POST /orders/{id}/status` server/manager/owner `{status:"PREPARING",expected_status:"NEW"}` -> Order. Only `NEW -> PREPARING -> READY -> SERVED`. Stale state returns 409.
+- `POST /orders/{id}/status` is retained for manager/owner handling of historic records. It accepts guarded `NEW -> PREPARING -> READY -> SERVED` transitions; stale state returns 409. New checkouts already use `SERVED`.
 - `POST /orders/{id}/refund` manager/owner `{reason:"Customer refund"}` -> Order. Full refund only during original OPEN business day, preserves original order/payment and creates financial reversal; stock is NOT automatically returned. Repeated refund rejected.
-- `GET /orders/{id}/ticket` -> `{order_id,number,created_at,lines,total_ngwee,payment_status,payment_method,tendered_ngwee,change_ngwee,fiscal_status:"NOT_CONFIGURED"}`.
+- `GET /orders/{id}/ticket` is a compatibility payload for existing integrations: `{order_id,number,created_at,lines,total_ngwee,payment_status,payment_method,tendered_ngwee,change_ngwee,fiscal_status:"NOT_CONFIGURED"}`. The web application prints one customer receipt from the saved sale.
 - Order `{id,number,business_day_id,status,created_at,cashier_name,lines,total_ngwee,payment:{method,status,amount_ngwee,tendered_ngwee,change_ngwee,provider,reference},refunded:boolean,refund_reason:null|string,offline:boolean}`. `cashier_name` is captured at checkout and does not change when the staff account is renamed. Lines same shape as quote. Payment status `CONFIRMED` or `REFUNDED`.
-- `GET /events` SSE with bearer auth: events `orders` containing `{revision:string}` on DB state changes; clients reload GET /orders?active=true. Reconnect must reload. Designed for multi-worker correctness by DB state polling; UI can use authenticated fetch stream or periodic queue polling fallback.
+- `GET /events` SSE remains available for compatibility and emits `orders` events containing `{revision:string}` on database state changes. The cashier-only web application does not expose a preparation queue.
 
 ## Inventory
 Manager/owner routes:

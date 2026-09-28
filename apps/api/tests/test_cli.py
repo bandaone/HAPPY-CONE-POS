@@ -8,6 +8,23 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import IntegrityError
 
 
+OLD_GUIDANCE = {
+    'ticket_guidance': 'Tickets use the browser print dialog. A printer problem never removes a completed sale; staff can reprint from Sales.',
+    'guide_workflow': 'Open a business day with the counted float. Choose an item, its size, serving and toppings. Take payment, then give the customer their numbered ticket. The preparation team moves the order through New, Preparing, Ready and Served.',
+    'guide_controls': 'Press / to search the menu. Use Tab and Shift + Tab to move between controls, Enter or Space to select, and Escape to close a dialog. On a phone, use the floating order button to jump to checkout.',
+    'guide_offline': 'After signing in, the cached menu stays available. Cash orders can be saved on this device. Keep the device and browser data until every order has synced; the queue shows any rejection that needs attention. Network payments need a connection.',
+    'guide_printing': 'Use the browser print dialog with a 58 or 80 mm receipt printer, or a normal printer. Sales stay saved if printing fails. Use your browser’s zoom and system text settings. Order states have text labels as well as colour.',
+}
+
+NEW_GUIDANCE = {
+    'ticket_guidance': 'Receipts use the browser print dialog. A printer problem never removes a completed sale; staff can reprint from Sales.',
+    'guide_workflow': 'Open a business day with the counted float. Choose each item, size, serving and extras, then take payment. Print or close the customer receipt and begin the next sale. Stock and reports update when the sale is accepted.',
+    'guide_controls': 'Press / to search the menu. Use Tab and Shift + Tab to move between controls, Enter or Space to select, and Escape to close a dialog. On a phone, use the floating sale button to jump to checkout.',
+    'guide_offline': 'After signing in, the cached menu stays available. Cash sales can be saved on this device. Keep the device and browser data until every sale has synced; rejected sales stay in the sync list for manager review. Mobile money and card payments need a connection.',
+    'guide_printing': 'Use the browser print dialog with a 58 or 80 mm receipt printer, or a normal printer. Sales stay saved if printing fails, and receipts can be reprinted from Sales. Use your browser’s zoom and system text settings.',
+}
+
+
 def test_migrate_is_repeatable_and_seed_explicit(tmp_path):
     env = {**os.environ, 'DATABASE_URL':f'sqlite:///{tmp_path}/cli.db', 'SEED_PASSWORD':'safe-test-password'}
     cwd = Path(__file__).resolve().parents[1]
@@ -24,7 +41,7 @@ def test_migrate_is_repeatable_and_seed_explicit(tmp_path):
     assert cli('seed','--password-env','SEED_PASSWORD').returncode == 0
     assert cli('seed','--password-env','SEED_PASSWORD').returncode == 0
     with engine.connect() as db:
-        assert db.scalar(text('SELECT COUNT(*) FROM users')) == 4
+        assert db.scalar(text('SELECT COUNT(*) FROM users')) == 3
         assert db.scalar(text('SELECT COUNT(*) FROM stock_movements')) == 9
         assert db.scalar(text('SELECT COUNT(*) FROM business_days')) == 0
         assert 'alembic_version' in inspect(db).get_table_names()
@@ -127,7 +144,7 @@ def test_cashier_name_migration_backfills_populated_database_and_retries(tmp_pat
     assert upgraded.returncode == 0, upgraded.stderr
     with engine.connect() as db:
         assert db.scalar(text("SELECT cashier_name FROM orders WHERE id = 'order-id'")) == 'Original Cashier'
-        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0006'
+        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0007'
         assert db.scalar(text('SELECT stand_name FROM stand_settings WHERE id = 1')) == 'Lusaka stand'
         assert db.scalar(text('SELECT tax_id FROM stand_settings WHERE id = 1')) == '1002681530'
         assert db.scalar(text('SELECT tax_label FROM stand_settings WHERE id = 1')) == 'TURNOVER TAX (TOT)'
@@ -139,4 +156,38 @@ def test_cashier_name_migration_backfills_populated_database_and_retries(tmp_pat
     assert any('total_ngwee>=0' in check.replace(' ', '') for check in checks)
     with pytest.raises(IntegrityError), engine.begin() as db:
         db.execute(text("UPDATE orders SET cashier_name = NULL WHERE id = 'order-id'"))
+    engine.dispose()
+
+
+@pytest.mark.parametrize('customized', [False, True])
+def test_cashier_only_guidance_migration_updates_only_supplied_defaults(tmp_path, customized):
+    env = {**os.environ, 'DATABASE_URL': f'sqlite:///{tmp_path}/guidance.db'}
+    cwd = Path(__file__).resolve().parents[1]
+
+    def alembic(*arguments):
+        return subprocess.run(
+            [sys.executable, '-m', 'alembic', *arguments], env=env, cwd=cwd,
+            capture_output=True, text=True, timeout=20,
+        )
+
+    initial = alembic('upgrade', '0006')
+    assert initial.returncode == 0, initial.stderr
+    engine = create_engine(env['DATABASE_URL'])
+    expected = NEW_GUIDANCE
+    if customized:
+        expected = {name: f'Owner wording for {name}' for name in OLD_GUIDANCE}
+        with engine.begin() as db:
+            db.execute(text(
+                'UPDATE stand_settings SET ' + ', '.join(f'{name} = :{name}' for name in expected)
+                + ' WHERE id = 1'
+            ), expected)
+
+    upgraded = alembic('upgrade', 'head')
+    assert upgraded.returncode == 0, upgraded.stderr
+    with engine.connect() as db:
+        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0007'
+        row = db.execute(text(
+            'SELECT ' + ', '.join(OLD_GUIDANCE) + ' FROM stand_settings WHERE id = 1'
+        )).mappings().one()
+        assert dict(row) == expected
     engine.dispose()

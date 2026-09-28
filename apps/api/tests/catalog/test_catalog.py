@@ -32,7 +32,7 @@ def test_manager_can_list_and_restore_unavailable_products(client, login):
     assert any(p['id'] == 'vanilla' for p in client.get('/api/catalog', headers=manager).json()['products'])
 
 
-def test_manager_builds_complete_sellable_item_and_owner_can_edit_it(client, login):
+def test_manager_builds_complete_sellable_item_and_owner_can_edit_it(client, login, legacy_server):
     manager = login('manager')
     assert client.post('/api/catalog/categories', headers=login('cashier'), json={
         'id': 'frozen-treats', 'name': 'Frozen treats',

@@ -32,6 +32,12 @@ def test_authenticated_staff_can_read_stand_settings(client, login):
     assert response.json()['tax_id'] == '1002681530'
     assert response.json()['tax_label'] == 'TURNOVER TAX (TOT)'
     assert response.json()['tax_rate_basis_points'] == 500
+    assert response.json()['ticket_guidance'] == 'Receipts use the browser print dialog. A printer problem never removes a completed sale; staff can reprint from Sales.'
+    assert response.json()['guide_workflow'] == 'Open a business day with the counted float. Choose each item, size, serving and extras, then take payment. Print or close the customer receipt and begin the next sale. Stock and reports update when the sale is accepted.'
+    assert 'order' not in response.json()['guide_controls'].lower()
+    assert 'order' not in response.json()['guide_offline'].lower()
+    assert 'order' not in response.json()['guide_printing'].lower()
+    assert 'prepar' not in response.json()['guide_workflow'].lower()
 
 
 def test_manager_updates_settings_and_change_is_audited(client, login):

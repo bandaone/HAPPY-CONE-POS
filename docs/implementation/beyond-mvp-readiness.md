@@ -13,17 +13,17 @@
 - CI jobs for API tests/lint, web tests/build, Playwright/axe flows, shell validation and container builds.
 - Verified backup generation, optional age encryption, checksums, retention, guarded restore automation and production preflight checks.
 - A first-owner CLI bootstrap path, deployment/incident/payment runbook and per-release evidence template.
-- Automated owner account-administration browser coverage in addition to the cashier, server and offline workflows.
+- Automated owner account-administration browser coverage in addition to the cashier and offline workflows.
 - Built API and Nginx images verified against PostgreSQL 16 through migration, sign-in, checkout, inventory/report persistence, backup, destructive restore and post-restore validation.
 
 ## What is already real
 
-- Four server-enforced roles with database-backed sessions.
+- Three supported server-enforced roles with database-backed sessions, plus controlled reassignment of historic Server records.
 - Server-priced sales, integer-ngwee accounting, idempotent checkout, immutable sales history and audited refunds.
 - Recipe-level inventory consumption and an append-only stock ledger.
 - Explicit business-day opening, cash control, close and variance records.
-- Customer tickets, preparation queue, daily reporting and audit history.
-- Offline cash-order capture with idempotent synchronization.
+- One customer receipt per completed sale, daily reporting and audit history.
+- Offline cash-sale capture with idempotent synchronization.
 - Responsive branded PWA with automated accessibility, component, API and end-to-end coverage.
 - PostgreSQL, Alembic, Docker, Nginx and deployment-script foundations.
 
@@ -35,15 +35,15 @@ Document the exact rules staff will follow for drawer ownership, shifts, discoun
 
 ### 2. Validate the service flow at the stand
 
-Run observed trials with the actual counter and preparation staff during realistic busy periods. Measure order-entry time, error recovery, ticket legibility, queue visibility, device reach, sunlight/glare, glove or wet-hand use, and the handoff from cashier to server. Use the findings to adjust control size, information density, wording and device placement.
+Run observed trials with the actual cashier during realistic busy periods. Measure sale-entry time, error recovery, receipt legibility, device reach, sunlight/glare, and glove or wet-hand use. Use the findings to adjust control size, information density, wording and device placement.
 
 ### 3. Choose the production hardware and network
 
-Select the counter device, preparation display, receipt width, printer connection, cash drawer behavior, router, backup connectivity and power/UPS strategy. The current browser-print design cannot be finalized until the exact 58 mm or 80 mm printer is tested.
+Select the counter device, receipt width, printer connection, cash drawer behavior, router, backup connectivity and power/UPS strategy. The current browser-print design cannot be finalized until the exact 58 mm or 80 mm printer is tested.
 
 ### 4. Decide the integration path
 
-Choose whether mobile-money/card payments remain operator-confirmed or become direct provider integrations. Confirm the ZRA Smart Invoice path, taxpayer/device registration and certification/UAT process with ZRA. Select whether customer and kitchen tickets use browser print, a local ESC/POS bridge or a network printer.
+Choose whether mobile-money/card payments remain operator-confirmed or become direct provider integrations. Confirm the ZRA Smart Invoice path, taxpayer/device registration and certification/UAT process with ZRA. Select whether customer receipts use browser print, a local ESC/POS bridge or a network printer.
 
 ### 5. Extend the design system
 
@@ -59,10 +59,10 @@ Turn the current visual language into documented tokens and reusable patterns fo
 4. **Implement backup and recovery.** Backup validation and a full destructive restore rehearsal passed on the isolated PostgreSQL stack. Production must schedule age-encrypted backups, copy them off-host, alert on failures and record a timed staging restore. The Docker volume is persistence, not a backup.
 5. **Add operational visibility.** Readiness checks, structured request logs, correlation identifiers and an incident runbook are implemented. The deployment must connect central logs/error reporting and uptime, disk, database, certificate and backup alerts.
 6. **Build production account administration.** Implemented and covered by API, component and browser tests. The first owner can be bootstrapped through the CLI; subsequent staff administration is available in Settings.
-7. **Complete fiscal readiness.** Replace the no-op fiscal adapter with the selected ZRA workflow, persist request/response status and identifiers, retry safely, expose rejected/pending states, render required invoice data, and complete sandbox/UAT before making compliance claims. Current tickets explicitly state that a fiscal invoice is not configured.
+7. **Complete fiscal readiness.** Replace the no-op fiscal adapter with the selected ZRA workflow, persist request/response status and identifiers, retry safely, expose rejected/pending states, render required invoice data, and complete sandbox/UAT before making compliance claims. Current receipts explicitly state that a fiscal invoice is not configured.
 8. **Complete the chosen payment workflow.** The manual-confirmation procedure and reconciliation responsibilities are documented. The business must approve that process or select a provider; direct integrations still require adapters, callbacks/webhooks, reconciliation and provider refunds.
-9. **Prove ticket printing.** Test the real printer, grayscale output and both receipt widths; add a monitored print queue and reprint history if browser print is insufficient. Implement a local/network ESC/POS adapter only after the hardware choice.
-10. **Complete the release accessibility review.** Record manual keyboard, screen-reader, zoom, contrast, offline, validation and printed-ticket results for the actual production devices and remediate every release-blocking defect.
+9. **Prove receipt printing.** Test the real printer, grayscale output and both receipt widths; add a monitored print queue and reprint history if browser print is insufficient. Implement a local/network ESC/POS adapter only after the hardware choice.
+10. **Complete the release accessibility review.** Record manual keyboard, screen-reader, zoom, contrast, offline, validation and printed-receipt results for the actual production devices and remediate every release-blocking defect.
 
 ### P1 — operational maturity immediately after the first deployment
 

@@ -1,62 +1,32 @@
-# Happy Cone MVP implementation ledger
+# Happy Cone implementation status
 
-Plan: `docs/superpowers/plans/2026-09-14-icecream-pos-roadmap.md`
+Current release: cashier-only checkout, completed 2026-09-28.
 
-User authorized the complete MVP and a professional, use-case-specific interface on 2026-09-14. That authorization superseded the starter prompt's Task 1 review stop.
+## Delivered system
 
-## Delivery status
+1. Password authentication, hashed sessions, sign-out, expiry, self-service password changes, session revocation, and Cashier, Manager, and Owner administrator access.
+2. A responsive cashier counter with menu search, product customization, cart recovery, server-priced totals, integer-ngwee accounting, and idempotent payment recovery.
+3. Cash and manually confirmed mobile-money or card payments with change calculation and provider references.
+4. Every accepted checkout becomes a completed sale immediately. There is no serving ticket, server notification, order-number workflow, or digital preparation workspace.
+5. One customer receipt with legal business identity, location, TPIN, contact number, Turnover Tax (TOT) details, item quantities, payment details, cashier, and a small **Receipt No.** value.
+6. Browser printing for 58 mm and 80 mm receipts, with saved-sale recovery and reprinting from **Sales** when printing is unavailable.
+7. Cash-only offline capture with durable device storage, automatic synchronization, idempotent replay, and clear **Pending sync** status.
+8. Categories, products, descriptions, variations, prices, serving choices, extras, availability, and stock recipes managed from **Stock → Menu and stock recipes** by Managers and Owner administrators.
+9. Append-only stock movements, receiving, waste, adjustments, physical counts, low-stock visibility, and recipe-level deduction exactly once per sale.
+10. Business-day opening and closing, signed cash movements, refunds, daily sales and payment reports, cash reconciliation, and append-only audit history.
+11. Editable stand, receipt, tax, payment, activity, and counter-guide wording in **Settings**. Exact old supplied defaults migrate to cashier-only wording while owner-customized text is preserved.
+12. Production configuration checks, PostgreSQL migrations, health and readiness endpoints, Docker and Nginx deployment files, backup and restore scripts, and operating documentation.
 
-All 15 roadmap tasks are implemented in source:
+Existing database rows with the historic `SERVER` role remain visible to an Owner administrator for reassignment or deactivation. Those accounts receive an account-only explanation and cannot enter an operational workspace. New staff accounts can use only Cashier, Manager, or Owner administrator.
 
-1. Development foundation, health checks, Dockerfiles, Compose, Nginx, migration and operating scripts.
-2. Password authentication, opaque hashed sessions, logout, expiry and cashier/server/manager/owner authorization.
-3. Catalog, variants, serving choices, toppings, recipes and manager-controlled availability.
-4. Append-only inventory movements, receiving, waste, adjustments, physical counts and low-stock visibility.
-5. Serialized business-day open/close, signed cash movements and immutable close snapshots.
-6. Server-priced order quotes and atomic, idempotent checkout using integer ngwee.
-7. Cash, manually confirmed mobile-money/card records, change calculation and payment validation.
-8. Responsive cashier counter with search, customization, cart preservation and payment recovery.
-9. Customer/provisional tickets, print styles, reprint flow and non-blocking printer failure handling.
-10. Preparation queue, guarded `NEW -> PREPARING -> READY -> SERVED` transitions and SSE refresh.
-11. Append-only audit history and controlled full refunds that preserve original sales and payments.
-12. Daily sales, product, payment and cash-reconciliation reports.
-13. Installable offline shell, cached live workspace, cash-only IndexedDB queue, automatic reconnect and idempotent replay.
-14. Explicit provider, printer and fiscal adapter boundaries without unsupported compliance claims.
-15. Automated full-flow browser acceptance coverage using a disposable database.
+## Release verification — 2026-09-28
 
-## Release verification — 2026-09-15
+- API: 53 checks passed across the local test environment and the production API image. Coverage includes checkout completion and retry idempotency, one-time stock deduction, role reassignment and session revocation, catalog and recipe controls, refunds, reports, settings migration, database readiness, and production documentation settings.
+- Web: 10 Vitest files and 43 component/unit tests passed.
+- Browser: 4 Playwright/Chrome journeys passed. They cover WCAG A/AA scans, phone reflow, password visibility, live and offline checkout, one printable receipt, receipt reprint, 58 mm and 80 mm overflow, stock deduction, reports, day close, editable stand and receipt settings, catalog editing, and supported staff creation.
+- Build: TypeScript and Vite completed successfully and generated the versioned offline shell.
+- Production API image: built successfully with the PostgreSQL driver; strict production startup disables interactive API documentation as required.
 
-- API: 26 tests passed in 28.55 seconds. Coverage includes authorization, money and payment rules, rollback, idempotency, competing checkout/close operations, oversell prevention, immutable ledgers and records, refunds, reports, UTC persistence, migrations and CLI behavior. Two dependency deprecation warnings remain in FastAPI/Starlette test adapters; they do not affect runtime behavior.
-- Web: 5 test files and 19 tests passed with Vitest 4.1.11.
-- Browser: 4 Playwright/Chrome scenarios passed in 22.1 seconds. They cover automated WCAG A/AA checks, keyboard dialog focus return, 375 px reflow, live checkout through day close, printer failure, stock/report/audit effects, offline reload and one-time sync, and server-role restrictions.
-- Production web build: TypeScript and Vite completed successfully; the application JavaScript is 337.04 kB (99.13 kB gzip), CSS is 34.35 kB (10.14 kB gzip), and the versioned offline shell was generated.
-- Dependencies: the installed direct dependency tree resolved successfully. The preceding clean install reported zero known vulnerabilities.
-- Operations: every shell script passed `bash -n`; `docker compose config --quiet` passed with an explicit test password; `git diff --check` passed; repeated SQLite migration checks passed.
-- Source sync: the reviewed tree was copied to `/home/on3/DENNIS/Happy Cone POS` without generated dependencies, build output, browser artifacts or temporary databases, then verified with a zero-difference dry run.
+## Deployment boundary
 
-## Release boundaries
-
-The code-level MVP is complete. The later deployment-candidate section supersedes this original boundary: container, PostgreSQL, backup and restore smoke tests now pass. A real deployment still needs TLS, managed secrets, scheduled encrypted off-host backups, monitoring, production staff setup, organization-approved payment/ZRA decisions, and the manual assistive-technology/keyboard/zoom/printer review described in the project guide.
-
-The implementation is maintained in Git with the repository's configured author identity; no fabricated identity is used.
-
-## Deployment-candidate hardening — 2026-09-16
-
-- Added production staff account administration, self-service password changes, session revocation and audited account changes.
-- Added strict production configuration, trusted hosts, disabled production API docs, database readiness, structured request logs and correlation IDs.
-- Added Nginx login throttling, production Compose/environment templates, CI, verified backup/restore scripts, a deployment preflight, an operations runbook and release-evidence template.
-- Improved Settings and account wording around staff access, payment confirmation, tickets and fiscal status.
-- Verification after these changes: 35 API tests, 22 web tests and 5 Playwright/axe browser scenarios. The production web build and focused Python correctness lint pass. The remaining environment gates are listed in the beyond-MVP readiness document.
-- Built Docker images passed an isolated PostgreSQL/Nginx rehearsal: migration, four-role seed, database readiness, a server-priced K36.00 sale, report persistence, validated backup, guarded restore, and post-restore report verification. The disposable stack and volume were removed afterward.
-
-## Full catalog and operational receipts — 2026-09-17
-
-- Owners and managers can create and edit categories, customer-facing products, sellable variations, modifier groups and extras. They control descriptions, display colour, selling prices, choice limits, availability and recipe-level stock consumption from **Stock → Menu and stock recipes**, beside current balances, movements and counts.
-- Catalog forms now generate internal codes automatically, put description and menu colour under optional details, and start each new variation or extra with a stock-recipe row. The browser and API both prevent an available sellable item from being saved without a recipe, protecting stock accuracy at checkout.
-- Permanent item codes preserve receipt and reporting references. Items are archived through availability instead of deleting business history. Cashier and server roles remain read-only for catalog data, with API authorization enforcing the boundary.
-- Checkout now snapshots the cashier's name on the order. The redesigned operational receipt shows the saved legal name, shop or branch, location, TPIN and contact number, followed by the order and sale reference, date/time, item and variation codes, quantities, unit prices, modifier details, total, payment/tender/change or provider reference, cashier and unit count.
-- Owners and managers can maintain receipt identity and tax fields from **Settings → Receipt details**. Happy Cone is configured for Turnover Tax at 5% of gross sales, and the receipt shows that estimate in a compact tax section without using VAT wording. It does not invent Smart Invoice/VSDC identifiers, fiscal signatures, SDC/MRC values, or verification QR codes.
-- API and web contracts cover the complete catalog administration surface, including validation for codes, prices, choice limits, recipe ingredients and positive quantities. Catalog mutations are audited.
-- Final verification: 46 API tests and 33 web component tests passed; all 5 Playwright/Chrome journeys passed against the production build, including axe WCAG A/AA scans, 375 px reflow, editable stand and receipt details, the simplified owner catalog workflow on the Stock page, all four staff-role boundaries, checkout, stock consumption, receipt and historical reprint, preparation, reporting, day close and offline recovery. Automated print-media evidence verifies that amount columns stay inside the receipt at 58 mm and 80 mm equivalent widths. TypeScript and Vite built successfully. Migration replay on populated and partially upgraded SQLite databases, historic-order backfill and changed-file Python lint passed.
-- Cashier hardening hides products until an active variation makes them sellable, preventing an unfinished menu item from blanking the counter. The login password remains masked by default and now has an accessible Show/Hide control.
-- An isolated PostgreSQL 16 Compose volume migrated to `0002_order_cashier_name`; schema inspection confirmed `orders.cashier_name` is non-null. A real K42.00 checkout returned `A001`, cashier `Chipo Phiri`, and the expected server-owned total. The disposable container, network and volume were removed after verification.
+The repository is ready for deployment after the operator supplies production secrets, a PostgreSQL database, TLS termination, scheduled encrypted off-host backups, monitoring, real staff accounts, and the organization’s approved payment and Zambia Revenue Authority integrations. The current receipt records Turnover Tax information but does not claim Smart Invoice or fiscal certification.

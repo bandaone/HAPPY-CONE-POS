@@ -46,12 +46,12 @@ export function StandSettingsCards({ profile, user, client, onSaved, onAudit, on
         <div className="key-value"><span>Tax treatment</span><strong>{profile.tax_label} · {profile.tax_rate_basis_points / 100}%</strong></div>
         <p className="hint-inline" style={{marginTop:14}}>These details print below the logo on every completed-sale receipt.</p>
       </div></section>
-      <section className="panel"><div className="panel-head settings-panel-head"><div><h2>Payments and tickets</h2><ShieldCheck size={19}/></div>{editButton('payments', 'Edit payment wording')}</div><div className="panel-body prose"><h3>Cash, mobile money and card</h3><p>{profile.payment_guidance}</p><h3>Customer tickets</h3><p>{profile.ticket_guidance}</p><h3>Fiscal status</h3><p>Fiscal integration is not configured. Printed customer tickets are operational receipts and are not certified fiscal invoices.</p><small className="managed-note">System status is protected so receipts cannot claim fiscal certification.</small></div></section>
+      <section className="panel"><div className="panel-head settings-panel-head"><div><h2>Payments and receipts</h2><ShieldCheck size={19}/></div>{editButton('payments', 'Edit payment and receipt wording')}</div><div className="panel-body prose"><h3>Cash, mobile money and card</h3><p>{profile.payment_guidance}</p><h3>Customer receipts</h3><p>{profile.ticket_guidance}</p><h3>Fiscal status</h3><p>Fiscal integration is not configured. Printed receipts are operational records and are not certified fiscal invoices.</p><small className="managed-note">System status is protected so receipts cannot claim fiscal certification.</small></div></section>
       <section className="panel"><div className="panel-head settings-panel-head"><div><h2>Activity record</h2><BookOpen size={19}/></div>{editButton('activity', 'Edit activity wording')}</div><div className="panel-body"><p className="prose">{profile.activity_guidance}</p><button className="button" style={{marginTop:18}} onClick={onAudit}>View activity log <ArrowRight size={16}/></button></div></section>
       <section className="panel"><div className="panel-head settings-panel-head"><div><h2>Operating guide</h2><CircleHelp size={19}/></div>{editButton('guide', 'Edit guide')}</div><div className="panel-body"><p className="prose">The guide covers the daily workflow, keyboard controls, offline operation and printing.</p><button className="button" style={{marginTop:18}} onClick={onHelp}>Open counter guide <ArrowRight size={16}/></button></div></section>
     </div>
-    {editing && <Modal wide title={editing === 'stand' ? 'Edit stand details' : editing === 'receipt' ? 'Edit receipt details' : editing === 'payments' ? 'Edit payment and ticket wording' : editing === 'activity' ? 'Edit activity wording' : 'Edit counter guide'} eyebrow="Stand administration" onClose={() => !busy && setEditing(null)}>
-      <form onSubmit={save}><div className="modal-body"><p>Changes apply to this counter and its printed customer tickets.</p>
+    {editing && <Modal wide title={editing === 'stand' ? 'Edit stand details' : editing === 'receipt' ? 'Edit receipt details' : editing === 'payments' ? 'Edit payment and receipt wording' : editing === 'activity' ? 'Edit activity wording' : 'Edit counter guide'} eyebrow="Stand administration" onClose={() => !busy && setEditing(null)}>
+      <form onSubmit={save}><div className="modal-body"><p>Changes apply to this counter and its printed customer receipts.</p>
         {editing === 'stand' && <div className="settings-form-grid">
           <label className="field">Business name<input required maxLength={120} value={draft.business_name} onChange={e=>field('business_name',e.target.value)}/></label>
           <label className="field">Stand name<input required maxLength={120} value={draft.stand_name} onChange={e=>field('stand_name',e.target.value)}/></label>
@@ -73,11 +73,11 @@ export function StandSettingsCards({ profile, user, client, onSaved, onAudit, on
         </div>}
         {editing === 'payments' && <>
           <label className="field">Payment instructions<textarea required minLength={10} maxLength={1000} value={draft.payment_guidance} onChange={e=>field('payment_guidance',e.target.value)}/></label>
-          <label className="field">Customer ticket instructions<textarea required minLength={10} maxLength={1000} value={draft.ticket_guidance} onChange={e=>field('ticket_guidance',e.target.value)}/></label>
+          <label className="field">Customer receipt instructions<textarea required minLength={10} maxLength={1000} value={draft.ticket_guidance} onChange={e=>field('ticket_guidance',e.target.value)}/></label>
         </>}
         {editing === 'activity' && <label className="field">Activity record introduction<textarea required minLength={10} maxLength={1000} value={draft.activity_guidance} onChange={e=>field('activity_guidance',e.target.value)}/></label>}
         {editing === 'guide' && <>
-          <label className="field">From order to served<textarea required minLength={10} maxLength={1500} value={draft.guide_workflow} onChange={e=>field('guide_workflow',e.target.value)}/></label>
+          <label className="field">From sale to receipt<textarea required minLength={10} maxLength={1500} value={draft.guide_workflow} onChange={e=>field('guide_workflow',e.target.value)}/></label>
           <label className="field">Keyboard and touch<textarea required minLength={10} maxLength={1500} value={draft.guide_controls} onChange={e=>field('guide_controls',e.target.value)}/></label>
           <label className="field">When the connection drops<textarea required minLength={10} maxLength={1500} value={draft.guide_offline} onChange={e=>field('guide_offline',e.target.value)}/></label>
           <label className="field">Printing and accessibility<textarea required minLength={10} maxLength={1500} value={draft.guide_printing} onChange={e=>field('guide_printing',e.target.value)}/></label>

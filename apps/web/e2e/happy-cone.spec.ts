@@ -21,7 +21,7 @@ async function addVanilla(page:Page) {
   await dialog.getByRole('button',{name:/^Double/}).click();
   await dialog.getByRole('button',{name:/^Waffle cone/}).click();
   await dialog.getByRole('button',{name:/^Oreo crumble/}).click();
-  await dialog.getByRole('button',{name:'Add to order'}).click();
+  await dialog.getByRole('button',{name:'Add to sale'}).click();
 }
 
 test.beforeEach(async ({ request }) => {
@@ -48,8 +48,9 @@ test('login is accessible and reflows on phone and desktop',async({page})=>{
   expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze()).violations).toEqual([]);
 });
 
-test('live cashier sale reaches preparation, stock, reporting and day close',async({page})=>{
+test('live cashier sale prints once, updates stock and reaches day close',async({page})=>{
   const token=await signIn(page); const headers={Authorization:`Bearer ${token}`};
+  await expect(page.getByRole('button',{name:'Prepare',exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Open business day',exact:true}).click();
   await page.getByLabel('Opening cash float (K)').fill('500');
   await page.getByRole('dialog').getByRole('button',{name:'Open business day',exact:true}).click();
@@ -65,8 +66,9 @@ test('live cashier sale reaches preparation, stock, reporting and day close',asy
   await expect(receipt.getByText('CREAMY HEAVEN LIMITED',{exact:true})).toBeVisible();
   await expect(receipt.getByText('TPIN: 1002681530',{exact:true})).toBeVisible();
   await expect(receipt.getByText('Tel: 0771450074',{exact:true})).toBeVisible();
-  await expect(receipt.getByText('Order A001',{exact:true})).toBeVisible();
-  await expect(receipt.getByText('VANILLA-DOUBLE',{exact:true})).toBeVisible();
+  await expect(receipt.getByText('Receipt No.',{exact:true})).toBeVisible();
+  await expect(receipt.getByText('A001',{exact:true})).toBeVisible();
+  await expect(receipt.getByText(/Order A001|Sale reference|VANILLA-DOUBLE|server|serving ticket/i)).toHaveCount(0);
   await expect(receipt.getByText('Mwansa Banda',{exact:true})).toBeVisible();
   await expect(receipt.getByRole('heading',{name:'Tax details'})).toBeVisible();
   await expect(receipt.getByText('TURNOVER TAX (TOT)',{exact:true})).toBeVisible();
@@ -76,6 +78,7 @@ test('live cashier sale reaches preparation, stock, reporting and day close',asy
   await page.evaluate(()=>{window.print=()=>{throw new Error('Printer unavailable');};});
   await page.getByRole('button',{name:'Print receipt',exact:true}).click();
   await expect(page.getByText('Printing was unavailable. Your sale is saved; reprint it from Sales.')).toBeVisible();
+  await expect(page.locator('.receipt-print .receipt')).toHaveCount(1);
   for (const paper of [{name:'58mm',width:219},{name:'80mm',width:302}]) {
     await page.setViewportSize({width:paper.width,height:900});
     await page.emulateMedia({media:'print'});
@@ -91,7 +94,9 @@ test('live cashier sale reaches preparation, stock, reporting and day close',asy
   await page.emulateMedia({media:'screen'});
   await page.setViewportSize({width:1280,height:720});
   const orders=await (await page.request.get('/api/orders',{headers})).json();
-  expect(orders).toHaveLength(1);expect(orders[0].total_ngwee).toBe(4200);
+  expect(orders).toHaveLength(1);expect(orders[0].total_ngwee).toBe(4200);expect(orders[0].status).toBe('SERVED');
+  const activeOrders=await (await page.request.get('/api/orders?active=true',{headers})).json();
+  expect(activeOrders).toEqual([]);
   const movements=await (await page.request.get('/api/inventory/movements',{headers})).json();
   const consumed=movements.filter((m:{type:string})=>m.type==='SALE_CONSUMPTION');
   expect(consumed.length).toBeGreaterThanOrEqual(3);
@@ -100,17 +105,14 @@ test('live cashier sale reaches preparation, stock, reporting and day close',asy
   await page.getByRole('button',{name:'Done'}).click();
   await page.getByRole('button',{name:'Sales',exact:true}).click();
   const saleRow=page.getByRole('row',{name:/A001/});
+  await expect(saleRow.getByText('Completed',{exact:true})).toBeVisible();
   await saleRow.getByRole('button',{name:'Receipt',exact:true}).click();
   const historicReceipt=page.getByRole('dialog',{name:'Receipt A001'});
-  await expect(historicReceipt.getByText('VANILLA-DOUBLE',{exact:true})).toBeVisible();
+  await expect(historicReceipt.getByText(/VANILLA-DOUBLE|Order A001|Sale reference/i)).toHaveCount(0);
+  await expect(historicReceipt.getByText('Receipt No.',{exact:true})).toBeVisible();
   await expect(historicReceipt.getByText('Mwansa Banda',{exact:true})).toBeVisible();
   await expect(historicReceipt.locator('.receipt-totals').getByText('K42.00',{exact:true})).toBeVisible();
   await historicReceipt.getByRole('button',{name:'Done'}).click();
-  await page.getByRole('button',{name:'Prepare',exact:true}).click();
-  await page.getByRole('button',{name:'Start preparing'}).click();
-  await page.getByRole('button',{name:'Mark ready'}).click();
-  await page.getByRole('button',{name:'Mark served'}).click();
-  await expect(page.getByText('No ready orders',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Reports',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Daily report'})).toBeVisible();
   const summary=await (await page.request.get('/api/reports/daily',{headers})).json();
@@ -125,7 +127,7 @@ test('live cashier sale reaches preparation, stock, reporting and day close',asy
   expect(audit.map((event:{action:string})=>event.action)).toEqual(expect.arrayContaining(['DAY_OPENED','ORDER_CREATED','DAY_CLOSED']));
 });
 
-test('a live offline cash order survives reload then syncs once',async({page,context})=>{
+test('a live offline cash sale survives reload then syncs once',async({page,context})=>{
   const token=await signIn(page); const headers={Authorization:`Bearer ${token}`};
   await page.getByRole('button',{name:'Open business day',exact:true}).click();
   await page.getByLabel('Opening cash float (K)').fill('500');
@@ -157,29 +159,23 @@ test('a live offline cash order survives reload then syncs once',async({page,con
   await page.getByRole('button',{name:'Take payment',exact:true}).click();
   await expect(page.getByRole('button',{name:'Mobile money',exact:true})).toBeDisabled();
   await page.getByLabel('Cash received (K)').fill('50');
-  await page.getByRole('button',{name:'Save cash order on device'}).click();
-  await expect(page.getByRole('dialog').getByText('Pending server acceptance',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Save cash sale on device'}).click();
+  await expect(page.getByRole('dialog').getByText('Pending sync',{exact:true})).toBeVisible();
   await page.reload();await expect(page.getByRole('button',{name:'1 to sync'})).toBeVisible();
   await context.setOffline(false);
   await expect(page.getByRole('button',{name:'1 to sync'})).toHaveCount(0);
   const orders=await (await page.request.get('/api/orders',{headers})).json();
   expect(orders.filter((o:{offline:boolean})=>o.offline)).toHaveLength(1);
+  expect(orders.find((o:{offline:boolean})=>o.offline).status).toBe('SERVED');
+  expect(await (await page.request.get('/api/orders?active=true',{headers})).json()).toEqual([]);
   await page.reload();
   const again=await (await page.request.get('/api/orders',{headers})).json();
   expect(again.filter((o:{offline:boolean})=>o.offline)).toHaveLength(1);
 });
 
-test('server role exposes preparation and rejects financial actions',async({page})=>{
-  const token=await signIn(page,'server');
-  await expect(page.getByRole('heading',{name:'Preparation queue'})).toBeVisible();
-  await expect(page.getByRole('button',{name:'Counter',exact:true})).toHaveCount(0);
-  await expect(page.getByRole('button',{name:'Reports',exact:true})).toHaveCount(0);
-  const response=await page.request.post('/api/business-day/open',{headers:{Authorization:`Bearer ${token}`},data:{opening_float_ngwee:50000}});
-  expect(response.status()).toBe(403);
-});
-
 test('owner manages staff access and changes their own password',async({page})=>{
   await signIn(page,'owner');
+  await expect(page.getByRole('button',{name:'Prepare',exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Settings and information'}).click();
   await expect(page.getByRole('heading',{name:'Staff accounts'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Menu and stock recipes'})).toHaveCount(0);
@@ -207,8 +203,8 @@ test('owner manages staff access and changes their own password',async({page})=>
   await expect(page.getByText('1002681530',{exact:true})).toBeVisible();
   await expect(page.getByText('TURNOVER TAX (TOT) · 5%',{exact:true})).toBeVisible();
 
-  await page.getByRole('button',{name:'Edit payment wording'}).click();
-  settingsDialog=page.getByRole('dialog',{name:'Edit payment and ticket wording'});
+  await page.getByRole('button',{name:'Edit payment and receipt wording'}).click();
+  settingsDialog=page.getByRole('dialog',{name:'Edit payment and receipt wording'});
   await settingsDialog.getByLabel('Payment instructions').fill('Confirm every external payment before the sale is completed.');
   await settingsDialog.getByRole('button',{name:'Save changes'}).click();
   await expect(page.getByText('Confirm every external payment before the sale is completed.')).toBeVisible();
@@ -221,11 +217,11 @@ test('owner manages staff access and changes their own password',async({page})=>
 
   await page.getByRole('button',{name:'Edit guide'}).click();
   settingsDialog=page.getByRole('dialog',{name:'Edit counter guide'});
-  await settingsDialog.getByLabel('From order to served').fill('Take the order, confirm payment, prepare it and call the ticket number.');
+  await settingsDialog.getByLabel('From sale to receipt').fill('Take payment, print the receipt and begin the next sale.');
   expect((await new AxeBuilder({page}).include('dialog').withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze()).violations).toEqual([]);
   await settingsDialog.getByRole('button',{name:'Save changes'}).click();
   await page.getByRole('button',{name:'Open counter guide'}).click();
-  await expect(page.getByRole('dialog',{name:'Counter guide'}).getByText('Take the order, confirm payment, prepare it and call the ticket number.')).toBeVisible();
+  await expect(page.getByRole('dialog',{name:'Counter guide'}).getByText('Take payment, print the receipt and begin the next sale.')).toBeVisible();
   await page.getByRole('dialog',{name:'Counter guide'}).getByRole('button',{name:'Close dialog'}).click();
 
   await page.getByRole('button',{name:'Stock',exact:true}).click();
@@ -272,18 +268,19 @@ test('owner manages staff access and changes their own password',async({page})=>
   await expect(page.getByRole('heading',{name:'Staff accounts'})).toBeVisible();
   await page.getByRole('button',{name:'Add staff account'}).click();
   const create=page.getByRole('dialog');
-  await create.getByLabel('Full name').fill('Evening Server');
-  await create.getByLabel('Username').fill('evening-server');
-  await create.getByLabel('Role').selectOption('SERVER');
+  await expect(create.getByLabel('Role').getByRole('option',{name:/Server/i})).toHaveCount(0);
+  await create.getByLabel('Full name').fill('Evening Cashier');
+  await create.getByLabel('Username').fill('evening-cashier');
+  await create.getByLabel('Role').selectOption('CASHIER');
   await create.getByLabel('Temporary password').fill('temporary-password-2026');
   await create.getByRole('button',{name:'Create account'}).click();
-  await expect(page.getByText('Evening Server',{exact:true})).toBeVisible();
+  await expect(page.getByText('Evening Cashier',{exact:true})).toBeVisible();
 
-  await page.getByRole('button',{name:'Edit Evening Server'}).click();
+  await page.getByRole('button',{name:'Edit Evening Cashier'}).click();
   const edit=page.getByRole('dialog');
   await edit.getByLabel('Account active').uncheck();
   await edit.getByRole('button',{name:'Save account changes'}).click();
-  await expect(page.getByRole('row',{name:/Evening Server/}).getByText('Inactive',{exact:true})).toBeVisible();
+  await expect(page.getByRole('row',{name:/Evening Cashier/}).getByText('Inactive',{exact:true})).toBeVisible();
 
   await page.getByRole('button',{name:'Account and stand'}).click();
   await page.getByRole('button',{name:'Change password'}).click();

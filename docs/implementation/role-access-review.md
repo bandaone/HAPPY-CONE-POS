@@ -1,25 +1,19 @@
 # Happy Cone role access review
 
-Verified against the local application on 15 September 2026.
+Verified against the cashier-only application on 28 September 2026.
 
-## Local accounts
+## Demonstration accounts
 
-All demonstration accounts use the password `happycone-local-2026`.
+The development seed creates Manager, Cashier, and Owner administrator accounts. The seed password is supplied by the operator and is never fixed in source.
 
 | Role | Username | Landing page | Visible navigation |
 | --- | --- | --- | --- |
-| Owner admin | `owner` | Counter | Counter, Prepare, Sales, Stock, Cash day, Reports, Settings, Help |
-| Manager | `manager` | Counter | Counter, Prepare, Sales, Stock, Cash day, Reports, Settings, Help |
+| Owner administrator | `owner` | Counter | Counter, Sales, Stock, Cash day, Reports, Settings, Help |
+| Manager | `manager` | Counter | Counter, Sales, Stock, Cash day, Reports, Settings, Help |
 | Cashier | `cashier` | Counter | Counter, Sales, Cash day, Help |
-| Server | `server` | Preparation queue | Prepare, Help |
 
-Owner and manager currently share the complete MVP workspace. Cashiers operate the counter, sales history, and cash day. Servers receive the focused preparation queue and do not receive financial or management navigation.
+Owner administrators and Managers maintain the menu, prices, stock recipes, inventory, refunds, cash close, reports, and stand settings. Cashiers operate the counter, receipt history, and business-day opening/cash view within the API’s role checks.
 
-## Captured views
+Historic database rows with the retired `SERVER` role remain visible in **Settings → Staff accounts**. An Owner administrator must reassign or deactivate them. A signed-in historic account receives only the reassignment explanation, account details, and Sign out; it has no operational navigation.
 
-- [Owner workspace](role-views/owner.png)
-- [Manager workspace](role-views/manager.png)
-- [Cashier workspace](role-views/cashier.png)
-- [Server workspace](role-views/server.png)
-
-Each login returned HTTP 200, loaded the Happy Cone logo, displayed the expected staff identity and role, and produced no browser console errors during this review.
+Automated component and browser checks confirm that supported roles have no Prepare navigation or preparation tour step, new accounts cannot be assigned Server, and a historic Server account cannot enter the counter workspace.
