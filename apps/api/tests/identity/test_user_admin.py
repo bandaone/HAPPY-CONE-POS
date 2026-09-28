@@ -3,7 +3,7 @@ from sqlalchemy import select
 from app.models.user import AuthSession, User
 
 
-def test_only_owner_can_list_and_create_staff(client, login):
+def test_only_owner_can_list_and_create_staff(client, login, legacy_server):
     assert client.get('/api/users', headers=login('cashier')).status_code == 403
     assert client.get('/api/users', headers=login('manager')).status_code == 403
 
@@ -36,20 +36,51 @@ def test_only_owner_can_list_and_create_staff(client, login):
         'role': 'CASHIER',
         'password': 'temporary-password-2026',
     }).status_code == 409
+    assert client.post('/api/users', headers=owner, json={
+        'username': 'new-server',
+        'name': 'New Server',
+        'role': 'SERVER',
+        'password': 'temporary-password-2026',
+    }).status_code == 422
 
 
-def test_owner_updates_staff_and_revokes_existing_sessions(client, login):
+def test_owner_reassigns_legacy_server_and_revokes_existing_sessions(client, login, legacy_server):
+    owner = login('owner')
+    server_session = login('server')
+    users = client.get('/api/users', headers=owner).json()
+    cashier = next(user for user in users if user['username'] == 'cashier')
+    server = next(user for user in users if user['username'] == 'server')
+
+    rejected = client.patch(f"/api/users/{cashier['id']}", headers=owner, json={
+        'role': 'SERVER',
+    })
+    assert rejected.status_code == 422
+
+    updated = client.patch(f"/api/users/{server['id']}", headers=owner, json={
+        'name': 'Tendai Zulu', 'role': 'CASHIER', 'active': True
+    })
+    assert updated.status_code == 200
+    assert updated.json()['name'] == 'Tendai Zulu'
+    assert updated.json()['role'] == 'CASHIER'
+    assert updated.json()['active'] is True
+    assert client.get('/api/session', headers=server_session).status_code == 401
+
+    audit = client.get('/api/audit', headers=owner).json()
+    assert 'USER_UPDATED' in {event['action'] for event in audit}
+
+
+def test_owner_deactivates_staff_and_revokes_existing_sessions(client, login):
     owner = login('owner')
     cashier_session = login('cashier')
     users = client.get('/api/users', headers=owner).json()
     cashier = next(user for user in users if user['username'] == 'cashier')
 
     updated = client.patch(f"/api/users/{cashier['id']}", headers=owner, json={
-        'name': 'Chipo Tembo', 'role': 'SERVER', 'active': False
+        'name': 'Chipo Tembo', 'role': 'CASHIER', 'active': False
     })
     assert updated.status_code == 200
     assert updated.json()['name'] == 'Chipo Tembo'
-    assert updated.json()['role'] == 'SERVER'
+    assert updated.json()['role'] == 'CASHIER'
     assert updated.json()['active'] is False
     assert client.get('/api/session', headers=cashier_session).status_code == 401
     assert client.post('/api/auth/login', json={
@@ -72,7 +103,7 @@ def test_owner_cannot_remove_last_active_owner_or_deactivate_self(client, login)
     ).status_code == 409
 
 
-def test_owner_resets_password_and_can_revoke_staff_sessions(client, login):
+def test_owner_resets_password_and_can_revoke_staff_sessions(client, login, legacy_server):
     owner = login('owner')
     cashier_session = login('cashier')
     cashier = next(user for user in client.get('/api/users', headers=owner).json() if user['username'] == 'cashier')

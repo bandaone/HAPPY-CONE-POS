@@ -25,7 +25,7 @@ def main():
     user_parser = subparsers.add_parser('create-user', help='Create a user without installing demo data')
     user_parser.add_argument('--username', required=True)
     user_parser.add_argument('--name', required=True)
-    user_parser.add_argument('--role', required=True, choices=('CASHIER','SERVER','MANAGER','OWNER_ADMIN'))
+    user_parser.add_argument('--role', required=True, choices=('CASHIER','MANAGER','OWNER_ADMIN'))
     password_arguments(user_parser)
     args = parser.parse_args()
     settings = Settings()

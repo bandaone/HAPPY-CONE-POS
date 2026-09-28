@@ -52,7 +52,7 @@ def checkout(db,actor,command):
     for item_id,quantity in consumption.items():
         if inventory.expected_on_hand(db,item_id)<quantity:
             raise HTTPException(409,'Insufficient stock for this order')
-    order=Order(id=new_id(),number=f'A{day.next_order_number:03d}',business_day_id=day.id,actor_id=actor.id,
+    order=Order(id=new_id(),number=f'A{day.next_order_number:03d}',business_day_id=day.id,actor_id=actor.id,status='SERVED',
                 cashier_name=actor.name,
                 total_ngwee=quote['total_ngwee'],idempotency_key=command.idempotency_key,payload_hash=digest,offline=command.offline)
     day.next_order_number+=1

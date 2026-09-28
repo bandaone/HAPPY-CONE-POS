@@ -18,7 +18,7 @@ def test_login_session_logout_and_invalid_credentials(client):
     assert client.get('/api/session', headers=headers).status_code == 401
 
 
-def test_roles_and_expired_session(client, login):
+def test_roles_and_expired_session(client, login, legacy_server):
     assert client.get('/api/audit', headers=login('cashier')).status_code == 403
     assert client.get('/api/audit', headers=login('manager')).status_code == 200
     headers = login('server')

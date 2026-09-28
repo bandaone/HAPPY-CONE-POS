@@ -1,18 +1,13 @@
 from tests.orders.test_checkout import command,open_day
+from app.models.order import Order
 
 
 def test_status_guards_and_refund_preserve_financial_history(client,login):
-    manager,cashier,server=login(),login('cashier'),login('server')
+    manager,cashier=login(),login('cashier')
     day=open_day(client,cashier)
     sale=client.post('/api/orders',headers=cashier,json=command(day)).json()
     path=f"/api/orders/{sale['id']}"
-    assert len(client.get('/api/orders?active=true',headers=server).json())==1
-    assert client.post(path+'/status',headers=cashier,json={'expected_status':'NEW','status':'PREPARING'}).status_code==403
-    assert client.post(path+'/status',headers=server,json={'expected_status':'NEW','status':'SERVED'}).status_code==409
-    for old,new in [('NEW','PREPARING'),('PREPARING','READY'),('READY','SERVED')]:
-        assert client.post(path+'/status',headers=server,json={'expected_status':old,'status':new}).json()['status']==new
-    assert client.post(path+'/status',headers=server,json={'expected_status':'READY','status':'SERVED'}).status_code==409
-    assert client.get('/api/orders?active=true',headers=server).json()==[]
+    assert client.get('/api/orders?active=true',headers=manager).json()==[]
     assert client.post(path+'/refund',headers=cashier,json={'reason':'Customer request'}).status_code==403
     refunded=client.post(path+'/refund',headers=manager,json={'reason':'Customer request'})
     assert refunded.status_code==200
@@ -30,7 +25,27 @@ def test_status_guards_and_refund_preserve_financial_history(client,login):
     assert summary['expected_cash_ngwee']==50000
     actions=[a['action'] for a in client.get('/api/audit',headers=manager).json()]
     assert 'ORDER_REFUNDED' in actions
-    assert actions.count('ORDER_STATUS_CHANGED')==3
+    assert actions.count('ORDER_STATUS_CHANGED')==0
+
+
+def test_manager_can_finish_a_legacy_new_order(client, login):
+    manager, cashier = login(), login('cashier')
+    sale = client.post('/api/orders', headers=cashier,
+                       json=command(open_day(client, cashier), key='legacy-status')).json()
+    with client.app.state.session_factory.begin() as db:
+        db.get(Order, sale['id']).status = 'NEW'
+
+    path = f"/api/orders/{sale['id']}"
+    assert len(client.get('/api/orders?active=true', headers=manager).json()) == 1
+    assert client.post(path + '/status', headers=cashier,
+                       json={'expected_status':'NEW','status':'PREPARING'}).status_code == 403
+    assert client.post(path + '/status', headers=manager,
+                       json={'expected_status':'NEW','status':'SERVED'}).status_code == 409
+    for old, new in [('NEW','PREPARING'),('PREPARING','READY'),('READY','SERVED')]:
+        response = client.post(path + '/status', headers=manager,
+                               json={'expected_status':old,'status':new})
+        assert response.json()['status'] == new
+    assert client.get('/api/orders?active=true', headers=manager).json() == []
 
 
 def test_closed_day_blocks_refund(client,login):

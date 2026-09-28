@@ -7,7 +7,7 @@ def recipe(item_id='vanilla-stock', quantity='120.000'):
     return [{'item_id': item_id, 'quantity': quantity}]
 
 
-def test_active_catalog_recipes_and_availability(client, login):
+def test_active_catalog_recipes_and_availability(client, login, legacy_server):
     headers = login()
     catalog = client.get('/api/catalog', headers=headers).json()
     assert len(catalog['products']) >= 3

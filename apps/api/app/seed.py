@@ -8,7 +8,7 @@ def seed_demo(db, password):
     if len(password) < 12:
         raise ValueError('Development seed password must contain at least 12 characters')
     for username, name, role in [('manager','Mwansa Banda','MANAGER'), ('cashier','Chipo Phiri','CASHIER'),
-                                 ('server','Tendai Zulu','SERVER'), ('owner','Dennis','OWNER_ADMIN')]:
+                                 ('owner','Dennis','OWNER_ADMIN')]:
         if not db.scalar(select(User).where(User.username == username)):
             user = User(username=username, name=name, role=role, password_hash=hash_password(password))
             db.add(user)

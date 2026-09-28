@@ -13,14 +13,14 @@ class UserCommand(BaseModel):
     model_config = ConfigDict(extra='forbid')
     username: str = Field(min_length=1,max_length=80,pattern=r'^[a-zA-Z0-9_.-]+$')
     name: str = Field(min_length=1,max_length=120)
-    role: Literal['CASHIER','SERVER','MANAGER','OWNER_ADMIN']
+    role: Literal['CASHIER','MANAGER','OWNER_ADMIN']
     password: str = Field(min_length=12,max_length=256)
 
 
 class UserUpdateCommand(BaseModel):
     model_config = ConfigDict(extra='forbid')
     name: str | None = Field(default=None,min_length=1,max_length=120)
-    role: Literal['CASHIER','SERVER','MANAGER','OWNER_ADMIN'] | None = None
+    role: Literal['CASHIER','MANAGER','OWNER_ADMIN'] | None = None
     active: bool | None = None
 
     @model_validator(mode='after')

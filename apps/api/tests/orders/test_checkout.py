@@ -25,7 +25,11 @@ def test_cash_checkout_recipe_ticket_and_idempotency(client, login):
     assert sale['payment']['change_ngwee'] == 800
     assert sale['number'] == 'A001'
     assert sale['cashier_name'] == 'Chipo Phiri'
-    assert client.post('/api/orders',headers=headers,json=data).json()['id'] == sale['id']
+    assert sale['status'] == 'SERVED'
+    retry = client.post('/api/orders',headers=headers,json=data).json()
+    assert retry['id'] == sale['id']
+    assert retry['status'] == 'SERVED'
+    assert client.get('/api/orders?active=true',headers=headers).json() == []
     with client.app.state.session_factory() as db:
         movements = db.scalars(select(StockMovement).where(StockMovement.reference==sale['id'])).all()
         assert {m.item_id:str(m.quantity) for m in movements} == {'vanilla-stock':'-160.000','cones':'-1.000','oreo-stock':'-20.000','napkins':'-1.000'}
@@ -55,7 +59,7 @@ def test_completed_order_keeps_cashier_name_after_staff_rename(client, login):
     assert historic['cashier_name'] == 'Chipo Phiri'
 
 
-def test_checkout_rejections(client,login):
+def test_checkout_rejections(client,login,legacy_server):
     headers=login('cashier')
     assert client.post('/api/orders',headers=headers,json=command('no-day')).status_code==409
     day_id=open_day(client,headers)
