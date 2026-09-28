@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, CheckCircle2, Compass, ListChecks, ShoppingBag, 
 import { Modal } from "../components/ui";
 import type { Role } from "../lib/types";
 
-type TourPage = "pos" | "preparation" | "sales" | "inventory" | "day" | "reports" | "settings";
+type TourPage = "pos" | "sales" | "inventory" | "day" | "reports" | "settings";
 
 interface TourStep {
   title: string;
@@ -32,31 +32,11 @@ function roleSteps(role: Role): TourStep[] {
     },
   ];
 
-  if (role === "SERVER") {
-    return [...shared,
-      {
-        title: "Move each order forward",
-        eyebrow: "Preparation queue",
-        copy: "Open Prepare to see paid orders. Move each ticket through Preparing, Ready and Served as the team completes it.",
-        note: "Order numbers and written status labels keep hand-offs clear.",
-        page: "preparation",
-        icon: ShoppingBag,
-      },
-      {
-        title: "You are ready to serve",
-        eyebrow: "One last check",
-        copy: "Use Help whenever you need the operating guide or want to take this tour again.",
-        note: "If the connection drops, wait for the counter to reconnect before changing an order.",
-        icon: CheckCircle2,
-      },
-    ];
-  }
-
   return [...shared,
     {
-      title: "Build and complete an order",
+      title: "Build and complete a sale",
       eyebrow: "Counter",
-      copy: "Choose a product, confirm its size and extras, then review the order before taking payment. The sale is recorded before a ticket is printed.",
+      copy: "Choose a product, confirm its size and extras, then review the sale before taking payment. The sale is recorded before its receipt is printed.",
       note: "Open the business day before the first payment. Cashiers can ask a manager when a correction is needed.",
       page: "pos",
       icon: ShoppingBag,
@@ -65,9 +45,9 @@ function roleSteps(role: Role): TourStep[] {
       title: role === "CASHIER" ? "Your counter is ready" : "Keep the whole stand in view",
       eyebrow: role === "CASHIER" ? "Start serving" : "Daily oversight",
       copy: role === "CASHIER"
-        ? "Sales keeps every completed ticket available. Cash day shows the opening float and the information needed at handover."
+        ? "Sales keeps every completed receipt available. Cash day shows the opening float and the information needed at handover."
         : "Use Stock to create menu items, set prices, define recipes and manage inventory. Reports and Cash day cover performance and reconciliation.",
-      note: "Settings holds staff access, receipt details and operating guidance. The connection indicator shows when cash orders need to wait before syncing.",
+      note: "Settings holds staff access, receipt details and operating guidance. The connection indicator shows when cash sales are waiting to sync.",
       page: role === "CASHIER" ? "sales" : "inventory",
       icon: role === "CASHIER" ? WifiOff : ListChecks,
     },

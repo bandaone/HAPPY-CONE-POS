@@ -20,21 +20,25 @@ function json(value: unknown) {
   });
 }
 
-beforeEach(() => {
-  localStorage.clear();
-  sessionStorage.clear();
-  Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
-  vi.stubGlobal("scrollTo", vi.fn());
+function stubWorkspaceUser(user: User) {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-    if (url.endsWith("/api/auth/login")) return json({ token: "cashier-token", user: cashier });
-    if (url.endsWith("/api/session")) return json(cashier);
+    if (url.endsWith("/api/auth/login")) return json({ token: `${user.username}-token`, user });
+    if (url.endsWith("/api/session")) return json(user);
     if (url.endsWith("/api/stand-settings")) return json(defaultStandProfile);
     if (url.includes("/api/catalog")) return json(catalog);
     if (url.endsWith("/api/business-day/current")) return json(null);
     if (url.endsWith("/api/auth/logout")) return new Response(null, { status: 204 });
     throw new Error(`Unexpected request: ${url}`);
   }));
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  sessionStorage.clear();
+  Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
+  vi.stubGlobal("scrollTo", vi.fn());
+  stubWorkspaceUser(cashier);
 });
 
 describe("first-time guidance", () => {
@@ -117,5 +121,41 @@ describe("first-time guidance", () => {
     expect(await screen.findByRole("heading", { name: "A little scoop of happy." })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Customize Unfinished item" })).not.toBeInTheDocument();
     expect(screen.getByText("No treats found")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["cashier", "CASHIER"],
+    ["manager", "MANAGER"],
+    ["owner", "OWNER_ADMIN"],
+  ] as const)("does not expose preparation work to a %s", async (username, role) => {
+    const member: User = { id: `${username}-id`, username, name: `${username} user`, role, active: true };
+    stubWorkspaceUser(member);
+    sessionStorage.setItem("happy-cone:session-token", JSON.stringify(`${username}-token`));
+    localStorage.setItem(`happy-cone:tour:v1:${member.id}`, "complete");
+
+    render(<App/>);
+
+    expect(await screen.findByRole("heading", { name: "A little scoop of happy." })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Prepare" })).not.toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/preparation queue|start preparing|mark ready|mark served/i);
+  });
+
+  it("keeps a legacy server account out of every operational workspace", async () => {
+    const server: User = { id: "legacy-server", username: "server", name: "Tendai Zulu", role: "SERVER", active: true };
+    stubWorkspaceUser(server);
+    sessionStorage.setItem("happy-cone:session-token", JSON.stringify("server-token"));
+    localStorage.setItem(`happy-cone:tour:v1:${server.id}`, "complete");
+
+    render(<App/>);
+
+    expect(await screen.findByRole("heading", { name: "This account needs reassignment" })).toBeInTheDocument();
+    expect(screen.getByText(/change this account to Cashier, Manager or Owner administrator/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Account details" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Main navigation" })).not.toBeInTheDocument();
+    for (const name of ["Counter", "Sales", "Stock", "Cash day", "Reports", "Settings", "Prepare"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+    expect(vi.mocked(fetch).mock.calls.some(([input]) => String(input).endsWith("/api/business-day/current"))).toBe(false);
   });
 });

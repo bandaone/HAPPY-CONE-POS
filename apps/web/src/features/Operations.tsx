@@ -3,7 +3,7 @@ import { ClipboardList, Clock3, KeyRound, ReceiptText, RefreshCw, UserPlus } fro
 import { Badge, Empty, ErrorMessage, Modal, SubmitButton, dateOf, readable, timeOf } from "../components/ui";
 import { currencySymbol, money, parseMoney } from "../lib/client";
 import type {
-  AuditEvent, Day, InventoryItem, Movement, MovementInput, Order, OrderStatus, POSClient, Role, StockCount, Summary, User,
+  AuditEvent, Day, InventoryItem, Movement, MovementInput, Order, POSClient, Role, StockCount, Summary, User,
 } from "../lib/types";
 
 type Changed = () => void | Promise<void>;
@@ -17,51 +17,6 @@ function statusTone(status: string): "neutral" | "green" | "orange" | "red" {
   return "neutral";
 }
 async function notifyChanged(callback: Changed): Promise<void> { await callback(); }
-
-export function Preparation({ client, onError, onChanged }: CoreProps) {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState<string | null>(null);
-  const [updated, setUpdated] = useState<Date | null>(null);
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) setLoading(true);
-    try { setOrders(await client.orders(true)); setUpdated(new Date()); setError(""); }
-    catch (reason) { setError(errorText(reason)); }
-    finally { if (!quiet) setLoading(false); }
-  }, [client]);
-  useEffect(() => {
-    void load();
-    const timer = window.setInterval(() => void load(true), 5_000);
-    const unwatch = client.watchOrders?.(() => void load(true));
-    return () => { window.clearInterval(timer); unwatch?.(); };
-  }, [client, load]);
-  const advance = async (order: Order, status: OrderStatus) => {
-    if (busy) return;
-    setBusy(order.id);
-    try { await client.transition(order, status); await load(true); await notifyChanged(onChanged); }
-    catch (reason) { const message = errorText(reason); setError(message); onError(message); await load(true); }
-    finally { setBusy(null); }
-  };
-  const lanes: Array<{ status: OrderStatus; title: string; next: OrderStatus; action: string }> = [
-    { status: "NEW", title: "New", next: "PREPARING", action: "Start preparing" },
-    { status: "PREPARING", title: "Preparing", next: "READY", action: "Mark ready" },
-    { status: "READY", title: "Ready", next: "SERVED", action: "Mark served" },
-  ];
-  return <>
-    <div className="page-heading"><div><h1>Preparation queue</h1><p>Order events refresh the queue promptly, with a five-second fallback. Each move checks the latest server status.</p></div><div className="heading-aside"><span className="muted"><small>{updated ? `Updated ${updated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : "Waiting for update"}</small></span><button className="button" type="button" onClick={() => void load()} disabled={loading}><RefreshCw size={16}/> Refresh</button></div></div>
-    <ErrorMessage error={error}/>
-    {loading ? <div className="spinner-area">Loading preparation queue…</div> : <div className="queue-grid">{lanes.map((lane) => {
-      const laneOrders = orders.filter((order) => order.status === lane.status);
-      return <section className="queue-column" key={lane.status} aria-labelledby={`lane-${lane.status}`}><div className="queue-column-header" id={`lane-${lane.status}`}>{lane.title}<span>{laneOrders.length}</span></div>
-        {laneOrders.length === 0 ? <div className="queue-empty">No {lane.title.toLowerCase()} orders</div> : laneOrders.map((order) => { const created = new Date(order.created_at).getTime(); const age = Math.max(0, Math.floor(((updated?.getTime() ?? created) - created) / 60_000)); return <article className="queue-order" key={order.id}>
-          <div className="queue-order-head"><strong>{order.number}</strong><Badge tone={statusTone(order.status)}>{readable(order.status)}</Badge></div><div className="table-detail">{timeOf(order.created_at)} · {age} min old · <Badge tone={order.payment.status === "CONFIRMED" ? "green" : "red"}>{order.payment.status === "CONFIRMED" ? "Paid" : readable(order.payment.status)}</Badge></div>
-          <ul>{order.lines.map((line, index) => <li key={`${line.variant_id}-${index}`}><strong>{line.quantity}</strong><div>{line.name}<small>{line.modifier_names.join(" · ")}</small>{line.notes && <div className="order-note">{line.notes}</div>}</div></li>)}</ul>
-          <button type="button" className="button dark" disabled={busy !== null} onClick={() => void advance(order, lane.next)}>{busy === order.id ? "Updating…" : lane.action}</button>
-        </article>; })}</section>;
-    })}</div>}
-  </>;
-}
 
 type InventoryTab = "stock" | "ledger" | "counts";
 type InventoryAction = "RECEIPT" | "WASTE" | "ADJUSTMENT_IN" | "ADJUSTMENT_OUT" | "COUNT";
@@ -223,7 +178,9 @@ export function StaffAccounts({ client, currentUserId, onError }: { client: POSC
   const openEdit = (user: User) => { setName(user.name); setUsername(user.username); setRole(user.role); setActive(user.active); setError(""); setDialog({ kind: "edit", user }); };
   const openReset = (user: User) => { setPassword(""); setError(""); setDialog({ kind: "reset", user }); };
   const submit = async (event: FormEvent) => {
-    event.preventDefault(); if (!dialog || busy) return; setBusy(true); setError("");
+    event.preventDefault(); if (!dialog || busy) return;
+    if (dialog.kind !== "reset" && role === "SERVER") { setError("Choose Cashier, Manager or Owner administrator before saving this account."); return; }
+    setBusy(true); setError("");
     try {
       if (dialog.kind === "create") await client.createUser({ name, username, role, password });
       else if (dialog.kind === "edit") await client.updateUser(dialog.user.id, { name, role, active });
@@ -239,8 +196,8 @@ export function StaffAccounts({ client, currentUserId, onError }: { client: POSC
     catch (failure) { const message = errorText(failure); setError(message); onError(message); }
     finally { setBusy(false); }
   };
-  return <section className="panel" style={{marginBottom:22}}><div className="panel-head"><div><h2>Staff accounts</h2><p className="hint-inline">Create accounts, assign roles and remove access when a team member leaves.</p></div><button className="button primary" type="button" onClick={openCreate}><UserPlus size={16}/> Add staff account</button></div><ErrorMessage error={error}/>{loading ? <div className="spinner-area">Loading staff accounts…</div> : <div className="table-scroll"><table><thead><tr><th>Team member</th><th>Username</th><th>Role</th><th>Status</th><th>Account actions</th></tr></thead><tbody>{users.map((staff) => <tr key={staff.id}><td><strong>{staff.name}</strong>{staff.id === currentUserId && <div className="table-detail">Your account</div>}</td><td>{staff.username}</td><td><Badge>{readable(staff.role)}</Badge></td><td><Badge tone={staff.active ? "green" : "red"}>{staff.active ? "Active" : "Inactive"}</Badge></td><td><div className="heading-aside" style={{justifyContent:"flex-start"}}><button className="text-button" type="button" onClick={() => openEdit(staff)} aria-label={`Edit ${staff.name}`}>Edit</button><button className="text-button" type="button" onClick={() => openReset(staff)} aria-label={`Reset password for ${staff.name}`}><KeyRound size={14}/> Reset password</button><button className="text-button" type="button" disabled={staff.id === currentUserId || busy} onClick={() => void revoke(staff)} aria-label={`Sign out ${staff.name} from all devices`}>Sign out devices</button></div></td></tr>)}</tbody></table></div>}
-  {dialog && <Modal title={dialog.kind === "create" ? "Add staff account" : dialog.kind === "edit" ? `Edit ${dialog.user.name}` : `Reset ${dialog.user.name}'s password`} eyebrow="Owner administration" onClose={() => !busy && setDialog(null)}><form onSubmit={submit}><div className="modal-body">{dialog.kind !== "reset" && <><label className="field">Full name<input aria-label="Full name" autoFocus required value={name} onChange={(event) => setName(event.target.value)}/></label>{dialog.kind === "create" && <label className="field">Username<input aria-label="Username" required autoCapitalize="none" autoCorrect="off" value={username} onChange={(event) => setUsername(event.target.value)}/><small>Letters, numbers, dots, hyphens and underscores only.</small></label>}<label className="field">Role<select aria-label="Role" value={role} disabled={dialog.kind === "edit" && dialog.user.id === currentUserId} onChange={(event) => setRole(event.target.value as Role)}><option value="CASHIER">Cashier</option><option value="SERVER">Server</option><option value="MANAGER">Manager</option><option value="OWNER_ADMIN">Owner administrator</option></select></label>{dialog.kind === "edit" && <label className="choice"><span><strong>Account active</strong><small>Inactive staff cannot sign in.</small></span><input type="checkbox" aria-label="Account active" checked={active} disabled={dialog.user.id === currentUserId} onChange={(event) => setActive(event.target.checked)}/></label>}</>}{dialog.kind !== "edit" && <label className="field">{dialog.kind === "create" ? "Temporary password" : "New temporary password"}<input aria-label={dialog.kind === "create" ? "Temporary password" : "New temporary password"} type="password" required minLength={12} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)}/><small>Use at least 12 characters and share it privately.</small></label>}<ErrorMessage error={error}/></div><div className="modal-footer"><button className="button" type="button" disabled={busy} onClick={() => setDialog(null)}>Cancel</button><SubmitButton busy={busy}>{dialog.kind === "create" ? "Create account" : dialog.kind === "edit" ? "Save account changes" : "Reset password"}</SubmitButton></div></form></Modal>}
+  return <section className="panel" style={{marginBottom:22}}><div className="panel-head"><div><h2>Staff accounts</h2><p className="hint-inline">Create accounts, assign roles and remove access when a team member leaves.</p></div><button className="button primary" type="button" onClick={openCreate}><UserPlus size={16}/> Add staff account</button></div><ErrorMessage error={error}/>{loading ? <div className="spinner-area">Loading staff accounts…</div> : <div className="table-scroll"><table><thead><tr><th>Team member</th><th>Username</th><th>Role</th><th>Status</th><th>Account actions</th></tr></thead><tbody>{users.map((staff) => <tr key={staff.id}><td><strong>{staff.name}</strong>{staff.id === currentUserId && <div className="table-detail">Your account</div>}</td><td>{staff.username}</td><td><Badge tone={staff.role === "SERVER" ? "orange" : "neutral"}>{staff.role === "SERVER" ? "Legacy server" : readable(staff.role)}</Badge></td><td><Badge tone={staff.active ? "green" : "red"}>{staff.active ? "Active" : "Inactive"}</Badge></td><td><div className="heading-aside" style={{justifyContent:"flex-start"}}><button className="text-button" type="button" onClick={() => openEdit(staff)} aria-label={`Edit ${staff.name}`}>Edit</button><button className="text-button" type="button" onClick={() => openReset(staff)} aria-label={`Reset password for ${staff.name}`}><KeyRound size={14}/> Reset password</button><button className="text-button" type="button" disabled={staff.id === currentUserId || busy} onClick={() => void revoke(staff)} aria-label={`Sign out ${staff.name} from all devices`}>Sign out devices</button></div></td></tr>)}</tbody></table></div>}
+  {dialog && <Modal title={dialog.kind === "create" ? "Add staff account" : dialog.kind === "edit" ? `Edit ${dialog.user.name}` : `Reset ${dialog.user.name}'s password`} eyebrow="Owner administration" onClose={() => !busy && setDialog(null)}><form onSubmit={submit}><div className="modal-body">{dialog.kind !== "reset" && <><label className="field">Full name<input aria-label="Full name" autoFocus required value={name} onChange={(event) => setName(event.target.value)}/></label>{dialog.kind === "create" && <label className="field">Username<input aria-label="Username" required autoCapitalize="none" autoCorrect="off" value={username} onChange={(event) => setUsername(event.target.value)}/><small>Letters, numbers, dots, hyphens and underscores only.</small></label>}<label className="field">Role<select aria-label="Role" value={role} disabled={dialog.kind === "edit" && dialog.user.id === currentUserId} onChange={(event) => setRole(event.target.value as Role)}>{dialog.kind === "edit" && dialog.user.role === "SERVER" && <option value="SERVER" disabled>Legacy server — reassign required</option>}<option value="CASHIER">Cashier</option><option value="MANAGER">Manager</option><option value="OWNER_ADMIN">Owner administrator</option></select></label>{dialog.kind === "edit" && <label className="choice"><span><strong>Account active</strong><small>{role === "SERVER" ? "Choose a supported role before reactivating this account." : "Inactive staff cannot sign in."}</small></span><input type="checkbox" aria-label="Account active" checked={active} disabled={dialog.user.id === currentUserId || role === "SERVER"} onChange={(event) => setActive(event.target.checked)}/></label>}</>}{dialog.kind !== "edit" && <label className="field">{dialog.kind === "create" ? "Temporary password" : "New temporary password"}<input aria-label={dialog.kind === "create" ? "Temporary password" : "New temporary password"} type="password" required minLength={12} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)}/><small>Use at least 12 characters and share it privately.</small></label>}<ErrorMessage error={error}/></div><div className="modal-footer"><button className="button" type="button" disabled={busy} onClick={() => setDialog(null)}>Cancel</button><SubmitButton busy={busy} disabled={dialog.kind === "edit" && role === "SERVER"}>{dialog.kind === "create" ? "Create account" : dialog.kind === "edit" ? "Save account changes" : "Reset password"}</SubmitButton></div></form></Modal>}
   </section>;
 }
 
