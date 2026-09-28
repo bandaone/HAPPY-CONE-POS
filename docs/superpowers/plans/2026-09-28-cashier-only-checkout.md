@@ -54,7 +54,7 @@ Add assertions that a successful checkout and an idempotent retry both return `s
 
 - [ ] **Step 2: Run the checkout tests and confirm they fail**
 
-Run: `pytest apps/api/tests/orders/test_checkout.py -q`  
+Run: `pytest apps/api/tests/orders/test_checkout.py -q`
 Expected: FAIL because new orders currently default to `NEW`.
 
 - [ ] **Step 3: Store new sales as complete**
@@ -67,7 +67,7 @@ Assert owner API create/update requests reject assigning `SERVER`, an existing s
 
 - [ ] **Step 5: Run identity tests and confirm they fail**
 
-Run: `pytest apps/api/tests/identity/test_user_admin.py apps/api/tests/identity/test_auth.py -q`  
+Run: `pytest apps/api/tests/identity/test_user_admin.py apps/api/tests/identity/test_auth.py -q`
 Expected: FAIL because `SERVER` is currently assignable.
 
 - [ ] **Step 6: Restrict new operational roles**
@@ -80,7 +80,7 @@ Keep one compatibility test that inserts a legacy `NEW` order directly and prove
 
 - [ ] **Step 8: Run Task 1 tests**
 
-Run: `pytest apps/api/tests/orders apps/api/tests/identity -q`  
+Run: `pytest apps/api/tests/orders apps/api/tests/identity -q`
 Expected: PASS.
 
 - [ ] **Step 9: Commit Task 1**
@@ -109,7 +109,7 @@ Assert the receipt includes `Receipt No. A001`, business/tax/payment/cashier dat
 
 - [ ] **Step 2: Run receipt tests and confirm they fail**
 
-Run: `npm test -- --run src/features/receipt.test.tsx src/features/practice-flow.test.tsx` from `apps/web`  
+Run: `npm test -- --run src/features/receipt.test.tsx src/features/practice-flow.test.tsx` from `apps/web`
 Expected: FAIL on current order labels, item code and button priority.
 
 - [ ] **Step 3: Simplify the receipt renderer**
@@ -126,7 +126,7 @@ Test that `window.print` failure leaves the completed receipt open/reprintable, 
 
 - [ ] **Step 6: Run Task 2 tests**
 
-Run: `npm test -- --run src/features/receipt.test.tsx src/features/practice-flow.test.tsx src/lib/offline.test.ts` from `apps/web`  
+Run: `npm test -- --run src/features/receipt.test.tsx src/features/practice-flow.test.tsx src/lib/offline.test.ts` from `apps/web`
 Expected: PASS.
 
 - [ ] **Step 7: Commit Task 2**
@@ -158,7 +158,7 @@ Assert Add staff account offers only Cashier, Manager and Owner administrator. W
 
 - [ ] **Step 3: Run focused tests and confirm they fail**
 
-Run: `npm test -- --run src/features/onboarding.test.tsx src/features/staff-accounts.test.tsx` from `apps/web`  
+Run: `npm test -- --run src/features/onboarding.test.tsx src/features/staff-accounts.test.tsx` from `apps/web`
 Expected: FAIL because preparation and Server are still exposed.
 
 - [ ] **Step 4: Remove preparation UI paths**
@@ -175,7 +175,7 @@ Remove Server from create choices. For an existing server row, show a legacy bad
 
 - [ ] **Step 7: Run Task 3 tests**
 
-Run: `npm test -- --run src/features/onboarding.test.tsx src/features/staff-accounts.test.tsx` from `apps/web`  
+Run: `npm test -- --run src/features/onboarding.test.tsx src/features/staff-accounts.test.tsx` from `apps/web`
 Expected: PASS.
 
 - [ ] **Step 8: Commit Task 3**
@@ -206,7 +206,7 @@ Assert migration 0007 replaces exact old defaults, preserves customized text, an
 
 - [ ] **Step 2: Run settings and migration tests and confirm they fail**
 
-Run: `pytest apps/api/tests/settings/test_stand_settings.py apps/api/tests/test_cli.py -q`  
+Run: `pytest apps/api/tests/settings/test_stand_settings.py apps/api/tests/test_cli.py -q`
 Expected: FAIL because revision 0007 and new defaults do not exist.
 
 - [ ] **Step 3: Add the guidance migration and defaults**
@@ -219,7 +219,7 @@ Remove preparation and server-role scenarios. Assert checkout returns `SERVED`, 
 
 - [ ] **Step 5: Run all automated verification**
 
-Run API tests, web component tests, TypeScript/Vite build, Playwright browser journeys and `git diff --check`.  
+Run API tests, web component tests, TypeScript/Vite build, Playwright browser journeys and `git diff --check`.
 Expected: all pass; production-readiness assertion also passes in the API container with PostgreSQL driver installed.
 
 - [ ] **Step 6: Update operational documentation**
