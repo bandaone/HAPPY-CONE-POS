@@ -32,7 +32,7 @@ cd "$HOME\Desktop\HappyCone-Windows-1.0.0"
 .\scripts\Test-HappyConeComputer.ps1 -WebPort 8080
 ```
 
-Do not continue if `CanInstall` is false. Correct every blocking error first. Preflight does not change Windows.
+Do not continue if `CanInstall` is false. Correct every blocking error first. Preflight does not change Windows. A computer sold with 4 GB RAM may report less than 4.00 GiB after hardware reservation; the supported reported floor is 3.50 GiB.
 
 ## Install a clean production system
 

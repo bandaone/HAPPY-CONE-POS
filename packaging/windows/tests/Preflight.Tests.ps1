@@ -1,7 +1,7 @@
 BeforeAll {
     Import-Module "$PSScriptRoot/../scripts/HappyCone.Common.psm1" -Force
     function GoodFacts {
-        [pscustomobject]@{ Is64Bit=$true; WindowsBuild=19045; TotalMemoryGB=4; FreeDiskGB=20; WebPortAvailable=$true; ApiPortAvailable=$true; NetworkProfiles=@('Private'); IPv4='192.168.1.20'; ComputerName='HAPPY-CONE' }
+        [pscustomobject]@{ Is64Bit=$true; WindowsBuild=19045; TotalMemoryGB=3.5; FreeDiskGB=20; WebPortAvailable=$true; ApiPortAvailable=$true; NetworkProfiles=@('Private'); IPv4='192.168.1.20'; ComputerName='HAPPY-CONE' }
     }
 }
 
@@ -9,6 +9,7 @@ Describe 'Happy Cone Windows preflight' {
     It 'accepts the minimum supported private-network computer' {
         $result = Test-HappyConePreflight -Facts (GoodFacts) -WebPort 8080
         $result.CanInstall | Should -BeTrue
+        $result.TotalMemoryGB | Should -Be 3.5
         $result.Address | Should -Be 'http://192.168.1.20:8080'
         $result.FirewallParameters.Profile | Should -Be 'Private'
     }
@@ -17,7 +18,7 @@ Describe 'Happy Cone Windows preflight' {
         $cases = @(
             @{ Name='64-bit'; Change={ param($f) $f.Is64Bit=$false } },
             @{ Name='Windows'; Change={ param($f) $f.WindowsBuild=17763 } },
-            @{ Name='memory'; Change={ param($f) $f.TotalMemoryGB=3.9 } },
+            @{ Name='memory'; Change={ param($f) $f.TotalMemoryGB=3.49 } },
             @{ Name='disk'; Change={ param($f) $f.FreeDiskGB=9.9 } },
             @{ Name='web port'; Change={ param($f) $f.WebPortAvailable=$false } },
             @{ Name='API port'; Change={ param($f) $f.ApiPortAvailable=$false } }

@@ -42,3 +42,5 @@ Receipt printing now stores an explicit 58 mm or 80 mm profile and constrains pr
 Automated implementation verification is complete on Ubuntu, including a real PowerShell runtime and Pester. Physical installation on the actual Windows computer, disconnected-internet LAN testing, measured memory, backup/restore rehearsal, and exact-model Xprinter printing remain required before live sales.
 
 Release `1.0.0` candidate evidence: 61 API tests, 47 web tests, four Chromium journeys, 33 Pester tests, eight bundle-builder tests, production web build, migration `0008`, 187 release-manifest entries, and the 391 MB transfer ZIP integrity check all passed. The transfer ZIP SHA-256 is `b5b459b8d861fb1ebc07596e5bb2356d9bdee5e1d84ea8259a3687766bdad0ef`; Windows CI and the physical-computer gates must still pass on the published commit.
+
+Release `1.0.1` corrects Windows preflight for nominal 4 GB computers that report 3.50–3.99 GiB after hardware reservation. Lower-memory computers remain blocked, and preflight now reports the measured memory and free disk values.

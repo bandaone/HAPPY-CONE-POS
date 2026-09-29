@@ -123,7 +123,7 @@ function Test-HappyConePreflight {
     $warnings = New-Object Collections.Generic.List[string]
     if (-not $Facts.Is64Bit) { $errors.Add('A 64-bit Windows installation is required.') }
     if ([int]$Facts.WindowsBuild -lt 19044) { $errors.Add('Windows 10 21H2 or newer Windows is required.') }
-    if ([double]$Facts.TotalMemoryGB -lt 4) { $errors.Add('At least 4 GB memory is required.') }
+    if ([double]$Facts.TotalMemoryGB -lt 3.5) { $errors.Add('At least 4 GB installed memory is required; Windows reported too little usable memory.') }
     if ([double]$Facts.FreeDiskGB -lt 10) { $errors.Add('At least 10 GB free disk space is required.') }
     if (-not $Facts.WebPortAvailable) { $errors.Add("The web port $WebPort is already in use.") }
     if (-not $Facts.ApiPortAvailable) { $errors.Add('The API port 8000 is already in use.') }
@@ -133,6 +133,7 @@ function Test-HappyConePreflight {
     [pscustomobject]@{
         CanInstall=($errors.Count -eq 0); BlockingErrors=@($errors); Warnings=@($warnings)
         Address="http://$($Facts.IPv4):$WebPort"; ComputerName=$Facts.ComputerName; IPv4=$Facts.IPv4
+        TotalMemoryGB=[double]$Facts.TotalMemoryGB; FreeDiskGB=[double]$Facts.FreeDiskGB
         FirewallParameters=(Get-HappyConeFirewallParameters $WebPort)
     }
 }
