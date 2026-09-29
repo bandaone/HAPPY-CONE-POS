@@ -51,6 +51,7 @@ Thumbs.db
 *.tmp
 .cache/
 backups/
+vendor-cache/
 
 # Isolated implementation worktrees
 .worktrees/
