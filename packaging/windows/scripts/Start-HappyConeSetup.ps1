@@ -2,11 +2,14 @@
 #requires -RunAsAdministrator
 [CmdletBinding()]
 param(
-    [string]$BundleRoot = (Split-Path $PSScriptRoot -Parent),
+    [string]$BundleRoot = '',
     [ValidateRange(1024,65535)][int]$WebPort = 8080
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if ([string]::IsNullOrWhiteSpace($BundleRoot)) {
+    $BundleRoot = Split-Path $PSScriptRoot -Parent
+}
 
 Write-Host ''
 Write-Host 'Happy Cone guided setup' -ForegroundColor Magenta

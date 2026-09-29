@@ -70,6 +70,9 @@ Describe 'Happy Cone installer contract' {
         Test-Path "$PSScriptRoot/../scripts/Start-HappyConeSetup.ps1" | Should -BeTrue
         $setup = Get-Content "$PSScriptRoot/../scripts/Start-HappyConeSetup.ps1" -Raw
         $setup | Should -Match 'Test-HappyConeComputer\.ps1'
+        $setup | Should -Not -Match 'BundleRoot = \(Split-Path \$PSScriptRoot'
+        $setup | Should -Match 'IsNullOrWhiteSpace\(\$BundleRoot\)'
+        $setup | Should -Match '\$BundleRoot = Split-Path \$PSScriptRoot -Parent'
         $setup | Should -Match '-PassThru'
         $setup | Should -Match 'preflight\.CanInstall'
         $setup | Should -Match 'Install-HappyCone\.ps1'

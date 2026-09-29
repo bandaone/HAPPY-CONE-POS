@@ -46,3 +46,5 @@ Release `1.0.0` candidate evidence: 61 API tests, 47 web tests, four Chromium jo
 Release `1.0.1` corrects Windows preflight for nominal 4 GB computers that report 3.50–3.99 GiB after hardware reservation. Lower-memory computers remain blocked, and preflight now reports the measured memory and free disk values.
 
 Release 1.0.2 adds the pinned Microsoft Visual C++ 2015-2022 x64 runtime required by the portable PostgreSQL binaries. Guided setup now verifies PostgreSQL before database mutation and safely resumes an early failed 1.0.1 installation when no protected installation phase completed.
+
+Release 1.0.3 resolves Windows PowerShell 5.1 guided-setup startup by resolving the release folder after script parameter binding. The double-click launcher and safe early-install recovery remain unchanged.
