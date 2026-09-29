@@ -70,8 +70,10 @@ function Wait-HappyConeUri([string]$Uri, [int]$TimeoutSeconds = 90) {
     throw "Timed out waiting for $Uri"
 }
 
-function Set-HappyConeDirectoryAcl([string]$Path, [string]$Identity) {
-    & icacls.exe $Path '/inheritance:r' '/grant:r' 'SYSTEM:(OI)(CI)(F)' 'BUILTIN\Administrators:(OI)(CI)(F)' "$Identity`:(OI)(CI)(M)" | Out-Null
+function Set-HappyConeDirectoryAcl([string]$Path, [string[]]$Identities) {
+    $grants = @('SYSTEM:(OI)(CI)(F)', 'BUILTIN\Administrators:(OI)(CI)(F)')
+    foreach ($identity in $Identities) { $grants += "${identity}:(OI)(CI)(M)" }
+    & icacls.exe $Path '/inheritance:r' '/grant:r' $grants | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "Could not secure directory $Path" }
 }
 
@@ -217,12 +219,12 @@ function Install-HappyCone {
                 Remove-Item $postgresData -Recurse -Force
             }
             New-Item $postgresData -ItemType Directory -Force | Out-Null
-            Set-HappyConeDirectoryAcl (Split-Path $postgresData -Parent) 'NT AUTHORITY\NETWORK SERVICE'
+            $installerIdentity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+            Set-HappyConeDirectoryAcl (Split-Path $postgresData -Parent) -Identities @('NT AUTHORITY\NETWORK SERVICE',$installerIdentity)
             $postgresAdminPassword = New-HappyConeSecret
             $passwordFile = Join-Path $DataRoot 'initdb-password.tmp'
             try {
                 [IO.File]::WriteAllText($passwordFile, $postgresAdminPassword, (New-Object Text.UTF8Encoding($false)))
-                $installerIdentity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
                 Protect-HappyConeFile $passwordFile -ServiceIdentity $installerIdentity
                 Invoke-HappyConeCommand (Join-Path $postgresRoot 'bin\initdb.exe') @('-D',$postgresData,'--username=postgres','--auth=scram-sha-256',"--pwfile=$passwordFile",'--encoding=UTF8','--locale=C')
             } finally { Remove-Item $passwordFile -Force -ErrorAction SilentlyContinue }

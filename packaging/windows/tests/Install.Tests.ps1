@@ -59,6 +59,12 @@ Describe 'Happy Cone installer contract' {
         $script | Should -Match 'targetVersion=\$version'
     }
 
+    It 'grants the restricted installer identity access to the database directory' {
+        $script | Should -Match 'Set-HappyConeDirectoryAcl\(\[string\]\$Path, \[string\[\]\]\$Identities\)'
+        $script | Should -Match 'foreach \(\$identity in \$Identities\)'
+        $script | Should -Match "Set-HappyConeDirectoryAcl.+-Identities @\('NT AUTHORITY\\NETWORK SERVICE',\$installerIdentity\)"
+    }
+
     It 'keeps the temporary initdb password readable by the restricted installer user' {
         $script | Should -Match 'WindowsIdentity\]::GetCurrent\(\)\.Name'
         $script | Should -Match 'Protect-HappyConeFile \$passwordFile -ServiceIdentity \$installerIdentity'

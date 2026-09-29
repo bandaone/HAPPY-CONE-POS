@@ -8,12 +8,12 @@ On the Ubuntu development computer, build a numbered release:
 
 ```bash
 ./scripts/build-windows-bundle.sh \
-  --version 1.0.4 \
+  --version 1.0.5 \
   --cache /tmp/happycone-vendor-cache \
   --output build/windows
 ```
 
-Copy the complete `HappyCone-Windows-1.0.4` folder to a USB drive. Do not copy individual files from inside it. `release-manifest.json` protects every application, installer, runtime, script, and configuration file with SHA-256.
+Copy the complete `HappyCone-Windows-1.0.5` folder to a USB drive. Do not copy individual files from inside it. `release-manifest.json` protects every application, installer, runtime, script, and configuration file with SHA-256.
 
 ## Prepare Windows
 
@@ -28,7 +28,7 @@ Run preflight from inside the copied release folder:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
-cd "$HOME\Desktop\HappyCone-Windows-1.0.4"
+cd "$HOME\Desktop\HappyCone-Windows-1.0.5"
 .\scripts\Test-HappyConeComputer.ps1 -WebPort 8080
 ```
 
@@ -44,7 +44,7 @@ If Windows blocks double-clicked command files, open Administrator PowerShell in
 .\scripts\Start-HappyConeSetup.ps1
 ```
 
-The setup is safe to run again after an interruption. Release 1.0.4 can repair the incomplete early stage left by 1.0.1 before any database or owner account was created. It installs the pinned Microsoft Visual C++ x64 runtime offline, verifies PostgreSQL can start, and then initializes the database.
+The setup is safe to run again after an interruption. Release 1.0.5 can repair the incomplete early stage left by 1.0.1 before any database or owner account was created. It installs the pinned Microsoft Visual C++ x64 runtime offline, verifies PostgreSQL can start, and then initializes the database.
 
 A successful installation prints the address staff should open, such as `http://192.168.1.20:8080`. It creates one owner account and an empty production database. It does not create sample staff, sample menu items, opening stock, or sales.
 

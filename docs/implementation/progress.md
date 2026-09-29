@@ -50,3 +50,5 @@ Release 1.0.2 adds the pinned Microsoft Visual C++ 2015-2022 x64 runtime require
 Release 1.0.3 resolves Windows PowerShell 5.1 guided-setup startup by resolving the release folder after script parameter binding. The double-click launcher and safe early-install recovery remain unchanged.
 
 Release 1.0.4 grants the installing Windows identity temporary read access to initdb's password file. PostgreSQL launches initdb with a restricted token that does not retain access through the Administrators group; the temporary file is still deleted immediately after initialization.
+
+Release 1.0.5 explicitly grants both the PostgreSQL service and the signed-in installer identity access to the database directory. This supports initdb's restricted Windows token while retaining ACL inheritance protection for the cluster.
