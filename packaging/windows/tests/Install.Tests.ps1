@@ -62,7 +62,8 @@ Describe 'Happy Cone installer contract' {
     It 'grants the restricted installer identity access to the database directory' {
         $script | Should -Match 'Set-HappyConeDirectoryAcl\(\[string\]\$Path, \[string\[\]\]\$Identities\)'
         $script | Should -Match 'foreach \(\$identity in \$Identities\)'
-        $script | Should -Match "Set-HappyConeDirectoryAcl.+-Identities @\('NT AUTHORITY\\NETWORK SERVICE',\$installerIdentity\)"
+        $expectedAclCall = 'Set-HappyConeDirectoryAcl (Split-Path $postgresData -Parent) -Identities @(''NT AUTHORITY\NETWORK SERVICE'',$installerIdentity)'
+        $script.Contains($expectedAclCall) | Should -BeTrue
     }
 
     It 'keeps the temporary initdb password readable by the restricted installer user' {
