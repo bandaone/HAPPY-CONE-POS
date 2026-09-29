@@ -117,7 +117,7 @@ function Install-HappyCone {
         Set-HappyConeDirectoryAcl $logsRoot 'NT AUTHORITY\LOCAL SERVICE'
         if ($newVersion) {
             New-Item $versionRoot -ItemType Directory | Out-Null
-            Copy-Item (Join-Path $bundle 'api'),(Join-Path $bundle 'web'),(Join-Path $bundle 'wheelhouse') $versionRoot -Recurse
+            Copy-Item (Join-Path $bundle 'api'),(Join-Path $bundle 'web'),(Join-Path $bundle 'wheelhouse'),(Join-Path $bundle 'scripts'),(Join-Path $bundle 'config') $versionRoot -Recurse
             New-Item (Join-Path $versionRoot 'services') -ItemType Directory | Out-Null
         }
 
@@ -235,6 +235,8 @@ function Install-HappyCone {
         $current = Join-Path $InstallRoot 'current'
         if (Test-Path $current) { Remove-Item $current -Force }
         Invoke-HappyConeCommand "$env:SystemRoot\System32\cmd.exe" @('/d','/c','mklink','/J',$current,$versionRoot)
+        $backupPolicy = Join-Path $DataRoot 'backup-policy.json'
+        if (-not (Test-Path $backupPolicy)) { Copy-Item (Join-Path $current 'config\backup-policy.json') $backupPolicy }
 
         $servicesRoot = Join-Path $versionRoot 'services'
         $winswSource = (Get-ChildItem (Join-Path $bundle 'runtime\WinSW-*-x64.exe') | Select-Object -First 1).FullName
@@ -242,7 +244,7 @@ function Install-HappyCone {
         $webService = Join-Path $servicesRoot 'HappyConeWeb.exe'
         Copy-Item $winswSource $apiService -Force; Copy-Item $winswSource $webService -Force
         $envXml = foreach ($key in ($environment.Keys | Sort-Object)) {
-            $name=[Security.SecurityElement]::Escape($key); $value=[Security.SecurityElement]::Escape($environment[$key]); "<env name=\"$name\" value=\"$value\" />"
+            $name=[Security.SecurityElement]::Escape($key); $value=[Security.SecurityElement]::Escape($environment[$key]); "<env name=`"$name`" value=`"$value`" />"
         }
         $apiXml = Get-Content (Join-Path (Split-Path $PSScriptRoot -Parent) 'config\happycone-api-service.xml.template') -Raw
         $apiXml = $apiXml.Replace('{{PYTHON_EXE}}',[Security.SecurityElement]::Escape($venvPython)).Replace('{{API_ROOT}}',[Security.SecurityElement]::Escape((Join-Path $versionRoot 'api'))).Replace('{{API_ENV_XML}}',($envXml -join "`r`n  ")).Replace('{{LOG_ROOT}}',[Security.SecurityElement]::Escape($logsRoot))
@@ -264,6 +266,7 @@ function Install-HappyCone {
         if ((Get-Service HappyConeWeb).Status -eq 'Running') { Invoke-HappyConeCommand $webService @('restart') } else { Invoke-HappyConeCommand $webService @('start') }
         $page = Wait-HappyConeUri "http://127.0.0.1:$WebPort/"
         if ($page.Content -notmatch 'id="root"') { throw 'The Happy Cone login page index.html did not load.' }
+        & (Join-Path $current 'scripts\Register-HappyConeBackupTask.ps1') -DataRoot $DataRoot
 
         $desktop = [Environment]::GetFolderPath('CommonDesktopDirectory')
         $programs = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs'

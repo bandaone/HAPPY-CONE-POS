@@ -1,0 +1,6 @@
+{
+  "schema": 1,
+  "retention_count": 30,
+  "schedule": "02:00",
+  "age_recipient": ""
+}
