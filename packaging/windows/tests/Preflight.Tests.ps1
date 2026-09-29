@@ -1,12 +1,11 @@
 BeforeAll {
     Import-Module "$PSScriptRoot/../scripts/HappyCone.Common.psm1" -Force
-}
-
-Describe 'Happy Cone Windows preflight' {
     function GoodFacts {
         [pscustomobject]@{ Is64Bit=$true; WindowsBuild=19045; TotalMemoryGB=4; FreeDiskGB=20; WebPortAvailable=$true; ApiPortAvailable=$true; NetworkProfiles=@('Private'); IPv4='192.168.1.20'; ComputerName='HAPPY-CONE' }
     }
+}
 
+Describe 'Happy Cone Windows preflight' {
     It 'accepts the minimum supported private-network computer' {
         $result = Test-HappyConePreflight -Facts (GoodFacts) -WebPort 8080
         $result.CanInstall | Should -BeTrue
@@ -16,7 +15,7 @@ Describe 'Happy Cone Windows preflight' {
 
     It 'blocks unsupported architecture, Windows, memory, disk, and occupied ports' {
         $cases = @(
-            @{ Name='architecture'; Change={ param($f) $f.Is64Bit=$false } },
+            @{ Name='64-bit'; Change={ param($f) $f.Is64Bit=$false } },
             @{ Name='Windows'; Change={ param($f) $f.WindowsBuild=17763 } },
             @{ Name='memory'; Change={ param($f) $f.TotalMemoryGB=3.9 } },
             @{ Name='disk'; Change={ param($f) $f.FreeDiskGB=9.9 } },

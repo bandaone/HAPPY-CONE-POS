@@ -88,7 +88,6 @@ function Write-HappyConeConfiguration {
         [Parameter(Mandatory)][string]$PublicHost,
         [Parameter(Mandatory)][string]$IPv4,
         [Parameter(Mandatory)][string]$DatabasePassword,
-        [Parameter(Mandatory)][string]$AppSecret,
         [ValidateRange(1024,65535)][int]$WebPort = 8080,
         [switch]$WhatIfMode
     )
@@ -98,7 +97,7 @@ function Write-HappyConeConfiguration {
     $allowedHosts = '["' + (($PublicHost, $IPv4, 'localhost') -join '","') + '"]'
     $values = @{
         INSTALL_ROOT=$InstallRoot.Replace('\','/'); DATA_ROOT=$DataRoot.Replace('\','/'); PUBLIC_HOST=$PublicHost
-        IPV4=$IPv4; WEB_PORT=$WebPort; DATABASE_PASSWORD=$DatabasePassword; APP_SECRET=$AppSecret
+        IPV4=$IPv4; WEB_PORT=$WebPort; DATABASE_PASSWORD=$DatabasePassword
         ALLOWED_HOSTS=$allowedHosts
     }
     $api = Expand-HappyConeTemplate (Get-Content (Join-Path $templateRoot 'api.env.template') -Raw) $values

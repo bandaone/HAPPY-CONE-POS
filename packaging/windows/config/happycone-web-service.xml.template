@@ -1,0 +1,17 @@
+<service>
+  <id>HappyConeWeb</id>
+  <name>Happy Cone Web</name>
+  <description>Private-network web entry point for Happy Cone POS.</description>
+  <executable>{{CADDY_EXE}}</executable>
+  <arguments>run --config "{{CADDYFILE}}" --adapter caddyfile</arguments>
+  <workingdirectory>{{RUNTIME_ROOT}}</workingdirectory>
+  <serviceaccount><username>NT AUTHORITY\LocalService</username></serviceaccount>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <stoptimeout>30sec</stoptimeout>
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <resetfailure>1 hour</resetfailure>
+  <logpath>{{LOG_ROOT}}</logpath>
+  <log mode="roll-by-size"><sizeThreshold>5120</sizeThreshold><keepFiles>5</keepFiles></log>
+</service>

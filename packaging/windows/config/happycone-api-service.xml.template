@@ -1,0 +1,18 @@
+<service>
+  <id>HappyConeApi</id>
+  <name>Happy Cone API</name>
+  <description>Local Happy Cone point-of-sale application service.</description>
+  <executable>{{PYTHON_EXE}}</executable>
+  <arguments>-m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 --no-access-log</arguments>
+  <workingdirectory>{{API_ROOT}}</workingdirectory>
+  {{API_ENV_XML}}
+  <serviceaccount><username>NT AUTHORITY\LocalService</username></serviceaccount>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <stoptimeout>30sec</stoptimeout>
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <resetfailure>1 hour</resetfailure>
+  <logpath>{{LOG_ROOT}}</logpath>
+  <log mode="roll-by-size"><sizeThreshold>5120</sizeThreshold><keepFiles>5</keepFiles></log>
+</service>

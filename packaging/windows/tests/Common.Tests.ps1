@@ -13,7 +13,7 @@ Describe 'Happy Cone common deployment functions' {
     It 'renders exact trusted hosts and same-origin CORS' {
         $root = Join-Path $TestDrive 'install'
         $data = Join-Path $TestDrive 'data'
-        $result = Write-HappyConeConfiguration -InstallRoot $root -DataRoot $data -PublicHost 'HAPPY-CONE' -IPv4 '192.168.1.20' -DatabasePassword 'db_safe' -AppSecret 'app_safe' -WebPort 8080 -WhatIfMode
+        $result = Write-HappyConeConfiguration -InstallRoot $root -DataRoot $data -PublicHost 'HAPPY-CONE' -IPv4 '192.168.1.20' -DatabasePassword 'db_safe' -WebPort 8080 -WhatIfMode
         $result.ApiEnvironment | Should -Match 'ALLOWED_HOSTS=\["HAPPY-CONE","192.168.1.20","localhost"\]'
         $result.ApiEnvironment | Should -Match 'CORS_ORIGINS=\[\]'
         $result.ApiEnvironment | Should -Match 'BRANCH_TIMEZONE=Africa/Lusaka'
