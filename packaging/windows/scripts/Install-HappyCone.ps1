@@ -118,7 +118,6 @@ function Install-HappyCone {
         if ($newVersion) {
             New-Item $versionRoot -ItemType Directory | Out-Null
             Copy-Item (Join-Path $bundle 'api'),(Join-Path $bundle 'web'),(Join-Path $bundle 'wheelhouse'),(Join-Path $bundle 'scripts'),(Join-Path $bundle 'config') $versionRoot -Recurse
-            New-Item (Join-Path $versionRoot 'services') -ItemType Directory | Out-Null
         }
 
         $pythonRoot = Join-Path $runtimeRoot 'python'
@@ -238,7 +237,8 @@ function Install-HappyCone {
         $backupPolicy = Join-Path $DataRoot 'backup-policy.json'
         if (-not (Test-Path $backupPolicy)) { Copy-Item (Join-Path $current 'config\backup-policy.json') $backupPolicy }
 
-        $servicesRoot = Join-Path $versionRoot 'services'
+        $servicesRoot = Join-Path $InstallRoot 'services'
+        New-Item $servicesRoot -ItemType Directory -Force | Out-Null
         $winswSource = (Get-ChildItem (Join-Path $bundle 'runtime\WinSW-*-x64.exe') | Select-Object -First 1).FullName
         $apiService = Join-Path $servicesRoot 'HappyConeApi.exe'
         $webService = Join-Path $servicesRoot 'HappyConeWeb.exe'
