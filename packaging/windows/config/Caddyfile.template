@@ -1,0 +1,27 @@
+:{{WEB_PORT}} {
+    root * "{{INSTALL_ROOT}}/current/web"
+    encode zstd gzip
+
+    @backend path /api/* /health /ready
+    reverse_proxy @backend 127.0.0.1:8000
+
+    header {
+        -Server
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    }
+
+    try_files {path} /index.html
+    file_server
+
+    log {
+        output file "{{DATA_ROOT}}/logs/caddy-access.log" {
+            roll_size 5MiB
+            roll_keep 5
+            roll_keep_for 168h
+        }
+        format json
+    }
+}
