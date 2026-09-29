@@ -23,7 +23,7 @@ afterAll(() => {
 const profile = {
   business_name: "CREAMY HEAVEN LIMITED", stand_name: "Cairo shop", location: "Lusaka",
   tax_id: "1002681530", contact_number: "0771450074", tax_label: "TURNOVER TAX (TOT)",
-  tax_rate_basis_points: 500, receipt_footer: "Thank you for choosing Happy Cone.",
+  tax_rate_basis_points: 500, receipt_paper_width: "80mm", receipt_footer: "Thank you for choosing Happy Cone.",
 } as StandProfile;
 
 function order(overrides: Partial<Order> = {}): Order {
@@ -52,6 +52,14 @@ function order(overrides: Partial<Order> = {}): Order {
 }
 
 describe("operational customer receipt", () => {
+  it("applies the configured thermal paper profile", () => {
+    const { rerender } = render(<Receipt order={order()} profile={{...profile, receipt_paper_width: "58mm"}}/>);
+    expect(screen.getByRole("article", { name: "Receipt A001" })).toHaveClass("receipt-paper-58");
+
+    rerender(<Receipt order={order()} profile={{...profile, receipt_paper_width: "80mm"}}/>);
+    expect(screen.getByRole("article", { name: "Receipt A001" })).toHaveClass("receipt-paper-80");
+  });
+
   it("prints one receipt number with customer, tax, payment and cashier details", () => {
     render(<Receipt order={order()} profile={profile}/>);
 

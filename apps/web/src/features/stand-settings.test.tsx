@@ -40,3 +40,18 @@ it('lets a manager maintain the details printed on receipts', async () => {
 
   expect(updateStandSettings).toHaveBeenCalledWith(expect.objectContaining({ tax_id: '1002003004', tax_rate_basis_points: 500 }));
 });
+
+
+it('lets a manager choose the installed receipt paper width', async () => {
+  const updateStandSettings = vi.fn(async (profile: StandProfile) => profile);
+  render(<StandSettingsCards profile={defaultStandProfile} user={manager} client={{ updateStandSettings } as unknown as POSClient} onSaved={()=>{}} onAudit={()=>{}} onHelp={()=>{}}/>);
+  const user = userEvent.setup();
+
+  await user.click(screen.getByRole('button', { name: 'Edit receipt details' }));
+  const dialog = screen.getByRole('dialog', { name: 'Edit receipt details' });
+  const paperWidth = within(dialog).getByRole('combobox', { name: 'Receipt paper width' });
+  await user.selectOptions(paperWidth, '58mm');
+  await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+  expect(updateStandSettings).toHaveBeenCalledWith(expect.objectContaining({ receipt_paper_width: '58mm' }));
+});

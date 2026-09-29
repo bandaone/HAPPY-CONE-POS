@@ -1,3 +1,4 @@
+from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -20,6 +21,7 @@ class StandSettingsCommand(BaseModel):
     payment_guidance: str = Field(min_length=10, max_length=1000)
     ticket_guidance: str = Field(min_length=10, max_length=1000)
     receipt_footer: str = Field(min_length=2, max_length=240)
+    receipt_paper_width: Literal['58mm', '80mm']
     activity_guidance: str = Field(min_length=10, max_length=1000)
     guide_workflow: str = Field(min_length=10, max_length=1500)
     guide_controls: str = Field(min_length=10, max_length=1500)

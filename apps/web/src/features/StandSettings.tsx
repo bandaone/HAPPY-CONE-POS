@@ -44,6 +44,7 @@ export function StandSettingsCards({ profile, user, client, onSaved, onAudit, on
         <div className="key-value"><span>TPIN</span><strong>{profile.tax_id}</strong></div>
         <div className="key-value"><span>Contact</span><strong>{profile.contact_number}</strong></div>
         <div className="key-value"><span>Tax treatment</span><strong>{profile.tax_label} · {profile.tax_rate_basis_points / 100}%</strong></div>
+        <div className="key-value"><span>Receipt paper</span><strong>{profile.receipt_paper_width}</strong></div>
         <p className="hint-inline" style={{marginTop:14}}>These details print below the logo on every completed-sale receipt.</p>
       </div></section>
       <section className="panel"><div className="panel-head settings-panel-head"><div><h2>Payments and receipts</h2><ShieldCheck size={19}/></div>{editButton('payments', 'Edit payment and receipt wording')}</div><div className="panel-body prose"><h3>Cash, mobile money and card</h3><p>{profile.payment_guidance}</p><h3>Customer receipts</h3><p>{profile.ticket_guidance}</p><h3>Fiscal status</h3><p>Fiscal integration is not configured. Printed receipts are operational records and are not certified fiscal invoices.</p><small className="managed-note">System status is protected so receipts cannot claim fiscal certification.</small></div></section>
@@ -69,6 +70,7 @@ export function StandSettingsCards({ profile, user, client, onSaved, onAudit, on
           <label className="field">Contact number<input required minLength={5} maxLength={40} value={draft.contact_number} onChange={e=>field('contact_number',e.target.value)}/></label>
           <label className="field">Tax category<input required maxLength={80} value={draft.tax_label} onChange={e=>field('tax_label',e.target.value)}/></label>
           <label className="field">Tax rate (%)<input aria-label="Tax rate (%)" required type="number" min="0" max="100" step="0.01" value={draft.tax_rate_basis_points / 100} onChange={e=>field('tax_rate_basis_points',Math.round(Number(e.target.value) * 100))}/><small>For TOT, tax is calculated from the gross sale total.</small></label>
+          <label className="field">Receipt paper width<select aria-label="Receipt paper width" value={draft.receipt_paper_width} onChange={e=>field('receipt_paper_width',e.target.value)}><option value="58mm">58 mm roll</option><option value="80mm">80 mm roll</option></select><small>Choose the paper loaded in the receipt printer.</small></label>
           <label className="field field-wide">Receipt footer<input required maxLength={240} value={draft.receipt_footer} onChange={e=>field('receipt_footer',e.target.value)}/></label>
         </div>}
         {editing === 'payments' && <>

@@ -79,6 +79,7 @@ test('live cashier sale prints once, updates stock and reaches day close',async(
   await page.getByRole('button',{name:'Print receipt',exact:true}).click();
   await expect(page.getByText('Printing was unavailable. Your sale is saved; reprint it from Sales.')).toBeVisible();
   await expect(page.locator('.receipt-print .receipt')).toHaveCount(1);
+  await expect(page.locator('.receipt-print .receipt')).toHaveClass(/receipt-paper-80/);
   for (const paper of [{name:'58mm',width:219},{name:'80mm',width:302}]) {
     await page.setViewportSize({width:paper.width,height:900});
     await page.emulateMedia({media:'print'});

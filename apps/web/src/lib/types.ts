@@ -36,6 +36,7 @@ export interface StandProfile {
   payment_guidance: string;
   ticket_guidance: string;
   receipt_footer: string;
+  receipt_paper_width: "58mm" | "80mm";
   activity_guidance: string;
   guide_workflow: string;
   guide_controls: string;

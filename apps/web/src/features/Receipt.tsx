@@ -4,7 +4,7 @@ import { BrandLogo, Modal, dateOf, timeOf } from "../components/ui";
 import { money } from "../lib/client";
 import type { Order, StandProfile } from "../lib/types";
 
-const receiptDefaults = { business_name: "CREAMY HEAVEN LIMITED", stand_name: "Lusaka stand", location: "Lusaka", tax_id: "1002681530", contact_number: "0771450074", tax_label: "TURNOVER TAX (TOT)", tax_rate_basis_points: 500, receipt_footer: "Thank you for choosing Happy Cone." };
+const receiptDefaults = { business_name: "CREAMY HEAVEN LIMITED", stand_name: "Lusaka stand", location: "Lusaka", tax_id: "1002681530", contact_number: "0771450074", tax_label: "TURNOVER TAX (TOT)", tax_rate_basis_points: 500, receipt_paper_width: "80mm" as const, receipt_footer: "Thank you for choosing Happy Cone." };
 
 function rateLabel(basisPoints: number) {
   return `${Number.isInteger(basisPoints / 100) ? basisPoints / 100 : (basisPoints / 100).toFixed(2)}%`;
@@ -19,7 +19,7 @@ export function Receipt({ order, profile }: { order: Order; profile?: StandProfi
   const units = order.lines.reduce((sum, line) => sum + line.quantity, 0);
   const taxNgwee = Math.round(order.total_ngwee * identity.tax_rate_basis_points / 10_000);
   const taxRate = rateLabel(identity.tax_rate_basis_points);
-  return <article className="receipt" aria-label={`Receipt ${order.number}`}>
+  return <article className={`receipt receipt-paper-${identity.receipt_paper_width.slice(0, 2)}`} aria-label={`Receipt ${order.number}`}>
     <header className="receipt-header">
       <BrandLogo variant="receipt"/>
       <strong className="receipt-business-name">{identity.business_name}</strong>

@@ -27,6 +27,7 @@ def dto(settings: StandSettings) -> dict:
         'payment_guidance': settings.payment_guidance,
         'ticket_guidance': settings.ticket_guidance,
         'receipt_footer': settings.receipt_footer,
+        'receipt_paper_width': settings.receipt_paper_width,
         'activity_guidance': settings.activity_guidance,
         'guide_workflow': settings.guide_workflow,
         'guide_controls': settings.guide_controls,

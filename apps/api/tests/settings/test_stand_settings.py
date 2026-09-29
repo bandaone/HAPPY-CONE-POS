@@ -11,6 +11,7 @@ def settings_payload(**overrides):
         'contact_number': '0771450074',
         'tax_label': 'TURNOVER TAX (TOT)',
         'tax_rate_basis_points': 500,
+        'receipt_paper_width': '80mm',
         'payment_guidance': 'Confirm mobile money and card payments before completing a sale.',
         'ticket_guidance': 'Give the numbered ticket to the customer after payment.',
         'receipt_footer': 'Thank you for choosing Happy Cone.',
@@ -32,6 +33,7 @@ def test_authenticated_staff_can_read_stand_settings(client, login):
     assert response.json()['tax_id'] == '1002681530'
     assert response.json()['tax_label'] == 'TURNOVER TAX (TOT)'
     assert response.json()['tax_rate_basis_points'] == 500
+    assert response.json()['receipt_paper_width'] == '80mm'
     assert response.json()['ticket_guidance'] == 'Receipts use the browser print dialog. A printer problem never removes a completed sale; staff can reprint from Sales.'
     assert response.json()['guide_workflow'] == 'Open a business day with the counted float. Choose each item, size, serving and extras, then take payment. Print or close the customer receipt and begin the next sale. Stock and reports update when the sale is accepted.'
     assert 'order' not in response.json()['guide_controls'].lower()
@@ -57,3 +59,22 @@ def test_cashier_cannot_update_settings_and_invalid_timezone_is_rejected(client,
     assert invalid.status_code == 422
     invalid_tax = client.put('/api/stand-settings', headers=login('manager'), json=settings_payload(tax_rate_basis_points=10001))
     assert invalid_tax.status_code == 422
+
+
+def test_manager_selects_supported_receipt_paper_widths(client, login):
+    manager = login('manager')
+    for width in ('58mm', '80mm'):
+        response = client.put(
+            '/api/stand-settings', headers=manager,
+            json=settings_payload(receipt_paper_width=width),
+        )
+        assert response.status_code == 200
+        assert response.json()['receipt_paper_width'] == width
+
+
+def test_receipt_paper_width_rejects_unsupported_rolls(client, login):
+    response = client.put(
+        '/api/stand-settings', headers=login('manager'),
+        json=settings_payload(receipt_paper_width='76mm'),
+    )
+    assert response.status_code == 422
