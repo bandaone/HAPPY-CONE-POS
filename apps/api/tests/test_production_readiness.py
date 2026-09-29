@@ -46,3 +46,31 @@ def test_readiness_checks_database_and_requests_have_correlation_ids(tmp_path):
         assert correlated.status_code == 200
         assert correlated.headers["x-request-id"] == "counter-check-123"
     app.state.engine.dispose()
+
+
+def test_production_accepts_explicit_lan_hosts_with_same_origin():
+    settings = Settings(
+        app_env="production",
+        database_url="postgresql+psycopg://user:pass@127.0.0.1/happycone",
+        allowed_hosts=["happycone-pos", "192.168.1.50"],
+        cors_origins=[],
+    )
+    assert settings.allowed_hosts == ["happycone-pos", "192.168.1.50"]
+    assert settings.cors_origins == []
+
+
+def test_production_rejects_only_loopback_trusted_hosts():
+    with pytest.raises(ValidationError):
+        Settings(
+            app_env="production",
+            database_url="postgresql+psycopg://user:pass@127.0.0.1/happycone",
+            allowed_hosts=["localhost", "127.0.0.1"],
+            cors_origins=[],
+        )
+
+
+def test_login_rate_limit_settings_have_production_defaults():
+    settings = Settings()
+    assert settings.login_rate_requests == 30
+    assert settings.login_rate_window_seconds == 60
+    assert settings.login_rate_capacity == 2048

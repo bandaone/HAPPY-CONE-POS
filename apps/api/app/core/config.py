@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     cors_origins: list[str] = Field(default_factory=lambda: ['http://localhost:5173', 'http://127.0.0.1:5173'])
     allowed_hosts: list[str] = Field(default_factory=lambda: ['localhost', '127.0.0.1', 'testserver'])
     log_level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR'] = 'INFO'
+    login_rate_requests: int = Field(default=30, ge=1, le=1000)
+    login_rate_window_seconds: int = Field(default=60, ge=1, le=3600)
+    login_rate_capacity: int = Field(default=2048, ge=1, le=100_000)
 
     @field_validator('branch_timezone')
     @classmethod

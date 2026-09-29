@@ -10,6 +10,7 @@ from sqlalchemy import text
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.core.config import Settings
 from app.core.db import make_database
+from app.core.rate_limit import LoginRateLimitMiddleware
 from app.api.routes.auth import router as auth_router
 from app.api.routes.catalog import router as catalog_router
 from app.api.routes.inventory import router as inventory_router
@@ -71,6 +72,12 @@ def create_app(settings: Settings | None = None, *, initialize: bool = False) ->
     api.state.settings = settings
     api.state.engine, api.state.session_factory = make_database(settings.database_url, initialize)
     api.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
+    api.add_middleware(
+        LoginRateLimitMiddleware,
+        requests=settings.login_rate_requests,
+        window_seconds=settings.login_rate_window_seconds,
+        capacity=settings.login_rate_capacity,
+    )
     api.add_middleware(RequestContextMiddleware, log_level=settings.log_level)
     api.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,
                        allow_methods=['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS'],

@@ -1,4 +1,7 @@
 from datetime import datetime, timedelta, timezone
+import time
+
+from fastapi.testclient import TestClient
 from sqlalchemy import select
 from app.models.user import AuthSession, User
 
@@ -38,3 +41,55 @@ def test_cli_user_password_keeps_intentional_whitespace(client):
         create_user(db,username='space-password',name='Test User',role='CASHIER',password=password)
     response = client.post('/api/auth/login',json={'username':'space-password','password':password})
     assert response.status_code == 200
+
+
+def rate_limited_app(tmp_path, *, requests=30, window_seconds=60, capacity=2048):
+    from app.core.config import Settings
+    from app.main import create_app
+
+    return create_app(Settings(
+        database_url=f"sqlite:///{tmp_path}/rate-limit.db",
+        login_rate_requests=requests,
+        login_rate_window_seconds=window_seconds,
+        login_rate_capacity=capacity,
+    ), initialize=True)
+
+
+def invalid_login(client):
+    return client.post('/api/auth/login', json={'username': 'unknown', 'password': 'wrong-password'})
+
+
+def test_login_rate_limit_blocks_the_31st_request_and_isolates_clients(tmp_path):
+    app = rate_limited_app(tmp_path)
+    with TestClient(app, client=('192.168.1.21', 50000)) as first:
+        for _ in range(30):
+            assert invalid_login(first).status_code == 401
+        blocked = invalid_login(first)
+        assert blocked.status_code == 429
+        assert blocked.json() == {'detail': 'Too many login attempts. Try again shortly.'}
+    with TestClient(app, client=('192.168.1.22', 50000)) as second:
+        assert invalid_login(second).status_code == 401
+    app.state.engine.dispose()
+
+
+def test_login_rate_limit_recovers_after_the_window(tmp_path):
+    app = rate_limited_app(tmp_path, requests=1, window_seconds=1)
+    with TestClient(app, client=('192.168.1.31', 50000)) as client:
+        assert invalid_login(client).status_code == 401
+        assert invalid_login(client).status_code == 429
+        time.sleep(1.05)
+        assert invalid_login(client).status_code == 401
+    app.state.engine.dispose()
+
+
+def test_login_rate_limit_evicts_the_oldest_client_at_capacity(tmp_path):
+    app = rate_limited_app(tmp_path, requests=1, capacity=2)
+    with TestClient(app, client=('192.168.1.41', 50000)) as first, \
+         TestClient(app, client=('192.168.1.42', 50000)) as second, \
+         TestClient(app, client=('192.168.1.43', 50000)) as third:
+        assert invalid_login(first).status_code == 401
+        assert invalid_login(first).status_code == 429
+        assert invalid_login(second).status_code == 401
+        assert invalid_login(third).status_code == 401
+        assert invalid_login(first).status_code == 401
+    app.state.engine.dispose()
