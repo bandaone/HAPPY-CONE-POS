@@ -1,6 +1,9 @@
 #requires -Version 5.1
 [CmdletBinding()]
-param([ValidateRange(1024,65535)][int]$WebPort = 8080)
+param(
+    [ValidateRange(1024,65535)][int]$WebPort = 8080,
+    [switch]$PassThru
+)
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'HappyCone.Common.psm1') -Force
 
@@ -24,5 +27,6 @@ $facts = [pscustomobject]@{
     ComputerName=$network.ComputerName
 }
 $result = Test-HappyConePreflight -Facts $facts -WebPort $WebPort
+if ($PassThru) { return $result }
 $result | ConvertTo-Json -Depth 5
 if (-not $result.CanInstall) { exit 2 }

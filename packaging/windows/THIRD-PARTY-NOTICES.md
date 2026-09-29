@@ -3,6 +3,7 @@
 The offline package redistributes unmodified vendor releases. Their own licenses remain in force.
 
 - Python 3.12 — Python Software Foundation License 2.0 — <https://www.python.org/downloads/release/python-31210/>
+- Microsoft Visual C++ Redistributable 2015–2022 x64 — Microsoft Software License Terms — <https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist>
 - PostgreSQL 16 — PostgreSQL License — <https://www.postgresql.org/about/licence/>
 - Caddy 2 — Apache License 2.0 — <https://github.com/caddyserver/caddy>
 - WinSW 2 — MIT License — <https://github.com/winsw/winsw>

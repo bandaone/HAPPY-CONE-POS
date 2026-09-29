@@ -30,6 +30,24 @@ function Invoke-HappyConeCommand([string]$FilePath, [string[]]$Arguments, [strin
     } finally { Set-Location $old }
 }
 
+function Test-HappyConeVCRuntime {
+    $runtime = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64' -ErrorAction SilentlyContinue
+    if (-not $runtime -or [int]$runtime.Installed -ne 1) { return $false }
+    $installedVersion = $null
+    if (-not [version]::TryParse(([string]$runtime.Version).TrimStart('v'), [ref]$installedVersion)) { return $false }
+    $installedVersion -ge [version]'14.44.35211.0'
+}
+
+function Install-HappyConeVCRuntime([string]$BundleRoot) {
+    if (Test-HappyConeVCRuntime) { return }
+    $installer = Get-ChildItem (Join-Path $BundleRoot 'installers\VC_redist.x64-*.exe') | Select-Object -First 1
+    if (-not $installer) { throw 'The Microsoft Visual C++ x64 runtime installer is missing from this release.' }
+    $process = Start-Process $installer.FullName -ArgumentList '/install','/quiet','/norestart' -Wait -PassThru
+    if ($process.ExitCode -notin 0,3010) { throw "Microsoft Visual C++ runtime installation failed with exit code $($process.ExitCode)." }
+    if (-not (Test-HappyConeVCRuntime)) { throw 'Microsoft Visual C++ runtime setup did not register the required x64 runtime.' }
+    if ($process.ExitCode -eq 3010) { Write-Warning 'Windows requested a restart after installing the Microsoft Visual C++ runtime. Complete setup, then restart before live use.' }
+}
+
 function ConvertFrom-HappyConeSecureString([Security.SecureString]$Value) {
     $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Value)
     try { [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer) }
@@ -94,6 +112,7 @@ function Install-HappyCone {
     $preflight = Test-HappyConePreflight -Facts $preflightFacts -WebPort $WebPort
     if (-not $preflight.CanInstall) { throw ($preflight.BlockingErrors -join [Environment]::NewLine) }
 
+    $version = [string]$manifest.version
     $statePath = Join-Path $DataRoot 'install-state.json'
     $state = @{}
     if (Test-Path $statePath) {
@@ -101,13 +120,25 @@ function Install-HappyCone {
         $loaded.psobject.Properties | ForEach-Object { $state[$_.Name] = $_.Value }
     } else {
         New-Item $DataRoot -ItemType Directory -Force | Out-Null
-        $state = @{ schema=1; installIdentity=[Guid]::NewGuid().ToString(); targetVersion=[string]$manifest.version; DatabaseInitialized=$false; DatabaseCreated=$false; OwnerCreated=$false; ServicesInstalled=$false; Complete=$false }
+        $state = @{ schema=1; installIdentity=[Guid]::NewGuid().ToString(); targetVersion=$version; DatabaseInitialized=$false; DatabaseCreated=$false; OwnerCreated=$false; ServicesInstalled=$false; Complete=$false }
         Save-HappyConeState $state $statePath
     }
 
-    $version = [string]$manifest.version
     if ($state.Complete -and [string]$state.version -ne $version) { throw "Happy Cone $($state.version) is already installed. Use Update-HappyCone.ps1 for version $version." }
-    if ($state.targetVersion -and [string]$state.targetVersion -ne $version) { throw "An interrupted installation for version $($state.targetVersion) exists. Resume with that same release folder." }
+    if ($state.targetVersion -and [string]$state.targetVersion -ne $version) {
+        $completedPhases = @(@('DatabaseInitialized','DatabaseCreated','OwnerCreated','ServicesInstalled') | Where-Object { [bool]$state[$_] })
+        if ($completedPhases.Count) { throw "An interrupted installation for version $($state.targetVersion) completed protected phases. Resume with that release before updating." }
+        $interruptedVersion = $null
+        $repairVersion = $null
+        $interruptedVersionValid = [version]::TryParse([string]$state.targetVersion, [ref]$interruptedVersion)
+        $repairVersionValid = [version]::TryParse($version, [ref]$repairVersion)
+        if (-not $interruptedVersionValid -or -not $repairVersionValid -or $repairVersion -le $interruptedVersion) {
+            throw "The interrupted installation targets version $($state.targetVersion). Repair it with a newer release."
+        }
+        Write-Warning "Continuing the interrupted installation with newer repair release $version."
+        $state.targetVersion=$version
+        Save-HappyConeState $state $statePath
+    }
     $versionRoot = Join-Path $InstallRoot "versions\$version"
     $runtimeRoot = Join-Path $InstallRoot 'runtime'
     $logsRoot = Join-Path $DataRoot 'logs'
@@ -117,6 +148,7 @@ function Install-HappyCone {
     try {
         New-Item (Split-Path $versionRoot -Parent),$runtimeRoot,$logsRoot,(Join-Path $DataRoot 'backups') -ItemType Directory -Force | Out-Null
         Set-HappyConeDirectoryAcl $logsRoot 'NT AUTHORITY\LOCAL SERVICE'
+        Install-HappyConeVCRuntime -BundleRoot $bundle
         if ($newVersion) {
             New-Item $versionRoot -ItemType Directory | Out-Null
             Copy-Item (Join-Path $bundle 'api'),(Join-Path $bundle 'web'),(Join-Path $bundle 'wheelhouse'),(Join-Path $bundle 'scripts'),(Join-Path $bundle 'config') $versionRoot -Recurse
@@ -141,6 +173,9 @@ function Install-HappyCone {
             Move-Item $pgsql.FullName $postgresRoot
             Remove-Item $unpack -Recurse -Force
         }
+
+        try { Invoke-HappyConeCommand (Join-Path $postgresRoot 'bin\initdb.exe') @('--version') }
+        catch { throw "PostgreSQL could not start after Microsoft Visual C++ runtime setup. Restart Windows and rerun Start-HappyConeSetup.ps1. $($_.Exception.Message)" }
 
         $caddyRoot = Join-Path $runtimeRoot 'caddy'
         $caddy = Join-Path $caddyRoot 'caddy.exe'
@@ -177,7 +212,10 @@ function Install-HappyCone {
         }
 
         if (-not $state.DatabaseInitialized) {
-            if ((Test-Path $postgresData) -and (Get-ChildItem $postgresData -Force | Select-Object -First 1)) { throw 'Refusing to initialize over an existing PostgreSQL data directory.' }
+            if (Test-Path $postgresData) {
+                if ($state.DatabaseCreated -or (Get-Service HappyConePostgreSQL -ErrorAction SilentlyContinue)) { throw 'Refusing to initialize over an existing PostgreSQL data directory.' }
+                Remove-Item $postgresData -Recurse -Force
+            }
             New-Item $postgresData -ItemType Directory -Force | Out-Null
             Set-HappyConeDirectoryAcl (Split-Path $postgresData -Parent) 'NT AUTHORITY\NETWORK SERVICE'
             $postgresAdminPassword = New-HappyConeSecret

@@ -32,6 +32,7 @@ def source_tree(tmp_path: Path) -> Path:
         'apps/api/alembic/env.py': b'',
         'apps/api/pyproject.toml': b'[project]',
         'packaging/windows/scripts/Install-HappyCone.ps1': b'Write-Host install',
+        'packaging/windows/START-HAPPY-CONE.cmd': b'@echo off',
         'packaging/windows/config/Caddyfile.template': b':{{PORT}}',
     }
     for name, data in files.items():
@@ -58,6 +59,18 @@ def test_load_dependency_lock_rejects_unsafe_or_wrong_architecture(tmp_path):
     }])
     with pytest.raises(ValueError, match='safe filename'):
         load_dependency_lock(lock)
+
+def test_repository_dependency_lock_contains_pinned_vc_runtime():
+    root = Path(__file__).resolve().parents[2]
+    lock = load_dependency_lock(root / 'packaging/windows/dependencies.lock.json')
+    runtimes = [
+        item for item in lock['artifacts']
+        if item['name'] == 'Microsoft Visual C++ Redistributable x64'
+    ]
+    assert len(runtimes) == 1
+    assert runtimes[0]['version'] == '14.44.35211'
+    assert runtimes[0]['filename'] == 'VC_redist.x64-14.44.35211.exe'
+    assert runtimes[0]['destination'] == 'installers'
 
 
 def test_verify_sha256_rejects_altered_artifact(tmp_path):
@@ -109,13 +122,14 @@ def test_assemble_bundle_emits_exact_layout_and_verified_manifest(tmp_path):
     assert release.name == 'HappyCone-Windows-1.0.0'
     assert {path.name for path in release.iterdir()} == {
         'api', 'config', 'installers', 'release-manifest.json', 'runtime', 'scripts',
-        'THIRD-PARTY-NOTICES.md', 'web', 'wheelhouse'
+        'START-HAPPY-CONE.cmd', 'THIRD-PARTY-NOTICES.md', 'web', 'wheelhouse'
     }
     manifest = json.loads((release / 'release-manifest.json').read_text())
     assert manifest['version'] == '1.0.0'
     assert manifest['architecture'] == 'win_amd64'
     assert manifest['database_migration'] == '0008'
     recorded = {entry['path']: entry['sha256'] for entry in manifest['files']}
+    assert recorded['START-HAPPY-CONE.cmd'] == digest(b'@echo off')
     assert recorded['installers/python.exe'] == digest(b'python')
     assert recorded['runtime/caddy.exe'] == digest(b'caddy')
     assert recorded['wheelhouse/tzdata.whl'] == digest(b'wheel')

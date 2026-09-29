@@ -125,6 +125,7 @@ def assemble_bundle(source_root: Path, output_root: Path, cache_root: Path, vers
         shutil.copy2(source_root / 'apps/api/pyproject.toml', staging / 'api/pyproject.toml')
         copy_tree(source_root / 'packaging/windows/scripts', staging / 'scripts')
         copy_tree(source_root / 'packaging/windows/config', staging / 'config')
+        shutil.copy2(source_root / 'packaging/windows/START-HAPPY-CONE.cmd', staging / 'START-HAPPY-CONE.cmd')
         shutil.copy2(source_root / 'packaging/windows/THIRD-PARTY-NOTICES.md', staging / 'THIRD-PARTY-NOTICES.md')
         copy_tree(cache_root / 'wheelhouse', staging / 'wheelhouse')
         shutil.copy2(cache_root / 'wheelhouse-manifest.json', staging / 'wheelhouse/manifest.json')

@@ -8,12 +8,12 @@ On the Ubuntu development computer, build a numbered release:
 
 ```bash
 ./scripts/build-windows-bundle.sh \
-  --version 1.0.0 \
+  --version 1.0.2 \
   --cache /tmp/happycone-vendor-cache \
   --output build/windows
 ```
 
-Copy the complete `HappyCone-Windows-1.0.0` folder to a USB drive. Do not copy individual files from inside it. `release-manifest.json` protects every application, installer, runtime, script, and configuration file with SHA-256.
+Copy the complete `HappyCone-Windows-1.0.2` folder to a USB drive. Do not copy individual files from inside it. `release-manifest.json` protects every application, installer, runtime, script, and configuration file with SHA-256.
 
 ## Prepare Windows
 
@@ -28,29 +28,27 @@ Run preflight from inside the copied release folder:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
-cd "$HOME\Desktop\HappyCone-Windows-1.0.0"
+cd "$HOME\Desktop\HappyCone-Windows-1.0.2"
 .\scripts\Test-HappyConeComputer.ps1 -WebPort 8080
 ```
 
 Do not continue if `CanInstall` is false. Correct every blocking error first. Preflight does not change Windows. A computer sold with 4 GB RAM may report less than 4.00 GiB after hardware reservation; the supported reported floor is 3.50 GiB.
 
-## Install a clean production system
+## Install or resume production setup
 
-Choose the first owner’s real name and username. The password must contain 12 to 256 characters. It is read as a protected value and is never written to the installer log or command line.
+Double-click `START-HAPPY-CONE.cmd` in the extracted release folder and approve the Windows Administrator prompt. The guided setup runs preflight, asks for the first owner's real name, username and protected password, and then completes installation. The password must contain 12 to 256 characters and is never written to the installer log or command line.
+
+If Windows blocks double-clicked command files, open Administrator PowerShell in the release folder and run:
 
 ```powershell
-$ownerPassword = Read-Host 'First owner password' -AsSecureString
-.\scripts\Install-HappyCone.ps1 `
-  -BundleRoot (Get-Location).Path `
-  -OwnerName 'Owner full name' `
-  -OwnerUsername 'owner' `
-  -OwnerPassword $ownerPassword `
-  -WebPort 8080
+.\scripts\Start-HappyConeSetup.ps1
 ```
+
+The setup is safe to run again after an interruption. Release 1.0.2 can repair the incomplete early stage left by 1.0.1 before any database or owner account was created. It installs the pinned Microsoft Visual C++ x64 runtime offline, verifies PostgreSQL can start, and then initializes the database.
 
 A successful installation prints the address staff should open, such as `http://192.168.1.20:8080`. It creates one owner account and an empty production database. It does not create sample staff, sample menu items, opening stock, or sales.
 
-The installer may be run again after an interruption. It records completed phases and never deletes an initialized database. If it finds database files without a matching completed phase, it stops for technical review instead of overwriting them.
+The installer may be run again after an interruption. It records completed phases and never deletes an initialized database. It removes only an incomplete cluster left before database initialization; if a database phase or service was recorded, it stops instead of overwriting data.
 
 ## Fix the network address
 

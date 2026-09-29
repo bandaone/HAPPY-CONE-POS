@@ -43,4 +43,44 @@ Describe 'Happy Cone installer contract' {
         $script | Should -Match 'state\.Complete.+Use Update-HappyCone\.ps1'
         $script | Should -Match 'targetVersion'
     }
+
+    It 'installs and verifies the pinned Visual C++ runtime before PostgreSQL starts' {
+        $script | Should -Match 'VC_redist\.x64-.+\.exe'
+        $script | Should -Match '/install.+/quiet.+/norestart'
+        $script.IndexOf('VC_redist.x64-') | Should -BeLessThan $script.IndexOf("@('--version')")
+        $script.IndexOf("@('--version')") | Should -BeLessThan $script.IndexOf("--username=postgres")
+    }
+
+    It 'allows a newer repair release only before any installation phase completed' {
+        $script | Should -Match 'completedPhases'
+        $script | Should -Match '\[version\]::TryParse'
+        $script | Should -Match 'repairVersion -le \$interruptedVersion'
+        $script | Should -Match 'interrupted installation.+newer repair release'
+        $script | Should -Match 'targetVersion=\$version'
+    }
+
+    It 'removes only an incomplete new database cluster before retrying initdb' {
+        $script | Should -Match 'state\.DatabaseInitialized'
+        $script | Should -Match 'state\.DatabaseCreated'
+        $script | Should -Match 'Get-Service HappyConePostgreSQL'
+        $script | Should -Match 'Remove-Item \$postgresData -Recurse -Force'
+    }
+
+    It 'ships a guided setup entry point for the operator' {
+        Test-Path "$PSScriptRoot/../scripts/Start-HappyConeSetup.ps1" | Should -BeTrue
+        $setup = Get-Content "$PSScriptRoot/../scripts/Start-HappyConeSetup.ps1" -Raw
+        $setup | Should -Match 'Test-HappyConeComputer\.ps1'
+        $setup | Should -Match '-PassThru'
+        $setup | Should -Match 'preflight\.CanInstall'
+        $setup | Should -Match 'Install-HappyCone\.ps1'
+        $setup | Should -Match 'Read-Host'
+        $setup | Should -Match 'at least 12 characters'
+        $setup | Should -Match 'passwordLength -gt 256'
+        $setup | Should -Not -Match '\$LASTEXITCODE'
+        $launcherPath = Join-Path $PSScriptRoot '../START-HAPPY-CONE.cmd'
+        Test-Path $launcherPath | Should -BeTrue
+        $launcher = Get-Content $launcherPath -Raw
+        $launcher | Should -Match 'Start-Process.+RunAs'
+        $launcher | Should -Match 'Start-HappyConeSetup\.ps1'
+    }
 }
