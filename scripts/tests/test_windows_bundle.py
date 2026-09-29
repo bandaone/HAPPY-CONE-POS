@@ -4,7 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from scripts.build_windows_bundle import assemble_bundle, load_bundle_layout, load_dependency_lock, verify_sha256
+from scripts.build_windows_bundle import (
+    assemble_bundle, load_bundle_layout, load_dependency_lock, verify_sha256, verify_wheelhouse,
+    write_wheelhouse_manifest,
+)
 
 
 def digest(data: bytes) -> str:
@@ -99,6 +102,7 @@ def test_assemble_bundle_emits_exact_layout_and_verified_manifest(tmp_path):
     (cache / 'caddy.exe').write_bytes(b'caddy')
     (cache / 'wheelhouse').mkdir()
     (cache / 'wheelhouse' / 'tzdata.whl').write_bytes(b'wheel')
+    write_wheelhouse_manifest(cache)
 
     release = assemble_bundle(source, tmp_path / 'out', cache, '1.0.0')
 
@@ -115,4 +119,15 @@ def test_assemble_bundle_emits_exact_layout_and_verified_manifest(tmp_path):
     assert recorded['installers/python.exe'] == digest(b'python')
     assert recorded['runtime/caddy.exe'] == digest(b'caddy')
     assert recorded['wheelhouse/tzdata.whl'] == digest(b'wheel')
+    assert 'wheelhouse/manifest.json' in recorded
     assert all('..' not in name and not name.startswith('/') for name in recorded)
+
+
+def test_verify_wheelhouse_rejects_an_altered_cached_wheel(tmp_path):
+    (tmp_path / 'wheelhouse').mkdir()
+    wheel = tmp_path / 'wheelhouse/example.whl'
+    wheel.write_bytes(b'original')
+    write_wheelhouse_manifest(tmp_path)
+    wheel.write_bytes(b'altered')
+    with pytest.raises(ValueError, match='checksum'):
+        verify_wheelhouse(tmp_path)

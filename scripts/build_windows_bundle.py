@@ -28,6 +28,28 @@ def verify_sha256(path: Path, expected: str) -> None:
         raise ValueError(f'Artifact checksum mismatch for {path.name}: expected {expected}, got {actual}')
 
 
+def write_wheelhouse_manifest(cache_root: Path) -> None:
+    wheels = sorted((cache_root / 'wheelhouse').glob('*.whl'))
+    if not wheels:
+        raise FileNotFoundError('The Windows wheelhouse is empty')
+    payload = {'schema': 1, 'files': [{'filename': wheel.name, 'sha256': sha256(wheel)} for wheel in wheels]}
+    (cache_root / 'wheelhouse-manifest.json').write_text(json.dumps(payload, indent=2) + '\n')
+
+
+def verify_wheelhouse(cache_root: Path) -> None:
+    manifest_path = cache_root / 'wheelhouse-manifest.json'
+    if not manifest_path.is_file():
+        raise FileNotFoundError('wheelhouse-manifest.json is missing')
+    data = json.loads(manifest_path.read_text())
+    if data.get('schema') != 1 or not data.get('files'):
+        raise ValueError('The wheelhouse manifest is invalid')
+    for entry in data['files']:
+        filename = entry.get('filename', '')
+        if Path(filename).name != filename or not filename.endswith('.whl'):
+            raise ValueError('The wheelhouse manifest contains an unsafe filename')
+        verify_sha256(cache_root / 'wheelhouse' / filename, entry.get('sha256', ''))
+
+
 def load_dependency_lock(path: Path) -> dict:
     data = json.loads(path.read_text())
     if data.get('schema') != 1:
@@ -70,10 +92,13 @@ def assemble_bundle(source_root: Path, output_root: Path, cache_root: Path, vers
     missing = [item['filename'] for item in lock['artifacts'] if not (cache_root / item['filename']).is_file()]
     if not (cache_root / 'wheelhouse').is_dir():
         missing.append('wheelhouse/')
+    if not (cache_root / 'wheelhouse-manifest.json').is_file():
+        missing.append('wheelhouse-manifest.json')
     if missing:
         raise FileNotFoundError('Missing cached artifacts: ' + ', '.join(sorted(missing)))
     for item in lock['artifacts']:
         verify_sha256(cache_root / item['filename'], item['sha256'])
+    verify_wheelhouse(cache_root)
 
     output_root.mkdir(parents=True, exist_ok=True)
     release = output_root / f'HappyCone-Windows-{version}'
@@ -92,6 +117,7 @@ def assemble_bundle(source_root: Path, output_root: Path, cache_root: Path, vers
         copy_tree(source_root / 'packaging/windows/config', staging / 'config')
         shutil.copy2(source_root / 'packaging/windows/THIRD-PARTY-NOTICES.md', staging / 'THIRD-PARTY-NOTICES.md')
         copy_tree(cache_root / 'wheelhouse', staging / 'wheelhouse')
+        shutil.copy2(cache_root / 'wheelhouse-manifest.json', staging / 'wheelhouse/manifest.json')
         for item in lock['artifacts']:
             shutil.copy2(cache_root / item['filename'], staging / item['destination'] / item['filename'])
         files = []
@@ -123,16 +149,21 @@ def populate_cache(source_root: Path, cache_root: Path, cache_only: bool) -> lis
             urllib.request.urlretrieve(item['url'], target)
         verify_sha256(target, item['sha256'])
     wheelhouse = cache_root / 'wheelhouse'
-    if not wheelhouse.is_dir() or not any(wheelhouse.glob('*.whl')):
+    wheel_manifest = cache_root / 'wheelhouse-manifest.json'
+    if not wheelhouse.is_dir() or not any(wheelhouse.glob('*.whl')) or not wheel_manifest.is_file():
         if cache_only:
-            missing.append('wheelhouse/')
+            missing.append('wheelhouse-manifest.json')
         else:
+            shutil.rmtree(wheelhouse, ignore_errors=True)
             wheelhouse.mkdir(exist_ok=True)
             subprocess.run([
                 sys.executable, '-m', 'pip', 'download', '--dest', str(wheelhouse),
                 '--platform', 'win_amd64', '--python-version', '312', '--implementation', 'cp',
                 '--abi', 'cp312', '--only-binary=:all:', str(source_root / 'apps/api'),
             ], check=True)
+            write_wheelhouse_manifest(cache_root)
+    if not missing:
+        verify_wheelhouse(cache_root)
     return missing
 
 

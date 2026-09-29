@@ -110,6 +110,9 @@ Use `scripts/backup.sh` for verified PostgreSQL custom-format backups. Productio
 ## Documentation
 
 - [Project and operations guide](docs/implementation/project-guide.md)
+- [Install the offline Windows shop server](docs/implementation/windows-installation.md)
+- [Windows backup, recovery, updates and support](docs/implementation/windows-recovery.md)
+- [Xprinter commissioning checklist](docs/implementation/xprinter-commissioning.md)
 - [Deployment and operations runbook](docs/implementation/deployment-runbook.md)
 - [Release evidence template](docs/implementation/release-evidence-template.md)
 - [Staff role access review and screenshots](docs/implementation/role-access-review.md)

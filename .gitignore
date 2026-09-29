@@ -25,6 +25,7 @@ apps/web/.vite/
 coverage/
 playwright-report/
 test-results/
+testResults.xml
 *.tsbuildinfo
 .eslintcache
 

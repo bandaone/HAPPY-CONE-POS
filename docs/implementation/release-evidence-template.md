@@ -1,6 +1,6 @@
 # Happy Cone release evidence
 
-Copy this file for each release and replace every blank. A release is blocked while any required result is blank or failed without an approved, documented resolution.
+Copy this file for each release and fill every required result. Any blank or failed release gate blocks real sales until it has a documented resolution.
 
 ## Release record
 
@@ -8,66 +8,89 @@ Copy this file for each release and replace every blank. A release is blocked wh
 | --- | --- |
 | Version / Git tag | |
 | Commit | |
-| Staging URL | |
-| Production URL | |
-| Reviewer | |
-| Review date | |
-| Counter device / browser | |
-| Preparation device / browser | |
-| Receipt printer / paper width | |
+| Release-folder SHA-256 manifest verified | |
+| Windows computer model / RAM / storage | |
+| Windows version / build | |
+| Reserved LAN address | |
+| Reviewer and date | |
+| Exact Xprinter model / driver / paper width | |
 
 ## Automated checks
 
 | Check | Result / evidence |
 | --- | --- |
 | API suite | |
-| Web component suite | |
-| Production web build | |
-| Playwright full flow and axe scan | |
-| PostgreSQL migration on staging copy | |
-| Built-container smoke test | |
-| Dependency/security scan | |
+| Web component suite and production build | |
+| Playwright full flow, accessibility scan and receipt overflow | |
+| Bundle-builder tests and full release manifest verification | |
+| PowerShell parser and all Pester tests on Windows | |
+| Clean offline wheelhouse install, timezone import and migration `0008` | |
+| Container checks for the managed-Linux alternative | |
 
-## Role and workflow review
+## Windows computer gate
 
-Record pass/fail and any issue identifier for owner, manager, cashier and server sign-in; business-day open/close; category/product/variation creation; price and recipe edit; catalog archive; cash sale; manually confirmed payment; receipt print/reprint; preparation transitions; refund; inventory movement/count; reports; activity log; staff account creation/deactivation/password reset; own-password change; offline cash order and reconnect sync.
+| Check | Result / evidence |
+| --- | --- |
+| Preflight passed: 64-bit, supported Windows, at least 4 GB RAM and 10 GB free | |
+| Clean offline install completed without downloading | |
+| PostgreSQL and API listen on loopback; firewall rule is Private profile only | |
+| Restart recovery: all three services and `/health` + `/ready` pass | |
+| Another LAN device works while internet is disconnected | |
+| Idle and checkout memory use recorded | |
+| Daily local backup created, validated and retention confirmed | |
+| Encrypted USB export checksum passed; recovery identity stored separately | |
+| Separate-database restore rehearsal passed and elapsed time recorded | |
+| Support bundle checked: redacted config and bounded logs, no database/backups | |
+
+## Role and business-flow review
 
 | Workflow / role | Result / evidence |
 | --- | --- |
-| Owner administration | |
-| Manager operations | |
-| Catalog, prices and recipes | |
-| Cashier counter | |
-| Server preparation | |
-| Offline and recovery | |
+| Owner sign-in, staff accounts, settings and receipt details | |
+| Manager catalog, prices, variations, recipes and inventory | |
+| Cashier open day, fast checkout, receipt, reprint and close day | |
+| Cash, manual mobile-money/card reference and reconciliation | |
+| Stock receive, sale deduction exactly once, waste, adjustment and count | |
+| Refund, reports and activity record | |
+| Offline cash sale and reconnect sync | |
+| Archived variation edit, restoration and accurate stock behavior | |
 
 ## Accessibility and device review
 
 | Review | Result / evidence |
 | --- | --- |
 | Keyboard only, visible focus and dialog focus return | |
-| Screen reader: sign-in, checkout, errors, preparation, settings | |
+| Screen reader: sign-in, checkout, errors, stock and settings | |
 | 320 CSS px reflow and 200% zoom | |
 | Text, focus and non-text contrast measurements | |
 | Reduced motion | |
-| Touch targets during observed service trial | |
-| Sunlight/glare and preparation-screen distance | |
-| 58/80 mm grayscale receipt legibility and no clipped values | |
+| Touch targets with wet or gloved hands during observed counter trial | |
+| Sunlight/glare at the real counter | |
 
-## Operations gate
+## Xprinter gate
 
 | Check | Result / evidence |
 | --- | --- |
-| TLS certificate and expiry alert | |
-| Host firewall and private database/API ports | |
-| `/health` and `/ready` monitoring | |
-| Central logs and request-ID search | |
-| Encrypted off-host backup | |
-| Timed staging restore rehearsal | |
-| Disk, database, restart and backup alerts | |
-| Manual payment reconciliation procedure approved | |
-| ZRA/fiscal disposition recorded | |
-| Staff fallback and incident briefing completed | |
+| HP DesignJet PostScript queue is not used | |
+| Exact XP model and matching 64-bit Xprinter driver recorded | |
+| Hardware self-test and Windows test page pass | |
+| Short, normal and long Happy Cone receipts pass | |
+| Logo, location, TPIN, phone and TOT details are clear | |
+| Long names wrap; values and totals do not clip | |
+| No browser header/footer or application interface prints | |
+| Final feed and single cut/tear are correct; no continuous blank feed | |
+| Saved-sale reprint passes | |
+
+## Business and compliance gate
+
+| Check | Result / evidence |
+| --- | --- |
+| Receipt legal name, location, TPIN, phone, TOT rate and wording approved | |
+| Receipt is not represented as ZRA Smart Invoice or fiscal certification | |
+| Manual external-payment and refund procedures approved | |
+| Named staff briefed; shared accounts prohibited | |
+| Power-cut, printer-failure and network-failure fallback rehearsed | |
+| No router port forwarding; any later remote access separately reviewed | |
 
 ## Approval
 

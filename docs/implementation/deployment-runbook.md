@@ -1,21 +1,27 @@
 # Happy Cone deployment and operations runbook
 
-This is the operating runbook for the owner and trusted technical administrator. It covers the supplied single-host Docker deployment. Record the real host, DNS name, backup location, responsible people and test dates in the private operations record; do not commit credentials or recovery keys.
+This is the operating runbook for the owner and trusted technical administrator. The supported shop setup is the offline Windows package in [Windows installation](windows-installation.md); the Docker procedure remains available for a later managed Linux host. Record the real host, network address, backup location, responsible people and test dates in the private operations record; do not commit credentials or recovery keys.
 
 ## Release gate
 
 Do not move a release to the live stand until all of these checks are recorded:
 
-- CI passes API tests, web tests, the production web build, shell syntax and container builds.
-- The release is exercised through built Nginx and PostgreSQL on staging, including migration, sign-in, catalog creation and price edit, sale, receipt, preparation, refund, stock effect, day close and report.
+- CI passes API, web, browser, bundle-builder and Windows Pester tests, the production web build, PowerShell parsing, shell syntax and container builds.
+- The release is exercised through Caddy and PostgreSQL on the actual Windows computer, including migration, sign-in, catalog creation and price edit, sale, receipt, refund, stock effect, day close and report.
 - A backup is created, copied off-host, decrypted and restored into an empty staging database within the agreed recovery time.
-- TLS, DNS, host firewall, disk alerts, container restart alerts and `/ready` uptime monitoring are active.
-- Owner, manager, cashier and server accounts are tested; shared production passwords are prohibited.
+- The Windows Private-profile firewall exposes only Caddy. PostgreSQL and the API remain on loopback; status, disk, service restart and `/ready` checks pass.
+- Owner, manager and cashier accounts are tested; shared production passwords are prohibited.
 - Keyboard-only, 200% zoom, narrow-screen, screen-reader, offline-cash and physical-printer checks pass on the devices used at the stand. Test both 58 mm and 80 mm paper if both widths will be used.
 - The chosen payment procedure is approved. Any direct provider integration must separately pass provider sandbox, webhook and reconciliation tests.
 - The saved legal name, branch, location, TPIN, contact number, Turnover Tax category, and tax rate have been confirmed by the business. The receipt omits ZRA fiscal identifiers and must not be represented as a certified Smart Invoice.
 
-## Host and secrets
+## Offline Windows shop server
+
+Build the checksummed release on the development computer, copy the complete folder by USB, run preflight, and install from Administrator PowerShell. Follow [Windows installation](windows-installation.md), [Windows recovery](windows-recovery.md), and [Xprinter commissioning](xprinter-commissioning.md). The installation creates automatic services, one clean owner, daily retained backups, stable LAN access, and no demonstration data.
+
+Do not expose port 8080 with router port forwarding. A later internet connection requires a reviewed VPN or HTTPS tunnel. Physical installation, disconnected-internet LAN testing, restore rehearsal, and exact-model Xprinter testing remain release gates.
+
+## Managed Linux host alternative
 
 Use a supported Linux host with Docker Engine and the Compose plugin. Keep PostgreSQL and the direct API port bound to loopback. Expose only a managed TLS reverse proxy that forwards to `127.0.0.1:8080`, preserves the original host and scheme, and permits long-lived `/api/events` responses.
 
@@ -42,7 +48,7 @@ Create the first `OWNER_ADMIN` with `python -m app.cli create-user` and the `--p
 2. Close the business day if the release could interrupt service.
 3. Run an encrypted backup and verify its checksum and off-host copy.
 4. Pull or check out the reviewed release tag and build immutable images.
-5. Run the migration command once, then replace the API and web services. Migration `0002_order_cashier_name` preserves cashier names on historical receipts, migration `0003` adds the editable stand profile, migration `0004_receipt_tax_details` adds the editable tax and contact fields, migration `0005_turnover_tax_defaults` corrects the configured tax treatment to TOT, migration `0006_archive_untracked_catalog_items` archives any sellable variation or extra that has no stock recipe, and migration `0007_cashier_only_guidance` updates unchanged supplied guidance while preserving owner-customized wording; confirm `0007` is at head.
+5. Run the migration command once, then replace the API and web services. Migration `0008_receipt_paper_width` adds the explicit 58 mm or 80 mm receipt profile while preserving existing settings; confirm `0008` is at head.
 6. Run `./scripts/production-check.sh` through the TLS URL by setting `HAPPYCONE_BASE_URL`.
 7. Complete a signed-in smoke test: create or edit a test product variation and recipe as a manager, make a low-value controlled sale, and confirm one receipt, the completed sale in Sales, the stock movement, report, and activity log. Archive the test item afterward if it is not part of the live menu.
 8. Record release version, operator, start/end time, migration result, backup identifier and smoke-test result.

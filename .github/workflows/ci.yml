@@ -77,3 +77,57 @@ jobs:
       - run: docker compose config --quiet
       - run: docker compose build api web
       - run: bash -n scripts/*.sh
+
+  windows-offline-package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: apps/api/pyproject.toml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install Pester 5.5.0
+        shell: pwsh
+        run: Install-Module Pester -RequiredVersion 5.5.0 -Scope CurrentUser -Force -SkipPublisherCheck
+      - name: Parse and test Windows lifecycle scripts
+        shell: pwsh
+        run: |
+          Import-Module Pester -RequiredVersion 5.5.0 -Force
+          $errors = @()
+          Get-ChildItem packaging/windows -Recurse -Include *.ps1,*.psm1 | ForEach-Object {
+            $tokens = $null
+            $fileErrors = $null
+            [Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$fileErrors) | Out-Null
+            $errors += $fileErrors
+          }
+          if ($errors.Count) { $errors | Format-List; exit 1 }
+          Invoke-Pester packaging/windows/tests -Output Detailed -CI
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: npm ci
+      - name: Build web assets
+        working-directory: apps/web
+        run: npm run build
+      - name: Test bundle assembly with controlled cache
+        run: |
+          python -m pip install pytest
+          python -m pytest scripts/tests/test_windows_bundle.py -q
+      - name: Build and install offline Windows wheelhouse
+        shell: pwsh
+        run: |
+          New-Item .ci-cache/wheelhouse -ItemType Directory -Force | Out-Null
+          python -m pip wheel ./apps/api --wheel-dir .ci-cache/wheelhouse
+          python -m venv .ci-runtime
+          ./.ci-runtime/Scripts/python -m pip install --no-index --find-links .ci-cache/wheelhouse icecream-pos-api==0.1.0
+          ./.ci-runtime/Scripts/python -c "from zoneinfo import ZoneInfo; from app.main import create_app; assert ZoneInfo('Africa/Lusaka'); assert create_app()"
+          $env:DATABASE_URL='sqlite:///./windows-ci.db'
+          Push-Location apps/api
+          ../../.ci-runtime/Scripts/python -m alembic upgrade head
+          ../../.ci-runtime/Scripts/python -m alembic current
+          Pop-Location
