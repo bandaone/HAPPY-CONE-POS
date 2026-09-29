@@ -222,7 +222,8 @@ function Install-HappyCone {
             $passwordFile = Join-Path $DataRoot 'initdb-password.tmp'
             try {
                 [IO.File]::WriteAllText($passwordFile, $postgresAdminPassword, (New-Object Text.UTF8Encoding($false)))
-                Protect-HappyConeFile $passwordFile
+                $installerIdentity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+                Protect-HappyConeFile $passwordFile -ServiceIdentity $installerIdentity
                 Invoke-HappyConeCommand (Join-Path $postgresRoot 'bin\initdb.exe') @('-D',$postgresData,'--username=postgres','--auth=scram-sha-256',"--pwfile=$passwordFile",'--encoding=UTF8','--locale=C')
             } finally { Remove-Item $passwordFile -Force -ErrorAction SilentlyContinue }
             Copy-Item (Join-Path (Split-Path $PSScriptRoot -Parent) 'config\postgresql-low-memory.conf') $postgresData

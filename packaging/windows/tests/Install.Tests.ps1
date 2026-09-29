@@ -59,6 +59,12 @@ Describe 'Happy Cone installer contract' {
         $script | Should -Match 'targetVersion=\$version'
     }
 
+    It 'keeps the temporary initdb password readable by the restricted installer user' {
+        $script | Should -Match 'WindowsIdentity\]::GetCurrent\(\)\.Name'
+        $script | Should -Match 'Protect-HappyConeFile \$passwordFile -ServiceIdentity \$installerIdentity'
+        $script.IndexOf('Protect-HappyConeFile $passwordFile -ServiceIdentity $installerIdentity') | Should -BeLessThan $script.IndexOf("'--username=postgres'")
+    }
+
     It 'removes only an incomplete new database cluster before retrying initdb' {
         $script | Should -Match 'state\.DatabaseInitialized'
         $script | Should -Match 'state\.DatabaseCreated'
