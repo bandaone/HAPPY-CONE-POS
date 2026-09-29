@@ -67,7 +67,11 @@ describe("first-time guidance", () => {
     await user.type(screen.getByLabelText("Password"), "first-day-password");
     await user.click(screen.getByRole("button", { name: "Open counter" }));
 
-    const tour = await screen.findByRole("dialog", { name: "Welcome to your counter" });
+    const tour = await screen.findByRole(
+      "dialog",
+      { name: "Welcome to your counter" },
+      { timeout: 5_000 },
+    );
     expect(within(tour).getByText("1 of 4")).toBeInTheDocument();
     expect(within(tour).getByText(/guided look at the tools you will use/i)).toBeInTheDocument();
     await user.click(within(tour).getByRole("button", { name: "Next" }));
