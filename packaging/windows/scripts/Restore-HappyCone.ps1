@@ -25,7 +25,7 @@ function Test-HappyConeRestore {
         Invoke-HappyConeAdminPg (Join-Path $pg 'createdb.exe') @('-h','127.0.0.1','-U','postgres','-O','happycone',$validation) $DataRoot
         $password=Get-HappyConeDatabasePassword $DataRoot;$old=$env:PGPASSWORD;$env:PGPASSWORD=$password
         try{
-            & (Join-Path $pg 'pg_restore.exe') -h 127.0.0.1 -U happycone -d $validation --no-owner --exit-on-error $ArchivePath
+            & (Join-Path $pg 'pg_restore.exe') -h 127.0.0.1 -U happycone -d $validation --no-owner --single-transaction --exit-on-error $ArchivePath
             if($LASTEXITCODE -ne 0){throw 'Validation restore failed.'}
             $revision=(& (Join-Path $pg 'psql.exe') -h 127.0.0.1 -U happycone -d $validation -tAc 'SELECT version_num FROM alembic_version').Trim()
         }finally{if($null -eq $old){Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue}else{$env:PGPASSWORD=$old}}
@@ -55,12 +55,12 @@ function Restore-HappyConeLive {
     $state=Get-Content (Join-Path $DataRoot 'install-state.json') -Raw|ConvertFrom-Json
     if($ExpectedInstallIdentity -ne $state.installIdentity){throw 'The expected installation identity does not match this computer.'}
     Test-HappyConeRestore -ArchivePath $ArchivePath -DataRoot $DataRoot|Out-Null
-    $safety=New-HappyConeBackup -DataRoot $DataRoot
-    if(-not $safety){throw 'The safety backup did not complete.'}
     $pg="$env:ProgramFiles\HappyCone\runtime\postgresql\bin"
     Stop-Service HappyConeApi -Force
     try{
-        Invoke-HappyConePgCommand (Join-Path $pg 'pg_restore.exe') @('-h','127.0.0.1','-U','happycone','-d','happycone','--clean','--if-exists','--no-owner','--exit-on-error',$ArchivePath) (Get-HappyConeDatabasePassword $DataRoot)
+        $safety=New-HappyConeBackup -DataRoot $DataRoot
+        if(-not $safety){throw 'The safety backup did not complete.'}
+        Invoke-HappyConePgCommand (Join-Path $pg 'pg_restore.exe') @('-h','127.0.0.1','-U','happycone','-d','happycone','--clean','--if-exists','--no-owner','--single-transaction','--exit-on-error',$ArchivePath) (Get-HappyConeDatabasePassword $DataRoot)
         Start-Service HappyConeApi
         $deadline=[DateTime]::UtcNow.AddSeconds(90);$ready=$false
         do{try{$ready=(Invoke-WebRequest 'http://127.0.0.1:8000/ready' -UseBasicParsing -TimeoutSec 3).StatusCode -eq 200}catch{Start-Sleep 2}}while(-not $ready -and [DateTime]::UtcNow -lt $deadline)

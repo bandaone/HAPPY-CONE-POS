@@ -2,8 +2,13 @@
     root * "{{INSTALL_ROOT}}/current/web"
     encode zstd gzip
 
-    @backend path /api/* /health /ready
-    reverse_proxy @backend 127.0.0.1:8000
+    route {
+        @backend path /api/* /health /ready
+        reverse_proxy @backend 127.0.0.1:8000
+
+        try_files {path} /index.html
+        file_server
+    }
 
     header {
         -Server
@@ -12,9 +17,6 @@
         Referrer-Policy "no-referrer"
         Permissions-Policy "camera=(), microphone=(), geolocation=()"
     }
-
-    try_files {path} /index.html
-    file_server
 
     log {
         output file "{{DATA_ROOT}}/logs/caddy-access.log" {

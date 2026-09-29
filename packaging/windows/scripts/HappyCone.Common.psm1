@@ -94,7 +94,7 @@ function Write-HappyConeConfiguration {
     if ($PublicHost -notmatch '^[A-Za-z0-9.-]+$') { throw 'The computer name contains unsupported characters.' }
     if (-not (Test-HappyConePrivateIPv4 $IPv4)) { throw 'The server address must be a private IPv4 address.' }
     $templateRoot = Join-Path (Split-Path $PSScriptRoot -Parent) 'config'
-    $allowedHosts = '["' + (($PublicHost, $IPv4, 'localhost') -join '","') + '"]'
+    $allowedHosts = '["' + (($PublicHost, $IPv4, 'localhost', '127.0.0.1') -join '","') + '"]'
     $values = @{
         INSTALL_ROOT=$InstallRoot.Replace('\','/'); DATA_ROOT=$DataRoot.Replace('\','/'); PUBLIC_HOST=$PublicHost
         IPV4=$IPv4; WEB_PORT=$WebPort; DATABASE_PASSWORD=$DatabasePassword

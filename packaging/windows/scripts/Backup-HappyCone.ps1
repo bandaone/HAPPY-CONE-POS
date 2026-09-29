@@ -25,7 +25,7 @@ function New-HappyConeBackup {
     $password = Get-HappyConeDatabasePassword $DataRoot
     try {
         Invoke-HappyConePgCommand (Join-Path $pgRoot 'pg_dump.exe') @('-h','127.0.0.1','-U','happycone','-d','happycone','-Fc','-f',$temporaryArchive) $password
-        Invoke-HappyConePgCommand (Join-Path $pgRoot 'pg_restore.exe') @('--list',$temporaryArchive) $password
+        Invoke-HappyConePgCommand (Join-Path $pgRoot 'pg_restore.exe') @('--list',$temporaryArchive) $password | Out-Null
         $hash = (Get-FileHash $temporaryArchive -Algorithm SHA256).Hash.ToLowerInvariant()
         $state = Get-Content (Join-Path $DataRoot 'install-state.json') -Raw | ConvertFrom-Json
         $manifest = [ordered]@{ schema=1; format='postgresql-custom'; database='happycone'; createdAt=[DateTime]::UtcNow.ToString('o'); sha256=$hash; bytes=(Get-Item $temporaryArchive).Length; appVersion=$state.version; migration='0008' }

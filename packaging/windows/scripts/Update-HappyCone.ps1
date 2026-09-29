@@ -20,7 +20,8 @@ function Update-HappyCone {
     param([string]$BundleRoot,[string]$InstallRoot="$env:ProgramFiles\HappyCone",[string]$DataRoot="$env:ProgramData\HappyCone")
     $manifest=Test-HappyConeReleaseManifest ([IO.Path]::GetFullPath($BundleRoot))
     $statePath=Join-Path $DataRoot 'install-state.json'
-    $state=Get-Content $statePath -Raw|ConvertFrom-Json
+    $originalStateJson=Get-Content $statePath -Raw
+    $state=$originalStateJson|ConvertFrom-Json
     $installedVersion=$null;$candidateVersion=$null
     if(-not [version]::TryParse([string]$state.version,[ref]$installedVersion) -or -not [version]::TryParse([string]$manifest.version,[ref]$candidateVersion)){throw 'Installed and candidate releases must use numeric versions such as 1.0.0.'}
     if($candidateVersion -le $installedVersion){throw "The update must be newer than the installed version $installedVersion."}
@@ -36,7 +37,7 @@ function Update-HappyCone {
     $apiXml=Join-Path $servicesRoot 'HappyConeApi.xml'
     $previousApiXml=Get-Content $apiXml -Raw
     $current=Join-Path $InstallRoot 'current';$next=Join-Path $InstallRoot 'current.next';$previous=Join-Path $InstallRoot 'current.previous'
-    $switched=$false;$environment=@{};$priorEnvironment=@{}
+    $switched=$false;$previousMoved=$false;$environment=@{};$priorEnvironment=@{}
     try{
         New-Item $versionRoot -ItemType Directory|Out-Null
         foreach($directory in 'api','web','wheelhouse','scripts','config'){Copy-Item (Join-Path $BundleRoot $directory) $versionRoot -Recurse}
@@ -60,20 +61,23 @@ function Update-HappyCone {
         Invoke-UpdateCommand "$env:SystemRoot\System32\cmd.exe" @('/d','/c','mklink','/J',$next,$versionRoot)
         if(Test-Path $previous){Remove-Item $previous -Force}
         Rename-Item $current (Split-Path $previous -Leaf)
+        $previousMoved=$true
         Rename-Item $next (Split-Path $current -Leaf)
         $switched=$true
         Move-Item "$apiXml.next" $apiXml -Force
         Protect-HappyConeFile $apiXml -ServiceIdentity 'NT AUTHORITY\LOCAL SERVICE'
         Start-Service HappyConeApi
         Wait-UpdateReady
-        Remove-Item $previous -Force
-        $state.version=[string]$manifest.version;$state.preUpdateBackup=$preUpdateBackup.FullName;$state.lastUpdateAt=[DateTime]::UtcNow.ToString('o');$state.Complete=$true
-        Write-UpdateState $state $statePath
         & (Join-Path $current 'scripts\Register-HappyConeBackupTask.ps1') -DataRoot $DataRoot
+        $state.version=[string]$manifest.version;$state.Complete=$true
+        $state|Add-Member -NotePropertyName preUpdateBackup -NotePropertyValue $preUpdateBackup.FullName -Force
+        $state|Add-Member -NotePropertyName lastUpdateAt -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
+        Write-UpdateState $state $statePath
+        Remove-Item $previous -Force -ErrorAction SilentlyContinue
         Write-Host "Happy Cone was updated to $($manifest.version)."
     }catch{
         $message=$_.Exception.Message
-        if($switched){Stop-Service HappyConeApi -Force -ErrorAction SilentlyContinue;if(Test-Path $current){Remove-Item $current -Force};if(Test-Path $previous){Rename-Item $previous (Split-Path $current -Leaf)}}
+        if($previousMoved -and (Test-Path $previous)){Stop-Service HappyConeApi -Force -ErrorAction SilentlyContinue;if(Test-Path $current){Remove-Item $current -Force};Rename-Item $previous (Split-Path $current -Leaf);[IO.File]::WriteAllText($statePath,$originalStateJson,(New-Object Text.UTF8Encoding($false)))}
         if($previousApiXml){[IO.File]::WriteAllText($apiXml,$previousApiXml,(New-Object Text.UTF8Encoding($false)))}
         Start-Service HappyConeApi -ErrorAction SilentlyContinue
         if(Test-Path $versionRoot){Remove-Item $versionRoot -Recurse -Force}

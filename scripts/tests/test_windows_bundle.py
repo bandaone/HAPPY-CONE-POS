@@ -102,7 +102,7 @@ def test_assemble_bundle_emits_exact_layout_and_verified_manifest(tmp_path):
     (cache / 'caddy.exe').write_bytes(b'caddy')
     (cache / 'wheelhouse').mkdir()
     (cache / 'wheelhouse' / 'tzdata.whl').write_bytes(b'wheel')
-    write_wheelhouse_manifest(cache)
+    write_wheelhouse_manifest(cache, source / 'apps/api/pyproject.toml')
 
     release = assemble_bundle(source, tmp_path / 'out', cache, '1.0.0')
 
@@ -130,4 +130,24 @@ def test_verify_wheelhouse_rejects_an_altered_cached_wheel(tmp_path):
     write_wheelhouse_manifest(tmp_path)
     wheel.write_bytes(b'altered')
     with pytest.raises(ValueError, match='checksum'):
+        verify_wheelhouse(tmp_path)
+
+
+def test_verify_wheelhouse_rejects_changed_api_dependencies(tmp_path):
+    requirements = tmp_path / 'pyproject.toml'
+    requirements.write_text('[project]\ndependencies=[]\n')
+    (tmp_path / 'wheelhouse').mkdir()
+    (tmp_path / 'wheelhouse/example.whl').write_bytes(b'wheel')
+    write_wheelhouse_manifest(tmp_path, requirements)
+    requirements.write_text('[project]\ndependencies=["new-package"]\n')
+    with pytest.raises(ValueError, match='different API dependencies'):
+        verify_wheelhouse(tmp_path, requirements)
+
+
+def test_verify_wheelhouse_rejects_an_unlisted_cached_wheel(tmp_path):
+    (tmp_path / 'wheelhouse').mkdir()
+    (tmp_path / 'wheelhouse/expected.whl').write_bytes(b'expected')
+    write_wheelhouse_manifest(tmp_path)
+    (tmp_path / 'wheelhouse/stale-extra.whl').write_bytes(b'unverified')
+    with pytest.raises(ValueError, match='exactly match'):
         verify_wheelhouse(tmp_path)

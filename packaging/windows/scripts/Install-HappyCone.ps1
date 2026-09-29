@@ -101,11 +101,13 @@ function Install-HappyCone {
         $loaded.psobject.Properties | ForEach-Object { $state[$_.Name] = $_.Value }
     } else {
         New-Item $DataRoot -ItemType Directory -Force | Out-Null
-        $state = @{ schema=1; installIdentity=[Guid]::NewGuid().ToString(); DatabaseInitialized=$false; DatabaseCreated=$false; OwnerCreated=$false; ServicesInstalled=$false; Complete=$false }
+        $state = @{ schema=1; installIdentity=[Guid]::NewGuid().ToString(); targetVersion=[string]$manifest.version; DatabaseInitialized=$false; DatabaseCreated=$false; OwnerCreated=$false; ServicesInstalled=$false; Complete=$false }
         Save-HappyConeState $state $statePath
     }
 
     $version = [string]$manifest.version
+    if ($state.Complete -and [string]$state.version -ne $version) { throw "Happy Cone $($state.version) is already installed. Use Update-HappyCone.ps1 for version $version." }
+    if ($state.targetVersion -and [string]$state.targetVersion -ne $version) { throw "An interrupted installation for version $($state.targetVersion) exists. Resume with that same release folder." }
     $versionRoot = Join-Path $InstallRoot "versions\$version"
     $runtimeRoot = Join-Path $InstallRoot 'runtime'
     $logsRoot = Join-Path $DataRoot 'logs'
@@ -124,7 +126,7 @@ function Install-HappyCone {
         $python = Join-Path $pythonRoot 'python.exe'
         if (-not (Test-Path $python)) {
             $pythonInstaller = Get-ChildItem (Join-Path $bundle 'installers\python-*-amd64.exe') | Select-Object -First 1
-            $process = Start-Process $pythonInstaller.FullName -ArgumentList '/quiet','InstallAllUsers=1','PrependPath=0','Include_test=0','Include_launcher=0',"TargetDir=$pythonRoot" -Wait -PassThru
+            $process = Start-Process $pythonInstaller.FullName -ArgumentList '/quiet','InstallAllUsers=1','PrependPath=0','Include_test=0','Include_launcher=0',"TargetDir=`"$pythonRoot`"" -Wait -PassThru
             if ($process.ExitCode -ne 0) { throw "Python installation failed with exit code $($process.ExitCode)." }
         }
 
@@ -272,7 +274,7 @@ function Install-HappyCone {
         $programs = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs'
         New-HappyConeShortcut (Join-Path $desktop 'Happy Cone POS.lnk') "$env:SystemRoot\System32\cmd.exe" "/c start http://$($network.IPv4):$WebPort"
         New-HappyConeShortcut (Join-Path $programs 'Happy Cone POS.lnk') "$env:SystemRoot\System32\cmd.exe" "/c start http://$($network.IPv4):$WebPort"
-        $state.ServicesInstalled=$true; $state.Complete=$true; $state.version=$version; $state.address="http://$($network.IPv4):$WebPort"
+        $state.ServicesInstalled=$true; $state.Complete=$true; $state.version=$version; $state.targetVersion=$version; $state.address="http://$($network.IPv4):$WebPort"
         Save-HappyConeState $state $statePath
         Write-Host "Happy Cone is ready at $($state.address)"
     } catch {
@@ -284,4 +286,4 @@ function Install-HappyCone {
     }
 }
 
-Install-HappyCone @PSBoundParameters
+Install-HappyCone -BundleRoot $BundleRoot -OwnerName $OwnerName -OwnerUsername $OwnerUsername -OwnerPassword $OwnerPassword -WebPort $WebPort -InstallRoot $InstallRoot -DataRoot $DataRoot

@@ -14,7 +14,7 @@ Describe 'Happy Cone common deployment functions' {
         $root = Join-Path $TestDrive 'install'
         $data = Join-Path $TestDrive 'data'
         $result = Write-HappyConeConfiguration -InstallRoot $root -DataRoot $data -PublicHost 'HAPPY-CONE' -IPv4 '192.168.1.20' -DatabasePassword 'db_safe' -WebPort 8080 -WhatIfMode
-        $result.ApiEnvironment | Should -Match 'ALLOWED_HOSTS=\["HAPPY-CONE","192.168.1.20","localhost"\]'
+        $result.ApiEnvironment | Should -Match 'ALLOWED_HOSTS=\["HAPPY-CONE","192.168.1.20","localhost","127.0.0.1"\]'
         $result.ApiEnvironment | Should -Match 'CORS_ORIGINS=\[\]'
         $result.ApiEnvironment | Should -Match 'BRANCH_TIMEZONE=Africa/Lusaka'
         $result.ApiEnvironment | Should -Match 'WEB_CONCURRENCY=1'
@@ -26,5 +26,11 @@ Describe 'Happy Cone common deployment functions' {
         $rule.Protocol | Should -Be 'TCP'
         $rule.LocalPort | Should -Be 8080
         $rule.Direction | Should -Be 'Inbound'
+    }
+
+    It 'routes API requests before the SPA fallback' {
+        $template = Get-Content "$PSScriptRoot/../config/Caddyfile.template" -Raw
+        $template | Should -Match 'route\s*\{'
+        $template.IndexOf('reverse_proxy') | Should -BeLessThan $template.IndexOf('try_files')
     }
 }

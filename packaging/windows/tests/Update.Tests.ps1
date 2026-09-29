@@ -18,5 +18,9 @@ Describe 'Happy Cone update contract' {
         $script | Should -Match 'previousApiXml'
         $script | Should -Match 'preUpdateBackup'
         $script | Should -Match 'Protect-HappyConeFile \$apiXml'
+        $script | Should -Match 'Add-Member -NotePropertyName preUpdateBackup'
+        $script | Should -Match 'Test-Path \$previous'
+        $script | Should -Match 'originalStateJson'
+        $script.IndexOf('$previousMoved=$true') | Should -BeLessThan $script.IndexOf('Rename-Item $next')
     }
 }

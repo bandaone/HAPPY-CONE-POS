@@ -32,4 +32,4 @@ function Uninstall-HappyCone {
     if($RemoveData -and (Test-Path $DataRoot)){Remove-Item $DataRoot -Recurse -Force;Write-Host 'Happy Cone and its production data were removed.'}
     else{Write-Host "Happy Cone application files were removed. Database files and backups remain in $DataRoot."}
 }
-Uninstall-HappyCone @PSBoundParameters
+Uninstall-HappyCone -KeepData:$KeepData -RemoveData:$RemoveData -ExpectedInstallIdentity $ExpectedInstallIdentity -InstallRoot $InstallRoot -DataRoot $DataRoot

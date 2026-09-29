@@ -15,4 +15,9 @@ Describe 'Happy Cone uninstall contract' {
     It 'removes services, firewall, scheduled task, shortcuts, and application files' {
         foreach($term in 'HappyConeApi','HappyConeWeb','HappyConePostgreSQL','Remove-NetFirewallRule','Unregister-ScheduledTask','Happy Cone POS.lnk','Remove-Item $InstallRoot'){$script|Should -Match ([regex]::Escape($term))}
     }
+
+    It 'passes top-level default paths into the uninstall function' {
+        $script | Should -Match 'Uninstall-HappyCone.+-InstallRoot \$InstallRoot -DataRoot \$DataRoot'
+        $script | Should -Not -Match 'Uninstall-HappyCone @PSBoundParameters'
+    }
 }

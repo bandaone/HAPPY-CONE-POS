@@ -28,21 +28,31 @@ def verify_sha256(path: Path, expected: str) -> None:
         raise ValueError(f'Artifact checksum mismatch for {path.name}: expected {expected}, got {actual}')
 
 
-def write_wheelhouse_manifest(cache_root: Path) -> None:
+def write_wheelhouse_manifest(cache_root: Path, requirements_path: Path | None = None) -> None:
     wheels = sorted((cache_root / 'wheelhouse').glob('*.whl'))
     if not wheels:
         raise FileNotFoundError('The Windows wheelhouse is empty')
-    payload = {'schema': 1, 'files': [{'filename': wheel.name, 'sha256': sha256(wheel)} for wheel in wheels]}
+    payload = {
+        'schema': 1,
+        'requirements_sha256': sha256(requirements_path) if requirements_path else None,
+        'files': [{'filename': wheel.name, 'sha256': sha256(wheel)} for wheel in wheels],
+    }
     (cache_root / 'wheelhouse-manifest.json').write_text(json.dumps(payload, indent=2) + '\n')
 
 
-def verify_wheelhouse(cache_root: Path) -> None:
+def verify_wheelhouse(cache_root: Path, requirements_path: Path | None = None) -> None:
     manifest_path = cache_root / 'wheelhouse-manifest.json'
     if not manifest_path.is_file():
         raise FileNotFoundError('wheelhouse-manifest.json is missing')
     data = json.loads(manifest_path.read_text())
     if data.get('schema') != 1 or not data.get('files'):
         raise ValueError('The wheelhouse manifest is invalid')
+    if requirements_path and data.get('requirements_sha256') != sha256(requirements_path):
+        raise ValueError('The wheelhouse was built for different API dependencies')
+    manifest_filenames = [entry.get('filename', '') for entry in data['files']]
+    actual_filenames = sorted(path.name for path in (cache_root / 'wheelhouse').glob('*.whl'))
+    if len(manifest_filenames) != len(set(manifest_filenames)) or sorted(manifest_filenames) != actual_filenames:
+        raise ValueError('The wheelhouse contents do not exactly match its manifest')
     for entry in data['files']:
         filename = entry.get('filename', '')
         if Path(filename).name != filename or not filename.endswith('.whl'):
@@ -98,7 +108,7 @@ def assemble_bundle(source_root: Path, output_root: Path, cache_root: Path, vers
         raise FileNotFoundError('Missing cached artifacts: ' + ', '.join(sorted(missing)))
     for item in lock['artifacts']:
         verify_sha256(cache_root / item['filename'], item['sha256'])
-    verify_wheelhouse(cache_root)
+    verify_wheelhouse(cache_root, source_root / 'apps/api/pyproject.toml')
 
     output_root.mkdir(parents=True, exist_ok=True)
     release = output_root / f'HappyCone-Windows-{version}'
@@ -150,7 +160,13 @@ def populate_cache(source_root: Path, cache_root: Path, cache_only: bool) -> lis
         verify_sha256(target, item['sha256'])
     wheelhouse = cache_root / 'wheelhouse'
     wheel_manifest = cache_root / 'wheelhouse-manifest.json'
-    if not wheelhouse.is_dir() or not any(wheelhouse.glob('*.whl')) or not wheel_manifest.is_file():
+    wheelhouse_ready = wheelhouse.is_dir() and any(wheelhouse.glob('*.whl')) and wheel_manifest.is_file()
+    if wheelhouse_ready:
+        try:
+            verify_wheelhouse(cache_root, source_root / 'apps/api/pyproject.toml')
+        except (FileNotFoundError, ValueError):
+            wheelhouse_ready = False
+    if not wheelhouse_ready:
         if cache_only:
             missing.append('wheelhouse-manifest.json')
         else:
@@ -161,9 +177,9 @@ def populate_cache(source_root: Path, cache_root: Path, cache_only: bool) -> lis
                 '--platform', 'win_amd64', '--python-version', '312', '--implementation', 'cp',
                 '--abi', 'cp312', '--only-binary=:all:', str(source_root / 'apps/api'),
             ], check=True)
-            write_wheelhouse_manifest(cache_root)
+            write_wheelhouse_manifest(cache_root, source_root / 'apps/api/pyproject.toml')
     if not missing:
-        verify_wheelhouse(cache_root)
+        verify_wheelhouse(cache_root, source_root / 'apps/api/pyproject.toml')
     return missing
 
 

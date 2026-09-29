@@ -10,6 +10,8 @@ Run these commands from **Windows PowerShell as Administrator**. Production scri
 
 Check this after a power cut, Windows restart, failed checkout, or update. All services should be running, `/health` and `/ready` should pass, schema should be `0008`, and the latest backup should be recent.
 
+During a server interruption, keep any already-open cashier tab open and do not clear its browser data. A cash payment that cannot reach the API is retained there as **Pending sync**. Restore service before opening or reloading Happy Cone on staff devices, then confirm every pending sale syncs before closing the business day.
+
 ## Create a backup now
 
 ```powershell

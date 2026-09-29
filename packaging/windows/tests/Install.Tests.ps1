@@ -29,4 +29,18 @@ Describe 'Happy Cone installer contract' {
         $script.IndexOf("@('-m','app.cli','migrate')") | Should -BeLessThan $script.IndexOf("@('-m','app.cli','create-user'")
         $script.IndexOf("@('-m','app.cli','create-user'") | Should -BeLessThan $script.IndexOf("$apiService @('start')")
     }
+
+    It 'passes top-level default paths and port into the installer function' {
+        $script | Should -Match 'Install-HappyCone -BundleRoot \$BundleRoot.+-WebPort \$WebPort.+-InstallRoot \$InstallRoot.+-DataRoot \$DataRoot'
+        $script | Should -Not -Match 'Install-HappyCone @PSBoundParameters'
+    }
+
+    It 'quotes the Python target under Program Files' {
+        $script | Should -Match 'TargetDir=`"\$pythonRoot`"'
+    }
+
+    It 'requires the update command for a different release after installation' {
+        $script | Should -Match 'state\.Complete.+Use Update-HappyCone\.ps1'
+        $script | Should -Match 'targetVersion'
+    }
 }

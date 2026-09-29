@@ -65,13 +65,25 @@ export default function App() {
   useEffect(()=>{if(!user)return;let alive=true;listPending(user.id).then(items=>{if(alive)setPending(items);}).catch(e=>{if(alive)setError(e.message);});return()=>{alive=false;};},[user]);
   useEffect(()=>{if(online && user){void sync();}},[online,user,sync]);
   function setCart(lines:CartLine[]){setCartState(lines);save(`happy-cone:cart:${namespace}`,lines);}
+  async function saveCashSaleForSync(command:CheckoutCommand){
+    const item=await enqueueCheckout(user!.id,command);
+    clearAttempt(namespace);setCheckoutAttempt(null);setPending(await listPending(user!.id));setCart([]);setPayment(false);
+    notify(`Cash sale ${item.command.idempotency_key.slice(0,8).toUpperCase()} saved on this device. Pending sync.`);setPendingReceipt(item);
+  }
   async function submitCheckout(command:CheckoutCommand){
     if(!user)throw new Error('Sign in before taking a payment.');
-    if(offline){const item=await enqueueCheckout(user.id,command);setPending(await listPending(user.id));setCart([]);setPayment(false);notify(`Cash sale ${item.command.idempotency_key.slice(0,8).toUpperCase()} saved on this device. Pending sync.`);setPendingReceipt(item);return;}
+    if(offline){await saveCashSaleForSync(command);return;}
     try { saveAttempt(namespace,command); } catch(e) { throw new POSAPIError((e as Error).message,422); }
     setCheckoutAttempt(command);
     try { const order=await client.checkout(command);clearAttempt(namespace);setCheckoutAttempt(null);setCart([]);setPayment(false);setReceipt(order);await refresh(); }
-    catch(e) { if(e instanceof POSAPIError && e.status>=400 && e.status<500 && e.status!==408){clearAttempt(namespace);setCheckoutAttempt(null);await refresh();}throw e; }
+    catch(e) {
+      if(e instanceof POSAPIError && e.status===0){
+        setOnline(false);
+        if(command.payment.method==='CASH'){await saveCashSaleForSync(command);return;}
+      }
+      if(e instanceof POSAPIError && e.status>=400 && e.status<500 && e.status!==408){clearAttempt(namespace);setCheckoutAttempt(null);await refresh();}
+      throw e;
+    }
   }
   const navigate = useCallback((next:Page)=>{setPage(next);setError('');document.title=`Happy Cone · ${navigation.find(n=>n.id===next)?.label ?? readable(next)}`;window.scrollTo({top:0,behavior:'instant'});},[]);
   async function signOut(){try{await client.logout();}catch(e){if(!(e instanceof POSAPIError && e.status===401))notify('Signed out on this device. The server session could not be revoked and will expire automatically.');}finally{sessionStorage.removeItem(`happy-cone:cache:${token}`);sessionStorage.removeItem('happy-cone:session-token');setToken('');setUser(null);setCartState([]);setUserMenu(false);setTour(false);}}

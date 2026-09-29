@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App, { defaultStandProfile } from "../App";
-import type { Catalog, CheckoutCommand, Day, Order, User } from "../lib/types";
+import type { Catalog, CheckoutCommand, Day, User } from "../lib/types";
 
 const originalShowModal = HTMLDialogElement.prototype.showModal;
 const originalClose = HTMLDialogElement.prototype.close;
@@ -24,10 +24,11 @@ afterAll(() => {
 beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
+  vi.stubGlobal("print", vi.fn());
 });
 
-describe("live checkout recovery", () => {
-  it("reuses the original payment command after an unknown result, dialog close, and reload", async () => {
+describe("checkout connection recovery", () => {
+  it("queues a cash payment when the API stops while Wi-Fi remains connected", async () => {
     const catalog: Catalog = {
       categories: [{ id: "scoops", name: "Scoops" }],
       products: [{ id: "vanilla", category_id: "scoops", name: "Vanilla bean", category: "Scoops", description: "Small-batch ice cream", color: "#f5e7bd", active: true, variants: [
@@ -47,7 +48,6 @@ describe("live checkout recovery", () => {
     const day: Day = { id: "live-day", status: "OPEN", opened_at: new Date().toISOString(), closed_at: null, opening_float_ngwee: 50_000, actual_cash_ngwee: null, expected_cash_ngwee: 50_000, variance_ngwee: null, summary: null };
     const currentUser: User = { id: "manager-live", username: "manager", name: "Live manager", role: "MANAGER", active: true };
     const checkoutCalls: CheckoutCommand[] = [];
-    let unknownResult = true;
     const json = (value: unknown) => new Response(JSON.stringify(value), { status: 200, headers: { "Content-Type": "application/json" } });
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
@@ -59,9 +59,7 @@ describe("live checkout recovery", () => {
       if (url.endsWith("/api/orders") && init?.method === "POST") {
         const command = JSON.parse(String(init.body)) as CheckoutCommand;
         checkoutCalls.push(command);
-        if (unknownResult) { unknownResult = false; throw new DOMException("Timed out", "AbortError"); }
-        const order: Order = { id: "accepted-order", number: "A001", business_day_id: day.id, status: "SERVED", created_at: new Date().toISOString(), cashier_name: "Chipo Phiri", lines: [{ variant_id: "vanilla-double", name: "Vanilla bean · Double", quantity: 1, unit_price_ngwee: 4200, total_ngwee: 4200, modifier_names: ["Cone", "Oreo"], notes: "" }], total_ngwee: 4200, payment: { method: "CASH", status: "CONFIRMED", amount_ngwee: 4200, tendered_ngwee: 5000, change_ngwee: 800, provider: null, reference: null }, refunded: false, refund_reason: null, offline: false };
-        return json(order);
+        throw new DOMException("Timed out", "AbortError");
       }
       throw new Error(`Unexpected request: ${url}`);
     });
@@ -87,25 +85,13 @@ describe("live checkout recovery", () => {
     await user.clear(within(dialog).getByLabelText("Cash received (K)"));
     await user.type(within(dialog).getByLabelText("Cash received (K)"), "50.00");
     await user.click(within(dialog).getByRole("button", { name: /Confirm payment/ }));
-    expect(await within(dialog).findByText(/request timed out/i)).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "Close dialog" }));
-    await user.click(screen.getByRole("button", { name: /Recover saved payment/ }));
-    expect(await screen.findByText(/Recovering your saved payment/i)).toBeInTheDocument();
-    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Close dialog" }));
+    expect(await screen.findByRole("heading", { name: "Cash sale saved on this device" })).toBeInTheDocument();
+    expect(screen.getAllByText(/Pending sync/).length).toBeGreaterThan(0);
+    expect(screen.getByText("Offline")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Recover saved payment/ })).not.toBeInTheDocument();
+    expect(checkoutCalls).toHaveLength(1);
+    expect(checkoutCalls[0].offline).toBe(false);
     first.unmount();
-
-    render(<App/>);
-    await screen.findByRole("heading", { name: "A little scoop of happy." });
-    await user.click(screen.getByRole("button", { name: /Recover saved payment/ }));
-    dialog = await screen.findByRole("dialog");
-    await user.click(within(dialog).getByRole("button", { name: /Confirm payment/ }));
-    expect(await screen.findByRole("article", { name: "Receipt A001" })).toHaveTextContent(/Receipt No\.\s*A001/);
-    vi.stubGlobal("print", vi.fn(() => { throw new Error("Printer unavailable"); }));
-    await user.click(screen.getByRole("button", { name: "Print receipt" }));
-    expect(await screen.findByText(/Printing was unavailable/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Print receipt" })).toBeInTheDocument();
-    expect(checkoutCalls).toHaveLength(2);
-    expect(checkoutCalls[1]).toEqual(checkoutCalls[0]);
     vi.unstubAllGlobals();
-  });
+  }, 10_000);
 });

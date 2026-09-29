@@ -70,6 +70,8 @@ Do not create router port forwarding. For later access outside the shop, use a r
 
 Use a separate named account for each person. Do not share the owner account at the counter.
 
+Internet loss does not interrupt the local system while the shop computer and router are running. If the Happy Cone API stops while a cashier is completing a cash sale, the open counter saves that sale on the device and syncs it after the API returns. Keep that browser tab open during a server interruption: a staff device cannot open or reload the counter until the local server is available again. Never clear browser data while a sale shows **Pending sync**.
+
 ## Restart and daily checks
 
 The database, API, and web entry point start automatically with Windows. After a restart, allow up to two minutes, then open Happy Cone. Check system condition at any time from Administrator PowerShell:
