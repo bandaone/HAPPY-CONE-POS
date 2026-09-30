@@ -38,6 +38,21 @@ class ModifierGroup(Base):
     maximum: Mapped[int] = mapped_column(default=3)
 
 
+class ProductModifierGroup(Base):
+    __tablename__ = 'product_modifier_groups'
+    __table_args__ = (
+        CheckConstraint('minimum >= 0'),
+        CheckConstraint('maximum >= minimum'),
+        CheckConstraint('maximum <= 20'),
+        CheckConstraint('position >= 0'),
+    )
+    product_id: Mapped[str] = mapped_column(ForeignKey('products.id'), primary_key=True)
+    group_id: Mapped[str] = mapped_column(ForeignKey('modifier_groups.id'), primary_key=True)
+    minimum: Mapped[int] = mapped_column(default=0)
+    maximum: Mapped[int] = mapped_column(default=3)
+    position: Mapped[int] = mapped_column(default=0)
+
+
 class Modifier(Base):
     __tablename__ = 'modifiers'
     __table_args__ = (CheckConstraint('price_ngwee >= 0'),)

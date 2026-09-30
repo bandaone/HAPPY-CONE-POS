@@ -42,6 +42,14 @@ def test_authenticated_staff_can_read_stand_settings(client, login):
     assert 'prepar' not in response.json()['guide_workflow'].lower()
 
 
+def test_menu_sales_mode_defaults_to_inventory_disabled(client, login):
+    from app.models.stand_settings import StandSettings
+
+    assert client.get('/api/stand-settings', headers=login('manager')).status_code == 200
+    with client.app.state.session_factory() as db:
+        assert db.get(StandSettings, 1).inventory_tracking_enabled is False
+
+
 def test_manager_updates_settings_and_change_is_audited(client, login):
     manager = login('manager')
     response = client.put('/api/stand-settings', headers=manager, json=settings_payload())

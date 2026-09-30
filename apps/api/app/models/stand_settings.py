@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Integer, String, Text
+from sqlalchemy import Boolean, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.time import UTCDateTime
@@ -27,6 +27,7 @@ class StandSettings(Base):
     ticket_guidance: Mapped[str] = mapped_column(Text, default='Receipts use the browser print dialog. A printer problem never removes a completed sale; staff can reprint from Sales.')
     receipt_footer: Mapped[str] = mapped_column(Text, default='Thank you for choosing Happy Cone.')
     receipt_paper_width: Mapped[str] = mapped_column(String(4), default='80mm')
+    inventory_tracking_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     activity_guidance: Mapped[str] = mapped_column(Text, default='Review the recorded actions behind sales, payments, stock changes, account administration and cash reconciliation.')
     guide_workflow: Mapped[str] = mapped_column(Text, default='Open a business day with the counted float. Choose each item, size, serving and extras, then take payment. Print or close the customer receipt and begin the next sale. Stock and reports update when the sale is accepted.')
     guide_controls: Mapped[str] = mapped_column(Text, default='Press / to search the menu. Use Tab and Shift + Tab to move between controls, Enter or Space to select, and Escape to close a dialog. On a phone, use the floating sale button to jump to checkout.')

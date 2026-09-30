@@ -144,7 +144,7 @@ def test_cashier_name_migration_backfills_populated_database_and_retries(tmp_pat
     assert upgraded.returncode == 0, upgraded.stderr
     with engine.connect() as db:
         assert db.scalar(text("SELECT cashier_name FROM orders WHERE id = 'order-id'")) == 'Original Cashier'
-        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0008'
+        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0009'
         assert db.scalar(text('SELECT stand_name FROM stand_settings WHERE id = 1')) == 'Lusaka stand'
         assert db.scalar(text('SELECT tax_id FROM stand_settings WHERE id = 1')) == '1002681530'
         assert db.scalar(text('SELECT tax_label FROM stand_settings WHERE id = 1')) == 'TURNOVER TAX (TOT)'
@@ -186,10 +186,105 @@ def test_cashier_only_guidance_migration_updates_only_supplied_defaults(tmp_path
     upgraded = alembic('upgrade', 'head')
     assert upgraded.returncode == 0, upgraded.stderr
     with engine.connect() as db:
-        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0008'
+        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0009'
         row = db.execute(text(
             'SELECT ' + ', '.join(OLD_GUIDANCE) + ' FROM stand_settings WHERE id = 1'
         )).mappings().one()
         assert dict(row) == expected
         assert db.scalar(text('SELECT receipt_paper_width FROM stand_settings WHERE id = 1')) == '80mm'
+    engine.dispose()
+
+
+def test_0009_preserves_financial_catalog_and_inventory_data(tmp_path):
+    env = {**os.environ, 'DATABASE_URL': f'sqlite:///{tmp_path}/menu-sales-upgrade.db'}
+    cwd = Path(__file__).resolve().parents[1]
+
+    def alembic(*arguments):
+        return subprocess.run(
+            [sys.executable, '-m', 'alembic', *arguments], env=env, cwd=cwd,
+            capture_output=True, text=True, timeout=20,
+        )
+
+    initial = alembic('upgrade', '0008')
+    assert initial.returncode == 0, initial.stderr
+    engine = create_engine(env['DATABASE_URL'])
+    with engine.begin() as db:
+        db.execute(text(
+            "INSERT INTO users (id, username, name, password_hash, role, active) "
+            "VALUES ('owner-id', 'owner', 'Owner', 'unused', 'OWNER_ADMIN', 1)"
+        ))
+        db.execute(text(
+            "INSERT INTO business_days "
+            "(id, status, opened_by, opened_at, opening_float_ngwee, next_order_number) "
+            "VALUES ('day-id', 'OPEN', 'owner-id', '2026-09-30 08:00:00', 0, 2)"
+        ))
+        db.execute(text("INSERT INTO categories (id, name) VALUES ('scoops', 'Scooped ice cream')"))
+        db.execute(text(
+            "INSERT INTO products (id, category_id, name, description, color, active) "
+            "VALUES ('single-scoop', 'scoops', 'Single Scoop', '', '#FFFFFF', 1)"
+        ))
+        db.execute(text(
+            "INSERT INTO variants (id, product_id, name, price_ngwee, active) "
+            "VALUES ('single-scoop-standard', 'single-scoop', 'Standard', 2500, 1)"
+        ))
+        db.execute(text(
+            "INSERT INTO modifier_groups (id, name, minimum, maximum) "
+            "VALUES ('flavour', 'Flavour', 1, 1)"
+        ))
+        db.execute(text(
+            "INSERT INTO modifiers (id, group_id, name, price_ngwee, active) "
+            "VALUES ('vanilla', 'flavour', 'Vanilla', 0, 1)"
+        ))
+        db.execute(text(
+            "INSERT INTO inventory_items (id, name, unit, low_stock_threshold) "
+            "VALUES ('legacy-stock', 'Legacy stock', 'piece', 2)"
+        ))
+        db.execute(text(
+            "INSERT INTO stock_movements "
+            "(id, item_id, type, quantity, reason, actor_id, created_at) "
+            "VALUES ('movement-id', 'legacy-stock', 'RECEIPT', 10, 'Opening', 'owner-id', '2026-09-30 08:00:00')"
+        ))
+        db.execute(text(
+            "INSERT INTO orders "
+            "(id, number, business_day_id, actor_id, cashier_name, status, total_ngwee, "
+            "idempotency_key, payload_hash, offline, created_at) VALUES "
+            "('order-id', 'A001', 'day-id', 'owner-id', 'Owner', 'SERVED', 2500, "
+            "'existing-sale', 'existing-hash', 0, '2026-09-30 08:30:00')"
+        ))
+        db.execute(text(
+            "INSERT INTO payments "
+            "(id, order_id, method, status, amount_ngwee, change_ngwee, provider, reference, "
+            "confirmed_by, created_at) VALUES "
+            "('payment-id', 'order-id', 'MOBILE_MONEY_MANUAL', 'CONFIRMED', 2500, 0, "
+            "'MTN', 'MM-EXISTING', 'owner-id', '2026-09-30 08:30:00')"
+        ))
+        before = {
+            table: db.scalar(text(f'SELECT COUNT(*) FROM {table}'))
+            for table in ('users', 'orders', 'payments', 'products', 'variants', 'modifiers',
+                          'inventory_items', 'stock_movements')
+        }
+
+    upgraded = alembic('upgrade', 'head')
+    assert upgraded.returncode == 0, upgraded.stderr
+    inspector = inspect(engine)
+    with engine.connect() as db:
+        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0009'
+        assert db.scalar(text(
+            'SELECT inventory_tracking_enabled FROM stand_settings WHERE id = 1'
+        )) in (False, 0)
+        assert db.execute(text(
+            "SELECT minimum, maximum, position FROM product_modifier_groups "
+            "WHERE product_id = 'single-scoop' AND group_id = 'flavour'"
+        )).one() == (1, 1, 0)
+        assert db.execute(text(
+            "SELECT provider, reference FROM payments WHERE id = 'payment-id'"
+        )).one() == ('MTN', 'MM-EXISTING')
+        after = {
+            table: db.scalar(text(f'SELECT COUNT(*) FROM {table}'))
+            for table in before
+        }
+        assert after == before
+    assert 'unique_external_payment_reference' not in {
+        constraint['name'] for constraint in inspector.get_unique_constraints('payments')
+    }
     engine.dispose()

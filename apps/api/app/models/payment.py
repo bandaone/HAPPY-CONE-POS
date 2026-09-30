@@ -1,6 +1,6 @@
 from app.core.time import UTCDateTime
 from datetime import datetime
-from sqlalchemy import String, ForeignKey, CheckConstraint, UniqueConstraint
+from sqlalchemy import String, ForeignKey, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from .base import Base, new_id, utcnow
 
@@ -9,8 +9,7 @@ class Payment(Base):
     __tablename__ = 'payments'
     __table_args__ = (CheckConstraint("method IN ('CASH','MOBILE_MONEY_MANUAL','CARD_MANUAL')"),
                       CheckConstraint("status IN ('PENDING','CONFIRMED','FAILED','CANCELLED','REFUNDED','PARTIALLY_REFUNDED')"),
-                      CheckConstraint('amount_ngwee >= 0'),CheckConstraint('change_ngwee >= 0'),
-                      UniqueConstraint('method','provider','reference',name='unique_external_payment_reference'))
+                      CheckConstraint('amount_ngwee >= 0'),CheckConstraint('change_ngwee >= 0'))
     id: Mapped[str] = mapped_column(String(36),primary_key=True,default=new_id)
     order_id: Mapped[str] = mapped_column(ForeignKey('orders.id'),unique=True)
     method: Mapped[str] = mapped_column(String(30))

@@ -19,7 +19,8 @@ def seed_demo(db, password):
 
 def seed_catalog(db):
     from decimal import Decimal
-    from app.models.catalog import Category, Product, Variant, ModifierGroup, Modifier, RecipeComponent
+    from app.models.catalog import (Category, Product, Variant, ModifierGroup,
+                                    ProductModifierGroup, Modifier, RecipeComponent)
     from app.models.inventory import InventoryItem, StockMovement
     if db.get(Category, 'ice-cream'):
         return
@@ -41,6 +42,10 @@ def seed_catalog(db):
                                          ('strawberry','Strawberry','#EDB1BD','A little fruity, a little dreamy')]:
         db.add(Product(id=key,category_id='ice-cream',name=name,color=color,description=description))
         db.flush()
+        db.add_all([
+            ProductModifierGroup(product_id=key, group_id='serving', minimum=1, maximum=1, position=0),
+            ProductModifierGroup(product_id=key, group_id='topping', minimum=0, maximum=3, position=1),
+        ])
         for size, title, price, quantity in [('single','Single scoop',2200,80),('double','Double scoop',3200,160)]:
             variant_id = f'{key}-{size}'
             db.add(Variant(id=variant_id,product_id=key,name=title,price_ngwee=price))
