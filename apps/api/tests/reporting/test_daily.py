@@ -1,4 +1,4 @@
-from tests.orders.test_checkout import command,open_day
+from tests.orders.test_checkout import command, open_day
 
 
 def test_mixed_payment_day_exact_totals_and_audit(client,login):
@@ -7,7 +7,7 @@ def test_mixed_payment_day_exact_totals_and_audit(client,login):
     for index,method in enumerate(['CASH','MOBILE_MONEY_MANUAL','CARD_MANUAL']):
         data=command(day,f'payment-{index}',method)
         if method!='CASH':
-            data['payment']={'method':method,'provider':'MTN' if index==1 else 'Bank terminal','reference':f'REF-{index}'}
+            data['payment']={'method':method}
         assert client.post('/api/orders',headers=headers,json=data).status_code==201
     report=client.get('/api/reports/daily',headers=headers).json()
     assert report['order_count']==3

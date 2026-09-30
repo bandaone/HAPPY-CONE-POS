@@ -1,8 +1,9 @@
-from tests.orders.test_checkout import command,open_day
 from app.models.order import Order
+from tests.orders.test_checkout import command, enable_inventory_tracking, open_day
 
 
 def test_status_guards_and_refund_preserve_financial_history(client,login):
+    enable_inventory_tracking(client)
     manager,cashier=login(),login('cashier')
     day=open_day(client,cashier)
     sale=client.post('/api/orders',headers=cashier,json=command(day)).json()

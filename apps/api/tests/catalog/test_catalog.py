@@ -236,6 +236,10 @@ def test_catalog_rejects_invalid_creation_and_recipe_without_partial_change(clie
 
 
 def test_recipe_and_price_changes_apply_only_to_future_sales(client, login):
+    with client.app.state.session_factory.begin() as db:
+        settings = db.get(StandSettings, 1) or StandSettings(id=1)
+        db.add(settings)
+        settings.inventory_tracking_enabled = True
     cashier = login('cashier')
     day = client.post('/api/business-day/open', headers=cashier,
                       json={'opening_float_ngwee': 50000}).json()['id']

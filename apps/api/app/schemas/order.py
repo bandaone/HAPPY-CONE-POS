@@ -1,5 +1,7 @@
 from typing import Literal
-from pydantic import Field, StrictInt, model_validator, StrictBool
+
+from pydantic import Field, StrictBool, StrictInt, model_validator
+
 from .common import Command, Money, Reason
 
 
@@ -17,19 +19,13 @@ class QuoteCommand(Command):
 class PaymentCommand(Command):
     method: Literal['CASH','MOBILE_MONEY_MANUAL','CARD_MANUAL']
     tendered_ngwee: Money | None = None
-    provider: str | None = Field(default=None,min_length=1,max_length=100)
-    reference: str | None = Field(default=None,min_length=1,max_length=120)
 
     @model_validator(mode='after')
     def valid_method(self):
         if self.method == 'CASH':
             if self.tendered_ngwee is None:
                 raise ValueError('Cash requires amount tendered')
-            if self.provider or self.reference:
-                raise ValueError('Cash cannot have an external payment reference')
         else:
-            if not self.provider or not self.reference:
-                raise ValueError('Manual external payments require provider and reference')
             if self.tendered_ngwee is not None:
                 raise ValueError('External payments cannot have cash tendered')
         return self

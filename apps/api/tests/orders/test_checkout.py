@@ -1,6 +1,9 @@
 from concurrent.futures import ThreadPoolExecutor
-from sqlalchemy import select, func
+
+from sqlalchemy import func, select
+
 from app.models.inventory import StockMovement
+from app.models.stand_settings import StandSettings
 
 
 def command(day_id, key='sale-001', method='CASH'):
@@ -12,7 +15,17 @@ def open_day(client, headers):
     return client.post('/api/business-day/open',headers=headers,json={'opening_float_ngwee':50000}).json()['id']
 
 
+def enable_inventory_tracking(client):
+    with client.app.state.session_factory.begin() as db:
+        settings = db.get(StandSettings, 1)
+        if settings is None:
+            settings = StandSettings(id=1)
+            db.add(settings)
+        settings.inventory_tracking_enabled = True
+
+
 def test_cash_checkout_recipe_ticket_and_idempotency(client, login):
+    enable_inventory_tracking(client)
     headers = login('cashier')
     data = command(open_day(client,headers))
     quote = client.post('/api/orders/quote',headers=headers,json={'lines':data['lines']})
@@ -83,6 +96,7 @@ def test_checkout_rejections(client,login,legacy_server):
 
 def test_stock_failure_rolls_back_whole_sale(client,login,monkeypatch):
     from app.domains.orders import service
+    enable_inventory_tracking(client)
     headers=login()
     data=command(open_day(client,headers))
     original=service.inventory.record_movement
@@ -143,6 +157,7 @@ def test_persisted_order_times_are_explicit_utc(client, login):
 
 
 def test_competing_sales_cannot_oversell_stock(client, login):
+    enable_inventory_tracking(client)
     headers = login()
     day = open_day(client, headers)
     stock = client.post('/api/inventory/movements', headers=headers, json={
@@ -242,3 +257,35 @@ def test_product_specific_choices_allow_repeated_flavours_and_reject_unrelated_o
     assert checkout('unrelated-choice', 'single-scoop-menu', ['choice-unrelated']).status_code == 422
     assert checkout('choice-on-fixed-item', 'fixed-special-menu', ['choice-vanilla']).status_code == 422
     assert len(client.get('/api/orders', headers=manager).json()) == 1
+
+
+def test_sales_mode_checkout_ignores_stock_and_writes_no_consumption(client, login):
+    from app.models.order import Order
+    from app.models.payment import Payment
+
+    manager = login('manager')
+    for item_id, quantity in [
+        ('vanilla-stock', '20000'), ('cones', '200'),
+        ('oreo-stock', '3000'), ('napkins', '500'),
+    ]:
+        response = client.post('/api/inventory/movements', headers=manager, json={
+            'item_id': item_id, 'type': 'WASTE', 'quantity': quantity,
+            'reason': 'Prove sales mode does not depend on stock',
+        })
+        assert response.status_code == 201
+
+    cashier = login('cashier')
+    data = command(open_day(client, cashier), key='sale-with-zero-stock')
+    response = client.post('/api/orders', headers=cashier, json=data)
+    assert response.status_code == 201
+    sale = response.json()
+    retry = client.post('/api/orders', headers=cashier, json=data)
+    assert retry.status_code == 201
+    assert retry.json()['id'] == sale['id']
+
+    with client.app.state.session_factory() as db:
+        assert db.scalar(select(func.count()).select_from(Order)) == 1
+        assert db.scalar(select(func.count()).select_from(Payment)) == 1
+        movements = db.scalars(select(StockMovement).where(
+            StockMovement.reference == sale['id'])).all()
+        assert movements == []

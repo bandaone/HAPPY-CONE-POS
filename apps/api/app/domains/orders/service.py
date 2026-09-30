@@ -1,16 +1,19 @@
 import hashlib
 import json
-from sqlalchemy import select
+
 from fastapi import HTTPException
-from app.models.order import Order, OrderLine
-from app.models.payment import Payment, Refund
-from app.models.base import new_id
+from sqlalchemy import select
+
 from app.core.db import lock_branch
+from app.domains.audit.service import record
 from app.domains.business_day.service import current
 from app.domains.catalog.service import price_lines
 from app.domains.inventory import service as inventory
-from app.domains.payments.service import record_payment, payment_dto
-from app.domains.audit.service import record
+from app.domains.payments.service import payment_dto, record_payment
+from app.domains.settings.service import get_settings
+from app.models.base import new_id
+from app.models.order import Order, OrderLine
+from app.models.payment import Payment, Refund
 
 
 def get_order(db,order_id):
@@ -49,9 +52,11 @@ def checkout(db,actor,command):
     quote,consumption=price_lines(db,command.lines)
     if quote['total_ngwee'] > 2_000_000_000:
         raise HTTPException(422,'Order exceeds the supported amount')
-    for item_id,quantity in consumption.items():
-        if inventory.expected_on_hand(db,item_id)<quantity:
-            raise HTTPException(409,'Insufficient stock for this order')
+    tracking_inventory = get_settings(db).inventory_tracking_enabled
+    if tracking_inventory:
+        for item_id,quantity in consumption.items():
+            if inventory.expected_on_hand(db,item_id)<quantity:
+                raise HTTPException(409,'Insufficient stock for this order')
     order=Order(id=new_id(),number=f'A{day.next_order_number:03d}',business_day_id=day.id,actor_id=actor.id,status='SERVED',
                 cashier_name=actor.name,
                 total_ngwee=quote['total_ngwee'],idempotency_key=command.idempotency_key,payload_hash=digest,offline=command.offline)
@@ -60,8 +65,9 @@ def checkout(db,actor,command):
     db.flush()
     db.add_all([OrderLine(order_id=order.id,position=position,**line) for position,line in enumerate(quote['lines'])])
     record_payment(db,actor,order,command.payment)
-    for item_id,quantity in consumption.items():
-        inventory.record_movement(db,actor,item_id,'SALE_CONSUMPTION',-quantity,'Recipe consumption',reference=order.id,correlation_id=order.id)
+    if tracking_inventory:
+        for item_id,quantity in consumption.items():
+            inventory.record_movement(db,actor,item_id,'SALE_CONSUMPTION',-quantity,'Recipe consumption',reference=order.id,correlation_id=order.id)
     record(db,actor,'ORDER_CREATED','order',order.id,{'total_ngwee':order.total_ngwee,'number':order.number,'offline':order.offline},order.id)
     return order_dto(db,order)
 
