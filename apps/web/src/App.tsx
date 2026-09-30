@@ -1,120 +1,1268 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { BarChart3, CheckCircle2, ChevronDown, CircleHelp, ClipboardList, Clock3, Compass, Eye, EyeOff, IceCreamCone, KeyRound, LayoutGrid, LoaderCircle, LogOut, Package, RefreshCw, Settings2, Wallet, WifiOff, X } from 'lucide-react';
-import { ApiClient, POSAPIError, configureMoney, currencySymbol, money, parseMoney } from './lib/client';
-import { readAttempt, saveAttempt, clearAttempt } from './lib/checkout-journal';
-import type { CartLine, Catalog, CheckoutCommand, Day, Order, POSClient, StandProfile, User } from './lib/types';
-import { enqueueCheckout, listPending, syncPending, type PendingCheckout } from './lib/offline';
-import { Badge, BrandLogo, ErrorMessage, Modal, SubmitButton, configureTimezone, dateOf, readable, timeOf } from './components/ui';
-import { Payment, PendingReceipt, Pos } from './features/Pos';
-import { Receipt, ReceiptModal } from './features/Receipt';
-import { AccountPassword, Audit, BusinessDay, Inventory, Reports, Sales, StaffAccounts } from './features/Operations';
-import { CatalogRecipes } from './features/CatalogRecipes';
-import { ProductTour } from './features/ProductTour';
-import { StandSettingsCards } from './features/StandSettings';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
+import {
+  BarChart3,
+  BookOpen,
+  CheckCircle2,
+  ChevronDown,
+  CircleHelp,
+  ClipboardList,
+  Clock3,
+  Compass,
+  Eye,
+  EyeOff,
+  IceCreamCone,
+  KeyRound,
+  LayoutGrid,
+  LoaderCircle,
+  LogOut,
+  RefreshCw,
+  Settings2,
+  Wallet,
+  WifiOff,
+  X,
+} from "lucide-react";
+import {
+  ApiClient,
+  POSAPIError,
+  configureMoney,
+  currencySymbol,
+  money,
+  parseMoney,
+} from "./lib/client";
+import { readAttempt, saveAttempt, clearAttempt } from "./lib/checkout-journal";
+import type {
+  CartLine,
+  Catalog,
+  CheckoutCommand,
+  Day,
+  Order,
+  POSClient,
+  StandProfile,
+  User,
+} from "./lib/types";
+import {
+  enqueueCheckout,
+  listPending,
+  syncPending,
+  type PendingCheckout,
+} from "./lib/offline";
+import {
+  Badge,
+  BrandLogo,
+  ErrorMessage,
+  Modal,
+  SubmitButton,
+  configureTimezone,
+  dateOf,
+  readable,
+  timeOf,
+} from "./components/ui";
+import { Payment, PendingReceipt, Pos } from "./features/Pos";
+import { Receipt, ReceiptModal } from "./features/Receipt";
+import {
+  AccountPassword,
+  Audit,
+  BusinessDay,
+  Reports,
+  Sales,
+  StaffAccounts,
+} from "./features/Operations";
+import { MenuAdmin } from "./features/MenuAdmin";
+import { ProductTour } from "./features/ProductTour";
+import { StandSettingsCards } from "./features/StandSettings";
 
-type Page = 'pos'|'sales'|'inventory'|'day'|'reports'|'audit'|'settings';
-const emptyCatalog:Catalog = {categories:[],products:[],modifier_groups:[],modifiers:[]};
-export const defaultStandProfile:StandProfile = {business_name:'CREAMY HEAVEN LIMITED',stand_name:'Lusaka stand',location:'Lusaka',currency_name:'Zambian kwacha',currency_code:'ZMW',currency_symbol:'K',timezone:'Africa/Lusaka',tax_id:'1002681530',contact_number:'0771450074',tax_label:'TURNOVER TAX (TOT)',tax_rate_basis_points:500,payment_guidance:'Cash change is calculated at checkout. Staff must confirm mobile money and card payments and record the provider reference before completing a sale.',ticket_guidance:'Receipts use the browser print dialog. A printer problem never removes a completed sale; staff can reprint from Sales.',receipt_footer:'Thank you for choosing Happy Cone.',receipt_paper_width:'80mm',activity_guidance:'Review the recorded actions behind sales, payments, stock changes, account administration and cash reconciliation.',guide_workflow:'Open a business day with the counted float. Choose each item, size, serving and extras, then take payment. Print or close the customer receipt and begin the next sale. Stock and reports update when the sale is accepted.',guide_controls:'Press / to search the menu. Use Tab and Shift + Tab to move between controls, Enter or Space to select, and Escape to close a dialog. On a phone, use the floating sale button to jump to checkout.',guide_offline:'After signing in, the cached menu stays available. Cash sales can be saved on this device. Keep the device and browser data until every sale has synced; rejected sales stay in the sync list for manager review. Mobile money and card payments need a connection.',guide_printing:'Use the browser print dialog with a 58 or 80 mm receipt printer, or a normal printer. Sales stay saved if printing fails, and receipts can be reprinted from Sales. Use your browser’s zoom and system text settings.'};
-function stored<T>(key:string, fallback:T, storage:Storage = localStorage):T {try {return JSON.parse(storage.getItem(key) ?? 'null') ?? fallback;} catch{return fallback;}}
-function save(key:string,value:unknown,storage:Storage=localStorage) {try {storage.setItem(key,JSON.stringify(value));} catch { /* Noncritical preferences must not stop checkout. */ }}
-const navigation = [{id:'pos',label:'Counter',icon:LayoutGrid},{id:'sales',label:'Sales',icon:ClipboardList},{id:'inventory',label:'Stock',icon:Package},{id:'day',label:'Cash day',icon:Wallet},{id:'reports',label:'Reports',icon:BarChart3}] as const;
-export default function App() {
-  const [token,setToken] = useState<string>(()=>stored('happy-cone:session-token','',sessionStorage));
-  const client = useMemo<POSClient>(()=>new ApiClient(token || undefined),[token]);
-  const [user,setUser] = useState<User|null>(null); const [page,setPage] = useState<Page>('pos'); const [catalog,setCatalog] = useState<Catalog>(emptyCatalog); const [day,setDay] = useState<Day|null>(null); const [cart,setCartState] = useState<CartLine[]>([]); const [loading,setLoading] = useState(true); const [error,setError] = useState(''); const [notice,setNotice] = useState(''); const [online,setOnline] = useState(navigator.onLine); const [payment,setPayment] = useState(false); const [checkoutAttempt,setCheckoutAttempt] = useState<CheckoutCommand|null>(null); const [receipt,setReceipt] = useState<Order|null>(null); const [pendingReceipt,setPendingReceipt] = useState<PendingCheckout|null>(null); const [printPending,setPrintPending] = useState<PendingCheckout|null>(null); const [printOrder,setPrintOrder] = useState<Order|null>(null); const [openDay,setOpenDay] = useState(false); const [help,setHelp] = useState(false); const [tour,setTour] = useState(false); const [userMenu,setUserMenu] = useState(false); const [passwordDialog,setPasswordDialog] = useState(false); const [showSync,setShowSync] = useState(false); const [pending,setPending] = useState<PendingCheckout[]>([]); const [syncing,setSyncing] = useState(false); const [revision,setRevision] = useState(0); const syncingRef = useRef(false); const noticeTimer = useRef<ReturnType<typeof setTimeout>|null>(null);
-  const [standProfile,setStandProfile] = useState<StandProfile>(defaultStandProfile);
-  const applyStandProfile = useCallback((profile:StandProfile)=>{configureMoney(profile.currency_symbol);configureTimezone(profile.timezone);setStandProfile(profile);},[]);
-  const canManage = !!user && ['MANAGER','OWNER_ADMIN'].includes(user.role); const canSell = !!user && user.role!=='SERVER'; const offline = !online; const namespace = `live:${user?.id ?? 'none'}`;
-  const notify = useCallback((message:string)=>{setNotice(message);if(noticeTimer.current) clearTimeout(noticeTimer.current);noticeTimer.current=setTimeout(()=>setNotice(''),7000);},[]);
-  useEffect(()=>()=>{if(noticeTimer.current)clearTimeout(noticeTimer.current);},[]);
-  useEffect(()=>{const up=()=>setOnline(true);const down=()=>setOnline(false);window.addEventListener('online',up);window.addEventListener('offline',down);return()=>{window.removeEventListener('online',up);window.removeEventListener('offline',down);};},[]);
-  useEffect(()=>{
-    if(online||!token)return;
-    let active=true;
-    const probe=async()=>{try{const response=await fetch('/health',{cache:'no-store'});if(active&&response.ok)setOnline(true);}catch{/* Keep the offline workspace available until the service returns. */}};
-    void probe();const timer=window.setInterval(()=>void probe(),2000);
-    return()=>{active=false;window.clearInterval(timer);};
-  },[online,token]);
-  useEffect(()=>{
-    let alive=true;setLoading(true);setError('');setUser(null);setCatalog(emptyCatalog);setDay(null);setCartState([]);setPending([]);setCheckoutAttempt(null);
-    async function boot(){
-      if(!token){if(alive)setLoading(false);return;}
-      try {
-        let currentUser:User; let currentCatalog:Catalog; let currentDay:Day|null; let currentProfile:StandProfile;
-        if(!navigator.onLine){const cached=stored<{user:User;catalog:Catalog;day:Day|null;standProfile?:StandProfile}|null>(`happy-cone:cache:${token}`,null,sessionStorage);if(!cached)throw new Error('Connect and sign in once before using this device offline.');currentUser=cached.user;currentCatalog=cached.catalog;currentDay=cached.day;currentProfile=cached.standProfile ?? defaultStandProfile;}
-        else{currentUser=await client.session();[currentCatalog,currentDay,currentProfile]=await Promise.all([client.catalog(),currentUser.role==='SERVER'?Promise.resolve(null):client.currentDay(),client.standSettings()]);save(`happy-cone:cache:${token}`,{user:currentUser,catalog:currentCatalog,day:currentDay,standProfile:currentProfile},sessionStorage);}
-        if(!alive)return;setUser(currentUser);setCatalog(currentCatalog);setDay(currentDay);applyStandProfile(currentProfile);const recovered=readAttempt(`live:${currentUser.id}`);setCheckoutAttempt(recovered);setCartState(recovered?.lines ?? stored<CartLine[]>(`happy-cone:cart:live:${currentUser.id}`,[]));setPage('pos');setTour(currentUser.role!=='SERVER'&&localStorage.getItem(`happy-cone:tour:v1:${currentUser.id}`)!=='complete');
-      }catch(e){
-        if(alive && e instanceof POSAPIError && e.status===401){
-          sessionStorage.removeItem(`happy-cone:cache:${token}`);sessionStorage.removeItem('happy-cone:session-token');setToken('');setError('');return;
-        }
-        const cached = token && e instanceof POSAPIError && e.status === 0
-          ? stored<{user:User;catalog:Catalog;day:Day|null;standProfile?:StandProfile}|null>(`happy-cone:cache:${token}`,null,sessionStorage)
-          : null;
-        if(alive && cached){
-          setOnline(false);setUser(cached.user);setCatalog(cached.catalog);setDay(cached.day);applyStandProfile(cached.standProfile ?? defaultStandProfile);
-          const recovered=readAttempt(`live:${cached.user.id}`);setCheckoutAttempt(recovered);
-          setCartState(recovered?.lines ?? stored<CartLine[]>(`happy-cone:cart:live:${cached.user.id}`,[]));
-          setPage('pos');setTour(false);setError('');
-        } else if(alive){setError((e as Error).message);}
-      }finally{if(alive)setLoading(false);}
-    }void boot();return()=>{alive=false;};
-  },[client,token,applyStandProfile]);
-  const refresh = useCallback(async()=>{if(!user||offline)return;try{const [newDay,newCatalog,newProfile]=await Promise.all([user.role==='SERVER'?Promise.resolve(null):client.currentDay(),client.catalog(),client.standSettings()]);setDay(newDay);setCatalog(newCatalog);applyStandProfile(newProfile);save(`happy-cone:cache:${token}`,{user,catalog:newCatalog,day:newDay,standProfile:newProfile},sessionStorage);setRevision(v=>v+1);}catch(e){setError((e as Error).message);}},[client,user,offline,token,applyStandProfile]);
-  const sync = useCallback(async()=>{if(!user||!navigator.onLine||syncingRef.current)return;syncingRef.current=true;setSyncing(true);try{const result=await syncPending(user.id,client);setPending(result.remaining);if(result.synced.length){notify(`${result.synced.length} saved ${result.synced.length===1?'sale has':'sales have'} synced.`);await refresh();}if(result.rejected.length)notify('Some saved sales need attention. Open the sync queue to review.');}catch(e){setError((e as Error).message);}finally{syncingRef.current=false;setSyncing(false);}},[user,client,notify,refresh]);
-  useEffect(()=>{if(!user)return;let alive=true;listPending(user.id).then(items=>{if(alive)setPending(items);}).catch(e=>{if(alive)setError(e.message);});return()=>{alive=false;};},[user]);
-  useEffect(()=>{if(online && user){void sync();}},[online,user,sync]);
-  function setCart(lines:CartLine[]){setCartState(lines);save(`happy-cone:cart:${namespace}`,lines);}
-  async function saveCashSaleForSync(command:CheckoutCommand){
-    const item=await enqueueCheckout(user!.id,command);
-    clearAttempt(namespace);setCheckoutAttempt(null);setPending(await listPending(user!.id));setCart([]);setPayment(false);
-    notify(`Cash sale ${item.command.idempotency_key.slice(0,8).toUpperCase()} saved on this device. Pending sync.`);setPendingReceipt(item);
+type Page = "pos" | "sales" | "menu" | "day" | "reports" | "audit" | "settings";
+const emptyCatalog: Catalog = {
+  categories: [],
+  products: [],
+  modifier_groups: [],
+  modifiers: [],
+};
+export const defaultStandProfile: StandProfile = {
+  business_name: "CREAMY HEAVEN LIMITED",
+  stand_name: "Lusaka stand",
+  location: "Lusaka",
+  currency_name: "Zambian kwacha",
+  currency_code: "ZMW",
+  currency_symbol: "K",
+  timezone: "Africa/Lusaka",
+  tax_id: "1002681530",
+  contact_number: "0771450074",
+  tax_label: "TURNOVER TAX (TOT)",
+  tax_rate_basis_points: 500,
+  payment_guidance:
+    "Cash change is calculated at checkout. For mobile money or card, select the confirmed payment method to complete the sale.",
+  ticket_guidance:
+    "Receipts use the browser print dialog. A printer problem never removes a completed sale; staff can reprint from Sales.",
+  receipt_footer: "Thank you for choosing Happy Cone.",
+  receipt_paper_width: "80mm",
+  activity_guidance:
+    "Review the recorded actions behind sales, payments, account administration and cash reconciliation.",
+  guide_workflow:
+    "Open a business day with the counted float. Choose each item and its customer choices, then take payment. Print or close the receipt and begin the next sale. Reports update when the sale is accepted.",
+  guide_controls:
+    "Press / to search the menu. Use Tab and Shift + Tab to move between controls, Enter or Space to select, and Escape to close a dialog. On a phone, use the floating sale button to jump to checkout.",
+  guide_offline:
+    "After signing in, the cached menu stays available. Cash sales can be saved on this device. Keep the device and browser data until every sale has synced; rejected sales stay in the sync list for manager review. Mobile money and card payments need a connection.",
+  guide_printing:
+    "Use the browser print dialog with a 58 or 80 mm receipt printer, or a normal printer. Sales stay saved if printing fails, and receipts can be reprinted from Sales. Use your browser’s zoom and system text settings.",
+};
+function stored<T>(
+  key: string,
+  fallback: T,
+  storage: Storage = localStorage,
+): T {
+  try {
+    return JSON.parse(storage.getItem(key) ?? "null") ?? fallback;
+  } catch {
+    return fallback;
   }
-  async function submitCheckout(command:CheckoutCommand){
-    if(!user)throw new Error('Sign in before taking a payment.');
-    if(offline){await saveCashSaleForSync(command);return;}
-    try { saveAttempt(namespace,command); } catch(e) { throw new POSAPIError((e as Error).message,422); }
-    setCheckoutAttempt(command);
-    try { const order=await client.checkout(command);clearAttempt(namespace);setCheckoutAttempt(null);setCart([]);setPayment(false);setReceipt(order);await refresh(); }
-    catch(e) {
-      if(e instanceof POSAPIError && e.status===0){
-        setOnline(false);
-        if(command.payment.method==='CASH'){await saveCashSaleForSync(command);return;}
+}
+function save(key: string, value: unknown, storage: Storage = localStorage) {
+  try {
+    storage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* Noncritical preferences must not stop checkout. */
+  }
+}
+const navigation = [
+  { id: "pos", label: "Counter", icon: LayoutGrid },
+  { id: "sales", label: "Sales", icon: ClipboardList },
+  { id: "menu", label: "Menu", icon: BookOpen },
+  { id: "day", label: "Cash day", icon: Wallet },
+  { id: "reports", label: "Reports", icon: BarChart3 },
+] as const;
+export default function App() {
+  const [token, setToken] = useState<string>(() =>
+    stored("happy-cone:session-token", "", sessionStorage),
+  );
+  const client = useMemo<POSClient>(
+    () => new ApiClient(token || undefined),
+    [token],
+  );
+  const [user, setUser] = useState<User | null>(null);
+  const [page, setPage] = useState<Page>("pos");
+  const [catalog, setCatalog] = useState<Catalog>(emptyCatalog);
+  const [day, setDay] = useState<Day | null>(null);
+  const [cart, setCartState] = useState<CartLine[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [online, setOnline] = useState(navigator.onLine);
+  const [payment, setPayment] = useState(false);
+  const [checkoutAttempt, setCheckoutAttempt] =
+    useState<CheckoutCommand | null>(null);
+  const [receipt, setReceipt] = useState<Order | null>(null);
+  const [pendingReceipt, setPendingReceipt] = useState<PendingCheckout | null>(
+    null,
+  );
+  const [printPending, setPrintPending] = useState<PendingCheckout | null>(
+    null,
+  );
+  const [printOrder, setPrintOrder] = useState<Order | null>(null);
+  const [openDay, setOpenDay] = useState(false);
+  const [help, setHelp] = useState(false);
+  const [tour, setTour] = useState(false);
+  const [userMenu, setUserMenu] = useState(false);
+  const [passwordDialog, setPasswordDialog] = useState(false);
+  const [showSync, setShowSync] = useState(false);
+  const [pending, setPending] = useState<PendingCheckout[]>([]);
+  const [syncing, setSyncing] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const syncingRef = useRef(false);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [standProfile, setStandProfile] =
+    useState<StandProfile>(defaultStandProfile);
+  const applyStandProfile = useCallback((profile: StandProfile) => {
+    configureMoney(profile.currency_symbol);
+    configureTimezone(profile.timezone);
+    setStandProfile(profile);
+  }, []);
+  const canManage = !!user && ["MANAGER", "OWNER_ADMIN"].includes(user.role);
+  const canSell = !!user && user.role !== "SERVER";
+  const offline = !online;
+  const namespace = `live:${user?.id ?? "none"}`;
+  const notify = useCallback((message: string) => {
+    setNotice(message);
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(""), 7000);
+  }, []);
+  useEffect(
+    () => () => {
+      if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    },
+    [],
+  );
+  useEffect(() => {
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
+    return () => {
+      window.removeEventListener("online", up);
+      window.removeEventListener("offline", down);
+    };
+  }, []);
+  useEffect(() => {
+    if (online || !token) return;
+    let active = true;
+    const probe = async () => {
+      try {
+        const response = await fetch("/health", { cache: "no-store" });
+        if (active && response.ok) setOnline(true);
+      } catch {
+        /* Keep the offline workspace available until the service returns. */
       }
-      if(e instanceof POSAPIError && e.status>=400 && e.status<500 && e.status!==408){clearAttempt(namespace);setCheckoutAttempt(null);await refresh();}
+    };
+    void probe();
+    const timer = window.setInterval(() => void probe(), 2000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [online, token]);
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setError("");
+    setUser(null);
+    setCatalog(emptyCatalog);
+    setDay(null);
+    setCartState([]);
+    setPending([]);
+    setCheckoutAttempt(null);
+    async function boot() {
+      if (!token) {
+        if (alive) setLoading(false);
+        return;
+      }
+      try {
+        let currentUser: User;
+        let currentCatalog: Catalog;
+        let currentDay: Day | null;
+        let currentProfile: StandProfile;
+        if (!navigator.onLine) {
+          const cached = stored<{
+            user: User;
+            catalog: Catalog;
+            day: Day | null;
+            standProfile?: StandProfile;
+          } | null>(`happy-cone:cache:${token}`, null, sessionStorage);
+          if (!cached)
+            throw new Error(
+              "Connect and sign in once before using this device offline.",
+            );
+          currentUser = cached.user;
+          currentCatalog = cached.catalog;
+          currentDay = cached.day;
+          currentProfile = cached.standProfile ?? defaultStandProfile;
+        } else {
+          currentUser = await client.session();
+          [currentCatalog, currentDay, currentProfile] = await Promise.all([
+            client.catalog(),
+            currentUser.role === "SERVER"
+              ? Promise.resolve(null)
+              : client.currentDay(),
+            client.standSettings(),
+          ]);
+          save(
+            `happy-cone:cache:${token}`,
+            {
+              user: currentUser,
+              catalog: currentCatalog,
+              day: currentDay,
+              standProfile: currentProfile,
+            },
+            sessionStorage,
+          );
+        }
+        if (!alive) return;
+        setUser(currentUser);
+        setCatalog(currentCatalog);
+        setDay(currentDay);
+        applyStandProfile(currentProfile);
+        const recovered = readAttempt(`live:${currentUser.id}`);
+        setCheckoutAttempt(recovered);
+        setCartState(
+          recovered?.lines ??
+            stored<CartLine[]>(`happy-cone:cart:live:${currentUser.id}`, []),
+        );
+        setPage("pos");
+        setTour(
+          currentUser.role !== "SERVER" &&
+            localStorage.getItem(`happy-cone:tour:v1:${currentUser.id}`) !==
+              "complete",
+        );
+      } catch (e) {
+        if (alive && e instanceof POSAPIError && e.status === 401) {
+          sessionStorage.removeItem(`happy-cone:cache:${token}`);
+          sessionStorage.removeItem("happy-cone:session-token");
+          setToken("");
+          setError("");
+          return;
+        }
+        const cached =
+          token && e instanceof POSAPIError && e.status === 0
+            ? stored<{
+                user: User;
+                catalog: Catalog;
+                day: Day | null;
+                standProfile?: StandProfile;
+              } | null>(`happy-cone:cache:${token}`, null, sessionStorage)
+            : null;
+        if (alive && cached) {
+          setOnline(false);
+          setUser(cached.user);
+          setCatalog(cached.catalog);
+          setDay(cached.day);
+          applyStandProfile(cached.standProfile ?? defaultStandProfile);
+          const recovered = readAttempt(`live:${cached.user.id}`);
+          setCheckoutAttempt(recovered);
+          setCartState(
+            recovered?.lines ??
+              stored<CartLine[]>(`happy-cone:cart:live:${cached.user.id}`, []),
+          );
+          setPage("pos");
+          setTour(false);
+          setError("");
+        } else if (alive) {
+          setError((e as Error).message);
+        }
+      } finally {
+        if (alive) setLoading(false);
+      }
+    }
+    void boot();
+    return () => {
+      alive = false;
+    };
+  }, [client, token, applyStandProfile]);
+  const refresh = useCallback(async () => {
+    if (!user || offline) return;
+    try {
+      const [newDay, newCatalog, newProfile] = await Promise.all([
+        user.role === "SERVER" ? Promise.resolve(null) : client.currentDay(),
+        client.catalog(),
+        client.standSettings(),
+      ]);
+      setDay(newDay);
+      setCatalog(newCatalog);
+      applyStandProfile(newProfile);
+      save(
+        `happy-cone:cache:${token}`,
+        { user, catalog: newCatalog, day: newDay, standProfile: newProfile },
+        sessionStorage,
+      );
+      setRevision((v) => v + 1);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }, [client, user, offline, token, applyStandProfile]);
+  const sync = useCallback(async () => {
+    if (!user || !navigator.onLine || syncingRef.current) return;
+    syncingRef.current = true;
+    setSyncing(true);
+    try {
+      const result = await syncPending(user.id, client);
+      setPending(result.remaining);
+      if (result.synced.length) {
+        notify(
+          `${result.synced.length} saved ${result.synced.length === 1 ? "sale has" : "sales have"} synced.`,
+        );
+        await refresh();
+      }
+      if (result.rejected.length)
+        notify(
+          "Some saved sales need attention. Open the sync queue to review.",
+        );
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      syncingRef.current = false;
+      setSyncing(false);
+    }
+  }, [user, client, notify, refresh]);
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    listPending(user.id)
+      .then((items) => {
+        if (alive) setPending(items);
+      })
+      .catch((e) => {
+        if (alive) setError(e.message);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [user]);
+  useEffect(() => {
+    if (online && user) {
+      void sync();
+    }
+  }, [online, user, sync]);
+  function setCart(lines: CartLine[]) {
+    setCartState(lines);
+    save(`happy-cone:cart:${namespace}`, lines);
+  }
+  async function saveCashSaleForSync(command: CheckoutCommand) {
+    const item = await enqueueCheckout(user!.id, command);
+    clearAttempt(namespace);
+    setCheckoutAttempt(null);
+    setPending(await listPending(user!.id));
+    setCart([]);
+    setPayment(false);
+    notify(
+      `Cash sale ${item.command.idempotency_key.slice(0, 8).toUpperCase()} saved on this device. Pending sync.`,
+    );
+    setPendingReceipt(item);
+  }
+  async function submitCheckout(command: CheckoutCommand) {
+    if (!user) throw new Error("Sign in before taking a payment.");
+    if (offline) {
+      await saveCashSaleForSync(command);
+      return;
+    }
+    try {
+      saveAttempt(namespace, command);
+    } catch (e) {
+      throw new POSAPIError((e as Error).message, 422);
+    }
+    setCheckoutAttempt(command);
+    try {
+      const order = await client.checkout(command);
+      clearAttempt(namespace);
+      setCheckoutAttempt(null);
+      setCart([]);
+      setPayment(false);
+      setReceipt(order);
+      await refresh();
+    } catch (e) {
+      if (e instanceof POSAPIError && e.status === 0) {
+        setOnline(false);
+        if (command.payment.method === "CASH") {
+          await saveCashSaleForSync(command);
+          return;
+        }
+      }
+      if (
+        e instanceof POSAPIError &&
+        e.status >= 400 &&
+        e.status < 500 &&
+        e.status !== 408
+      ) {
+        clearAttempt(namespace);
+        setCheckoutAttempt(null);
+        await refresh();
+      }
       throw e;
     }
   }
-  const navigate = useCallback((next:Page)=>{setPage(next);setError('');document.title=`Happy Cone · ${navigation.find(n=>n.id===next)?.label ?? readable(next)}`;window.scrollTo({top:0,behavior:'instant'});},[]);
-  async function signOut(){try{await client.logout();}catch(e){if(!(e instanceof POSAPIError && e.status===401))notify('Signed out on this device. The server session could not be revoked and will expire automatically.');}finally{sessionStorage.removeItem(`happy-cone:cache:${token}`);sessionStorage.removeItem('happy-cone:session-token');setToken('');setUser(null);setCartState([]);setUserMenu(false);setTour(false);}}
-  function finishTour(){if(user)localStorage.setItem(`happy-cone:tour:v1:${user.id}`,'complete');setTour(false);}
-  function standSaved(profile:StandProfile){applyStandProfile(profile);if(user)save(`happy-cone:cache:${token}`,{user,catalog,day,standProfile:profile},sessionStorage);notify('Stand settings saved.');}
-  const nav = navigation.filter(n=>n.id==='pos'||n.id==='sales'||n.id==='day'?canSell:canManage);
-  if(!token)return <Login client={client} onLogin={(newToken)=>{save('happy-cone:session-token',newToken,sessionStorage);setToken(newToken);}}/>;
-  if(!loading&&user?.role==='SERVER')return <><a className="skip-link" href="#main-content">Skip to main content</a><main className="legacy-access-page" id="main-content"><section className="legacy-access-card"><BrandLogo variant="hero"/><span className="eyebrow">Account access only</span><h1>This account needs reassignment</h1><p>The Server role is no longer used at Happy Cone. Ask an owner administrator to change this account to Cashier, Manager or Owner administrator, or to deactivate it.</p><div className="legacy-access-actions"><button className="button" type="button" onClick={()=>setUserMenu(true)}>Account details</button><button className="button primary" type="button" onClick={()=>void signOut()}><LogOut size={16}/>Sign out</button></div></section></main>{userMenu&&<Modal title={user.name} eyebrow="Legacy staff account" onClose={()=>setUserMenu(false)}><div className="modal-body"><div className="key-value"><span>Username</span><strong>{user.username}</strong></div><div className="key-value"><span>Role</span><strong>Legacy server</strong></div><div className="key-value"><span>Stand</span><strong>{standProfile.stand_name}</strong></div><p className="hint-inline" style={{marginTop:18}}>An owner administrator can reassign or deactivate this account from Staff accounts.</p></div><div className="modal-footer"><button className="button primary" type="button" onClick={()=>setUserMenu(false)}>Close</button></div></Modal>}</>;
-  return <><a className="skip-link" href="#main-content">Skip to main content</a><div className="app"><aside className="rail" aria-label="Main navigation"><BrandLogo variant="mark" decorative/><nav>{nav.map(({id,label,icon:Icon})=><button key={id} className={`nav-button ${page===id?'active':''}`} onClick={()=>navigate(id)} aria-current={page===id?'page':undefined}><Icon size={22} strokeWidth={1.6}/><span>{label}</span></button>)}</nav><div className="rail-footer">{canManage && <button className={`nav-button ${page==='settings'?'active':''}`} aria-label="Settings and information" onClick={()=>navigate('settings')}><Settings2 size={22} strokeWidth={1.6}/><span>Settings</span></button>}<button className="nav-button" onClick={()=>setHelp(true)} aria-label="Help"><CircleHelp size={21} strokeWidth={1.6}/><span>Help</span></button></div></aside><div className="workspace"><header className="topbar"><div className="brand-lockup"><BrandLogo/><div className="location"><strong>{standProfile.stand_name}</strong>{standProfile.location}</div></div><div className="top-actions">{pending.length>0 && <button className="text-button pending-count" onClick={()=>setShowSync(true)}>{pending.length} to sync</button>}<span className={`connection ${!online?'offline':''}`}><span className="dot"/>{online?'Connected':'Offline'}</span><button className="user-button" onClick={()=>setUserMenu(true)} aria-label="Account and stand"><div className="avatar">{user?user.name.split(' ').map(n=>n[0]).slice(0,2).join(''):'HC'}</div><div><strong>{user?.name ?? 'Your counter'}</strong><small>{user?readable(user.role):'Opening account'}</small></div><ChevronDown size={13}/></button></div></header>{offline && <div className="practice-strip"><WifiOff size={13}/><span>You’re offline. Cash sales save on this device until they can sync.</span></div>}<main className="page-content" id="main-content" tabIndex={-1}><ErrorMessage error={error}/>{loading?<div className="spinner-area" role="status"><LoaderCircle size={28} className="spin"/><p>Opening your counter…</p></div>:user?<>
-  {page==='pos'&&canSell&&<Pos catalog={catalog} cart={cart} setCart={setCart} day={day} locked={!!checkoutAttempt} onPay={()=>setPayment(true)} onOpenDay={()=>setOpenDay(true)}/>}
-  {page==='sales'&&canSell&&<Sales key={`sales-${revision}`} client={client} canManage={canManage} onReceipt={setReceipt} onChanged={refresh}/>}
-  {page==='inventory'&&canManage&&<><Inventory client={client} onError={setError} onChanged={refresh}/><div style={{marginTop:22}}><CatalogRecipes client={client} onChanged={refresh} onError={setError}/></div></>}
-  {page==='day'&&canSell&&<BusinessDay key={`day-${revision}`} client={client} day={day} canManage={canManage} onChanged={refresh} onError={setError} pendingCount={pending.length+(checkoutAttempt?1:0)}/>}
-  {page==='reports'&&canManage&&<Reports client={client}/>}
-  {page==='audit'&&canManage&&<Audit client={client}/>}
-  {page==='settings'&&canManage&&<Settings user={user} client={client} profile={standProfile} onProfileSaved={standSaved} onError={setError} onAudit={()=>navigate('audit')} onHelp={()=>setHelp(true)}/>}
-  <footer className="session-footer"><div><Clock3 size={13}/><span>{dateOf(new Date().toISOString())} · {standProfile.timezone}</span></div><div className="session-meta"><span>Opening float</span><strong>{day?money(day.opening_float_ngwee):'Day closed'}</strong></div><div><IceCreamCone size={13}/><span>Made for the good little moments.</span></div></footer></>:<div className="empty-state"><h2>Connection unavailable</h2><p>Reload the counter to try connecting again.</p><button className="button" onClick={()=>window.location.reload()}>Reload counter</button></div>}</main></div></div>
-  {payment&&(day||checkoutAttempt)&&<Payment client={client} cart={cart} catalog={catalog} day={day} attempt={checkoutAttempt} offline={offline} onClose={()=>setPayment(false)} onSubmit={submitCheckout}/>}
-  {receipt&&<ReceiptModal order={receipt} profile={standProfile} onClose={()=>setReceipt(null)} onPrint={()=>{setPrintPending(null);setPrintOrder(receipt);setTimeout(()=>{try{window.print();}catch{notify('Printing was unavailable. Your sale is saved; reprint it from Sales.');}},50);}}/>}
-  {printPending&&<div className={`receipt-print receipt-paper-${standProfile.receipt_paper_width.slice(0,2)}`}><PendingReceipt command={printPending.command} createdAt={printPending.created_at} catalog={catalog} profile={standProfile}/></div>}
-  {pendingReceipt&&<Modal title="Cash sale saved on this device" eyebrow="Provisional receipt" onClose={()=>setPendingReceipt(null)}><PendingReceipt command={pendingReceipt.command} createdAt={pendingReceipt.created_at} catalog={catalog} profile={standProfile}/><div className="modal-footer"><button className="button primary" autoFocus onClick={()=>{setPrintOrder(null);setPrintPending(pendingReceipt);setTimeout(()=>{try{window.print();}catch{notify('Printing was unavailable. Your offline cash sale remains saved on this device.');}},50);}}>Print provisional receipt</button><button className="button" onClick={()=>setPendingReceipt(null)}>Next sale</button></div></Modal>}
-  {printOrder&&<div className={`receipt-print receipt-paper-${standProfile.receipt_paper_width.slice(0,2)}`}><Receipt order={printOrder} profile={standProfile}/></div>}
-  {openDay&&<OpenDay client={client} onClose={()=>setOpenDay(false)} onDone={async()=>{setOpenDay(false);await refresh();notify('Business day opened. Your counter is ready.');}}/>}
-  {help&&<Modal title="Counter guide" eyebrow="Help for every shift" onClose={()=>setHelp(false)}><div className="modal-body prose"><h3>From sale to receipt</h3><p>{standProfile.guide_workflow}</p><h3>Keyboard and touch</h3><p>{standProfile.guide_controls}</p><h3>When the connection drops</h3><p>{standProfile.guide_offline}</p><h3>Printing and accessibility</h3><p>{standProfile.guide_printing}</p><button className="button tour-restart" onClick={()=>{setHelp(false);setTour(true);}}><Compass size={16}/>Take product tour</button></div></Modal>}
-  {tour&&user&&<ProductTour role={user.role} onNavigate={navigate} onFinish={finishTour}/>}
-  {userMenu&&<Modal title={user?.name ?? 'Your account'} eyebrow="Account" onClose={()=>setUserMenu(false)}><div className="modal-body"><div className="key-value"><span>System</span><Badge tone="green">Live counter</Badge></div><div className="key-value"><span>Role</span><strong>{user&&readable(user.role)}</strong></div><div className="key-value"><span>Stand timezone</span><strong>{standProfile.timezone}</strong></div><p className="hint-inline" style={{marginTop:18}}>Pending offline sales stay on this device after you sign out.</p><div style={{display:"flex",gap:10,marginTop:18,flexWrap:"wrap"}}>{canManage&&<button className="button" onClick={()=>{setUserMenu(false);navigate("settings");}}><Settings2 size={16}/>Stand settings</button>}<button className="button" onClick={()=>{setUserMenu(false);setPasswordDialog(true);}}><KeyRound size={16}/>Change password</button><button className="button" onClick={()=>{setUserMenu(false);setHelp(true);}}><CircleHelp size={16}/>Counter guide</button></div></div><div className="modal-footer"><button className="button primary" onClick={()=>void signOut()}><LogOut size={16}/>Sign out</button></div></Modal>}
-  {passwordDialog&&<AccountPassword client={client} onClose={()=>setPasswordDialog(false)} onChanged={(otherSessions)=>{setPasswordDialog(false);notify(otherSessions ? `Password updated. ${otherSessions} other signed-in ${otherSessions===1?'device was':'devices were'} signed out.` : 'Password updated.');}}/>}
-  {showSync&&<Modal title="Sales saved on this device" eyebrow="Offline sync" onClose={()=>setShowSync(false)}><div className="modal-body"><p>Only synchronized sales receive a final receipt number and affect stock and reports.</p>{!pending.length?<div className="empty-state"><CheckCircle2 size={25}/><h3>Everything is synced</h3></div>:<ul className="sync-items">{pending.map(item=><li key={item.id}><strong>Local {item.command.idempotency_key.slice(0,8).toUpperCase()}</strong> · {timeOf(item.created_at)}<br/><Badge tone={item.status==='REJECTED'?'red':'orange'}>{item.status==='REJECTED'?'Needs attention':'Pending sync'}</Badge>{item.error&&<p className="hint-inline">{item.error}</p>}</li>)}</ul>}<p className="hint-inline">Do not clear browser data while sales remain here. A manager should review rejected sales against cash received before closing the day.</p></div><div className="modal-footer"><button className="button primary" disabled={syncing||!online||!pending.length} onClick={()=>void sync()}><RefreshCw size={16} className={syncing?'spin':''}/>Sync saved sales</button></div></Modal>}
-  {notice&&<div className="toast" role="status"><CheckCircle2 size={17}/><span>{notice}</span><button aria-label="Dismiss notification" onClick={()=>setNotice('')}><X size={15}/></button></div>}
-  </>;
+  const navigate = useCallback((next: Page) => {
+    setPage(next);
+    setError("");
+    document.title = `Happy Cone · ${navigation.find((n) => n.id === next)?.label ?? readable(next)}`;
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, []);
+  async function signOut() {
+    try {
+      await client.logout();
+    } catch (e) {
+      if (!(e instanceof POSAPIError && e.status === 401))
+        notify(
+          "Signed out on this device. The server session could not be revoked and will expire automatically.",
+        );
+    } finally {
+      sessionStorage.removeItem(`happy-cone:cache:${token}`);
+      sessionStorage.removeItem("happy-cone:session-token");
+      setToken("");
+      setUser(null);
+      setCartState([]);
+      setUserMenu(false);
+      setTour(false);
+    }
+  }
+  function finishTour() {
+    if (user) localStorage.setItem(`happy-cone:tour:v1:${user.id}`, "complete");
+    setTour(false);
+  }
+  function standSaved(profile: StandProfile) {
+    applyStandProfile(profile);
+    if (user)
+      save(
+        `happy-cone:cache:${token}`,
+        { user, catalog, day, standProfile: profile },
+        sessionStorage,
+      );
+    notify("Stand settings saved.");
+  }
+  const nav = navigation.filter((n) =>
+    n.id === "pos" || n.id === "sales" || n.id === "day" ? canSell : canManage,
+  );
+  if (!token)
+    return (
+      <Login
+        client={client}
+        onLogin={(newToken) => {
+          save("happy-cone:session-token", newToken, sessionStorage);
+          setToken(newToken);
+        }}
+      />
+    );
+  if (!loading && user?.role === "SERVER")
+    return (
+      <>
+        <a className="skip-link" href="#main-content">
+          Skip to main content
+        </a>
+        <main className="legacy-access-page" id="main-content">
+          <section className="legacy-access-card">
+            <BrandLogo variant="hero" />
+            <span className="eyebrow">Account access only</span>
+            <h1>This account needs reassignment</h1>
+            <p>
+              The Server role is no longer used at Happy Cone. Ask an owner
+              administrator to change this account to Cashier, Manager or Owner
+              administrator, or to deactivate it.
+            </p>
+            <div className="legacy-access-actions">
+              <button
+                className="button"
+                type="button"
+                onClick={() => setUserMenu(true)}
+              >
+                Account details
+              </button>
+              <button
+                className="button primary"
+                type="button"
+                onClick={() => void signOut()}
+              >
+                <LogOut size={16} />
+                Sign out
+              </button>
+            </div>
+          </section>
+        </main>
+        {userMenu && (
+          <Modal
+            title={user.name}
+            eyebrow="Legacy staff account"
+            onClose={() => setUserMenu(false)}
+          >
+            <div className="modal-body">
+              <div className="key-value">
+                <span>Username</span>
+                <strong>{user.username}</strong>
+              </div>
+              <div className="key-value">
+                <span>Role</span>
+                <strong>Legacy server</strong>
+              </div>
+              <div className="key-value">
+                <span>Stand</span>
+                <strong>{standProfile.stand_name}</strong>
+              </div>
+              <p className="hint-inline" style={{ marginTop: 18 }}>
+                An owner administrator can reassign or deactivate this account
+                from Staff accounts.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="button primary"
+                type="button"
+                onClick={() => setUserMenu(false)}
+              >
+                Close
+              </button>
+            </div>
+          </Modal>
+        )}
+      </>
+    );
+  return (
+    <>
+      <a className="skip-link" href="#main-content">
+        Skip to main content
+      </a>
+      <div className="app">
+        <aside className="rail" aria-label="Main navigation">
+          <BrandLogo variant="mark" decorative />
+          <nav>
+            {nav.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                className={`nav-button ${page === id ? "active" : ""}`}
+                onClick={() => navigate(id)}
+                aria-current={page === id ? "page" : undefined}
+              >
+                <Icon size={22} strokeWidth={1.6} />
+                <span>{label}</span>
+              </button>
+            ))}
+          </nav>
+          <div className="rail-footer">
+            {canManage && (
+              <button
+                className={`nav-button ${page === "settings" ? "active" : ""}`}
+                aria-label="Settings and information"
+                onClick={() => navigate("settings")}
+              >
+                <Settings2 size={22} strokeWidth={1.6} />
+                <span>Settings</span>
+              </button>
+            )}
+            <button
+              className="nav-button"
+              onClick={() => setHelp(true)}
+              aria-label="Help"
+            >
+              <CircleHelp size={21} strokeWidth={1.6} />
+              <span>Help</span>
+            </button>
+          </div>
+        </aside>
+        <div className="workspace">
+          <header className="topbar">
+            <div className="brand-lockup">
+              <BrandLogo />
+              <div className="location">
+                <strong>{standProfile.stand_name}</strong>
+                {standProfile.location}
+              </div>
+            </div>
+            <div className="top-actions">
+              {pending.length > 0 && (
+                <button
+                  className="text-button pending-count"
+                  onClick={() => setShowSync(true)}
+                >
+                  {pending.length} to sync
+                </button>
+              )}
+              <span className={`connection ${!online ? "offline" : ""}`}>
+                <span className="dot" />
+                {online ? "Connected" : "Offline"}
+              </span>
+              <button
+                className="user-button"
+                onClick={() => setUserMenu(true)}
+                aria-label="Account and stand"
+              >
+                <div className="avatar">
+                  {user
+                    ? user.name
+                        .split(" ")
+                        .map((n) => n[0])
+                        .slice(0, 2)
+                        .join("")
+                    : "HC"}
+                </div>
+                <div>
+                  <strong>{user?.name ?? "Your counter"}</strong>
+                  <small>
+                    {user ? readable(user.role) : "Opening account"}
+                  </small>
+                </div>
+                <ChevronDown size={13} />
+              </button>
+            </div>
+          </header>
+          {offline && (
+            <div className="practice-strip">
+              <WifiOff size={13} />
+              <span>
+                You’re offline. Cash sales save on this device until they can
+                sync.
+              </span>
+            </div>
+          )}
+          <main className="page-content" id="main-content" tabIndex={-1}>
+            <ErrorMessage error={error} />
+            {loading ? (
+              <div className="spinner-area" role="status">
+                <LoaderCircle size={28} className="spin" />
+                <p>Opening your counter…</p>
+              </div>
+            ) : user ? (
+              <>
+                {page === "pos" && canSell && (
+                  <Pos
+                    catalog={catalog}
+                    cart={cart}
+                    setCart={setCart}
+                    day={day}
+                    locked={!!checkoutAttempt}
+                    onPay={() => setPayment(true)}
+                    onOpenDay={() => setOpenDay(true)}
+                  />
+                )}
+                {page === "sales" && canSell && (
+                  <Sales
+                    key={`sales-${revision}`}
+                    client={client}
+                    canManage={canManage}
+                    onReceipt={setReceipt}
+                    onChanged={refresh}
+                  />
+                )}
+                {page === "menu" && canManage && (
+                  <MenuAdmin
+                    client={client}
+                    onChanged={refresh}
+                    onError={setError}
+                  />
+                )}
+                {page === "day" && canSell && (
+                  <BusinessDay
+                    key={`day-${revision}`}
+                    client={client}
+                    day={day}
+                    canManage={canManage}
+                    onChanged={refresh}
+                    onError={setError}
+                    pendingCount={pending.length + (checkoutAttempt ? 1 : 0)}
+                  />
+                )}
+                {page === "reports" && canManage && <Reports client={client} />}
+                {page === "audit" && canManage && <Audit client={client} />}
+                {page === "settings" && canManage && (
+                  <Settings
+                    user={user}
+                    client={client}
+                    profile={standProfile}
+                    onProfileSaved={standSaved}
+                    onError={setError}
+                    onAudit={() => navigate("audit")}
+                    onHelp={() => setHelp(true)}
+                  />
+                )}
+                <footer className="session-footer">
+                  <div>
+                    <Clock3 size={13} />
+                    <span>
+                      {dateOf(new Date().toISOString())} ·{" "}
+                      {standProfile.timezone}
+                    </span>
+                  </div>
+                  <div className="session-meta">
+                    <span>Opening float</span>
+                    <strong>
+                      {day ? money(day.opening_float_ngwee) : "Day closed"}
+                    </strong>
+                  </div>
+                  <div>
+                    <IceCreamCone size={13} />
+                    <span>Made for the good little moments.</span>
+                  </div>
+                </footer>
+              </>
+            ) : (
+              <div className="empty-state">
+                <h2>Connection unavailable</h2>
+                <p>Reload the counter to try connecting again.</p>
+                <button
+                  className="button"
+                  onClick={() => window.location.reload()}
+                >
+                  Reload counter
+                </button>
+              </div>
+            )}
+          </main>
+        </div>
+      </div>
+      {payment && (day || checkoutAttempt) && (
+        <Payment
+          client={client}
+          cart={cart}
+          catalog={catalog}
+          day={day}
+          attempt={checkoutAttempt}
+          offline={offline}
+          onClose={() => setPayment(false)}
+          onSubmit={submitCheckout}
+        />
+      )}
+      {receipt && (
+        <ReceiptModal
+          order={receipt}
+          profile={standProfile}
+          onClose={() => setReceipt(null)}
+          onPrint={() => {
+            setPrintPending(null);
+            setPrintOrder(receipt);
+            setTimeout(() => {
+              try {
+                window.print();
+              } catch {
+                notify(
+                  "Printing was unavailable. Your sale is saved; reprint it from Sales.",
+                );
+              }
+            }, 50);
+          }}
+        />
+      )}
+      {printPending && (
+        <div
+          className={`receipt-print receipt-paper-${standProfile.receipt_paper_width.slice(0, 2)}`}
+        >
+          <PendingReceipt
+            command={printPending.command}
+            createdAt={printPending.created_at}
+            catalog={catalog}
+            profile={standProfile}
+          />
+        </div>
+      )}
+      {pendingReceipt && (
+        <Modal
+          title="Cash sale saved on this device"
+          eyebrow="Provisional receipt"
+          onClose={() => setPendingReceipt(null)}
+        >
+          <PendingReceipt
+            command={pendingReceipt.command}
+            createdAt={pendingReceipt.created_at}
+            catalog={catalog}
+            profile={standProfile}
+          />
+          <div className="modal-footer">
+            <button
+              className="button primary"
+              autoFocus
+              onClick={() => {
+                setPrintOrder(null);
+                setPrintPending(pendingReceipt);
+                setTimeout(() => {
+                  try {
+                    window.print();
+                  } catch {
+                    notify(
+                      "Printing was unavailable. Your offline cash sale remains saved on this device.",
+                    );
+                  }
+                }, 50);
+              }}
+            >
+              Print provisional receipt
+            </button>
+            <button className="button" onClick={() => setPendingReceipt(null)}>
+              Next sale
+            </button>
+          </div>
+        </Modal>
+      )}
+      {printOrder && (
+        <div
+          className={`receipt-print receipt-paper-${standProfile.receipt_paper_width.slice(0, 2)}`}
+        >
+          <Receipt order={printOrder} profile={standProfile} />
+        </div>
+      )}
+      {openDay && (
+        <OpenDay
+          client={client}
+          onClose={() => setOpenDay(false)}
+          onDone={async () => {
+            setOpenDay(false);
+            await refresh();
+            notify("Business day opened. Your counter is ready.");
+          }}
+        />
+      )}
+      {help && (
+        <Modal
+          title="Counter guide"
+          eyebrow="Help for every shift"
+          onClose={() => setHelp(false)}
+        >
+          <div className="modal-body prose">
+            <h3>From sale to receipt</h3>
+            <p>{standProfile.guide_workflow}</p>
+            <h3>Keyboard and touch</h3>
+            <p>{standProfile.guide_controls}</p>
+            <h3>When the connection drops</h3>
+            <p>{standProfile.guide_offline}</p>
+            <h3>Printing and accessibility</h3>
+            <p>{standProfile.guide_printing}</p>
+            <button
+              className="button tour-restart"
+              onClick={() => {
+                setHelp(false);
+                setTour(true);
+              }}
+            >
+              <Compass size={16} />
+              Take product tour
+            </button>
+          </div>
+        </Modal>
+      )}
+      {tour && user && (
+        <ProductTour
+          role={user.role}
+          onNavigate={navigate}
+          onFinish={finishTour}
+        />
+      )}
+      {userMenu && (
+        <Modal
+          title={user?.name ?? "Your account"}
+          eyebrow="Account"
+          onClose={() => setUserMenu(false)}
+        >
+          <div className="modal-body">
+            <div className="key-value">
+              <span>System</span>
+              <Badge tone="green">Live counter</Badge>
+            </div>
+            <div className="key-value">
+              <span>Role</span>
+              <strong>{user && readable(user.role)}</strong>
+            </div>
+            <div className="key-value">
+              <span>Stand timezone</span>
+              <strong>{standProfile.timezone}</strong>
+            </div>
+            <p className="hint-inline" style={{ marginTop: 18 }}>
+              Pending offline sales stay on this device after you sign out.
+            </p>
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                marginTop: 18,
+                flexWrap: "wrap",
+              }}
+            >
+              {canManage && (
+                <button
+                  className="button"
+                  onClick={() => {
+                    setUserMenu(false);
+                    navigate("settings");
+                  }}
+                >
+                  <Settings2 size={16} />
+                  Stand settings
+                </button>
+              )}
+              <button
+                className="button"
+                onClick={() => {
+                  setUserMenu(false);
+                  setPasswordDialog(true);
+                }}
+              >
+                <KeyRound size={16} />
+                Change password
+              </button>
+              <button
+                className="button"
+                onClick={() => {
+                  setUserMenu(false);
+                  setHelp(true);
+                }}
+              >
+                <CircleHelp size={16} />
+                Counter guide
+              </button>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button className="button primary" onClick={() => void signOut()}>
+              <LogOut size={16} />
+              Sign out
+            </button>
+          </div>
+        </Modal>
+      )}
+      {passwordDialog && (
+        <AccountPassword
+          client={client}
+          onClose={() => setPasswordDialog(false)}
+          onChanged={(otherSessions) => {
+            setPasswordDialog(false);
+            notify(
+              otherSessions
+                ? `Password updated. ${otherSessions} other signed-in ${otherSessions === 1 ? "device was" : "devices were"} signed out.`
+                : "Password updated.",
+            );
+          }}
+        />
+      )}
+      {showSync && (
+        <Modal
+          title="Sales saved on this device"
+          eyebrow="Offline sync"
+          onClose={() => setShowSync(false)}
+        >
+          <div className="modal-body">
+            <p>
+              Only synchronized sales receive a final receipt number and appear
+              in reports.
+            </p>
+            {!pending.length ? (
+              <div className="empty-state">
+                <CheckCircle2 size={25} />
+                <h3>Everything is synced</h3>
+              </div>
+            ) : (
+              <ul className="sync-items">
+                {pending.map((item) => (
+                  <li key={item.id}>
+                    <strong>
+                      Local{" "}
+                      {item.command.idempotency_key.slice(0, 8).toUpperCase()}
+                    </strong>{" "}
+                    · {timeOf(item.created_at)}
+                    <br />
+                    <Badge tone={item.status === "REJECTED" ? "red" : "orange"}>
+                      {item.status === "REJECTED"
+                        ? "Needs attention"
+                        : "Pending sync"}
+                    </Badge>
+                    {item.error && <p className="hint-inline">{item.error}</p>}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="hint-inline">
+              Do not clear browser data while sales remain here. A manager
+              should review rejected sales against cash received before closing
+              the day.
+            </p>
+          </div>
+          <div className="modal-footer">
+            <button
+              className="button primary"
+              disabled={syncing || !online || !pending.length}
+              onClick={() => void sync()}
+            >
+              <RefreshCw size={16} className={syncing ? "spin" : ""} />
+              Sync saved sales
+            </button>
+          </div>
+        </Modal>
+      )}
+      {notice && (
+        <div className="toast" role="status">
+          <CheckCircle2 size={17} />
+          <span>{notice}</span>
+          <button
+            aria-label="Dismiss notification"
+            onClick={() => setNotice("")}
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+    </>
+  );
 }
-function Login({client,onLogin}:{client:POSClient;onLogin:(token:string)=>void}){const[username,setUsername]=useState('');const[password,setPassword]=useState('');const[showPassword,setShowPassword]=useState(false);const[error,setError]=useState('');const[busy,setBusy]=useState(false);async function submit(e:FormEvent){e.preventDefault();setError('');setBusy(true);try{const result=await client.login(username,password);onLogin(result.token);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}return <main className="login-page"><div className="login-layout"><div className="login-story"><BrandLogo variant="hero"/><div><span className="eyebrow">Happy Cone · Lusaka</span><h1>Small scoops.<br/>Happy days.</h1><p>Sales, receipts, stock and daily close—kept clear for the whole team.</p></div><p className="login-welcome">Your shift starts here.</p></div><form className="login-form" onSubmit={submit}><span className="eyebrow">Happy Cone staff</span><h2>Staff sign-in</h2><p>Enter the account details provided by your manager.</p><label className="field">Username<input autoComplete="username" autoFocus required value={username} onChange={e=>setUsername(e.target.value)}/></label><div className="field"><label htmlFor="login-password">Password</label><span className="password-input"><input id="login-password" type={showPassword?'text':'password'} autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)}/><button type="button" aria-label={showPassword?'Hide password':'Show password'} aria-pressed={showPassword} onClick={()=>setShowPassword(value=>!value)}>{showPassword?<EyeOff size={18}/>:<Eye size={18}/>}</button></span></div><ErrorMessage error={error}/><SubmitButton busy={busy}>Open counter</SubmitButton><p className="login-support">Need access? Ask the stand owner or manager to create or reset your staff account.</p></form></div></main>;}
-function OpenDay({client,onClose,onDone}:{client:POSClient;onClose:()=>void;onDone:()=>Promise<void>}){const[amount,setAmount]=useState('');const[busy,setBusy]=useState(false);const[error,setError]=useState('');async function submit(e:FormEvent){e.preventDefault();setBusy(true);setError('');try{await client.openDay(parseMoney(amount));await onDone();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}return <Modal title="Start a good day." eyebrow="Open business day" onClose={()=>{if(!busy)onClose();}}><form onSubmit={submit}><div className="modal-body"><p>Count the cash in your drawer before the first sale. This is your opening float.</p><label className="field">Opening cash float ({currencySymbol()})<input autoFocus required inputMode="decimal" placeholder="500.00" value={amount} onChange={e=>setAmount(e.target.value)}/></label><ErrorMessage error={error}/></div><div className="modal-footer"><SubmitButton busy={busy}>Open business day</SubmitButton></div></form></Modal>;}
-function Settings({user,client,profile,onProfileSaved,onError,onAudit,onHelp}:{user:User;client:POSClient;profile:StandProfile;onProfileSaved:(profile:StandProfile)=>void;onError:(message:string)=>void;onAudit:()=>void;onHelp:()=>void}){return <><div className="page-heading"><div><span className="eyebrow">Stand administration</span><h1>Settings</h1><p>Manage staff access, receipt details and operating guidance for {profile.stand_name}.</p></div></div>{user.role==='OWNER_ADMIN'&&<StaffAccounts client={client} currentUserId={user.id} onError={onError}/>}<StandSettingsCards profile={profile} user={user} client={client} onSaved={onProfileSaved} onAudit={onAudit} onHelp={onHelp}/></>;}
+function Login({
+  client,
+  onLogin,
+}: {
+  client: POSClient;
+  onLogin: (token: string) => void;
+}) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    setBusy(true);
+    try {
+      const result = await client.login(username, password);
+      onLogin(result.token);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <main className="login-page">
+      <div className="login-layout">
+        <div className="login-story">
+          <BrandLogo variant="hero" />
+          <div>
+            <span className="eyebrow">Happy Cone · Lusaka</span>
+            <h1>
+              Small scoops.
+              <br />
+              Happy days.
+            </h1>
+            <p>
+              Menu, sales, receipts and daily close—kept clear for the whole
+              team.
+            </p>
+          </div>
+          <p className="login-welcome">Your shift starts here.</p>
+        </div>
+        <form className="login-form" onSubmit={submit}>
+          <span className="eyebrow">Happy Cone staff</span>
+          <h2>Staff sign-in</h2>
+          <p>Enter the account details provided by your manager.</p>
+          <label className="field">
+            Username
+            <input
+              autoComplete="username"
+              autoFocus
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+          </label>
+          <div className="field">
+            <label htmlFor="login-password">Password</label>
+            <span className="password-input">
+              <input
+                id="login-password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword((value) => !value)}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </span>
+          </div>
+          <ErrorMessage error={error} />
+          <SubmitButton busy={busy}>Open counter</SubmitButton>
+          <p className="login-support">
+            Need access? Ask the stand owner or manager to create or reset your
+            staff account.
+          </p>
+        </form>
+      </div>
+    </main>
+  );
+}
+function OpenDay({
+  client,
+  onClose,
+  onDone,
+}: {
+  client: POSClient;
+  onClose: () => void;
+  onDone: () => Promise<void>;
+}) {
+  const [amount, setAmount] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      await client.openDay(parseMoney(amount));
+      await onDone();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Modal
+      title="Start a good day."
+      eyebrow="Open business day"
+      onClose={() => {
+        if (!busy) onClose();
+      }}
+    >
+      <form onSubmit={submit}>
+        <div className="modal-body">
+          <p>
+            Count the cash in your drawer before the first sale. This is your
+            opening float.
+          </p>
+          <label className="field">
+            Opening cash float ({currencySymbol()})
+            <input
+              autoFocus
+              required
+              inputMode="decimal"
+              placeholder="500.00"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </label>
+          <ErrorMessage error={error} />
+        </div>
+        <div className="modal-footer">
+          <SubmitButton busy={busy}>Open business day</SubmitButton>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+function Settings({
+  user,
+  client,
+  profile,
+  onProfileSaved,
+  onError,
+  onAudit,
+  onHelp,
+}: {
+  user: User;
+  client: POSClient;
+  profile: StandProfile;
+  onProfileSaved: (profile: StandProfile) => void;
+  onError: (message: string) => void;
+  onAudit: () => void;
+  onHelp: () => void;
+}) {
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <span className="eyebrow">Stand administration</span>
+          <h1>Settings</h1>
+          <p>
+            Manage staff access, receipt details and operating guidance for{" "}
+            {profile.stand_name}.
+          </p>
+        </div>
+      </div>
+      {user.role === "OWNER_ADMIN" && (
+        <StaffAccounts
+          client={client}
+          currentUserId={user.id}
+          onError={onError}
+        />
+      )}
+      <StandSettingsCards
+        profile={profile}
+        user={user}
+        client={client}
+        onSaved={onProfileSaved}
+        onAudit={onAudit}
+        onHelp={onHelp}
+      />
+    </>
+  );
+}

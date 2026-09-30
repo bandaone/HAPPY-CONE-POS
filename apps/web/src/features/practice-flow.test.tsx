@@ -1,4 +1,12 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App, { defaultStandProfile } from "../App";
@@ -8,14 +16,21 @@ const originalShowModal = HTMLDialogElement.prototype.showModal;
 const originalClose = HTMLDialogElement.prototype.close;
 
 beforeAll(() => {
-  HTMLDialogElement.prototype.showModal = function showModal() { this.setAttribute("open", ""); };
-  HTMLDialogElement.prototype.close = function close() { this.removeAttribute("open"); };
+  HTMLDialogElement.prototype.showModal = function showModal() {
+    this.setAttribute("open", "");
+  };
+  HTMLDialogElement.prototype.close = function close() {
+    this.removeAttribute("open");
+  };
   vi.stubGlobal("scrollTo", vi.fn());
 });
 
 afterAll(() => {
-  if (originalShowModal) HTMLDialogElement.prototype.showModal = originalShowModal;
-  else delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>).showModal;
+  if (originalShowModal)
+    HTMLDialogElement.prototype.showModal = originalShowModal;
+  else
+    delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>)
+      .showModal;
   if (originalClose) HTMLDialogElement.prototype.close = originalClose;
   else delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>).close;
   vi.unstubAllGlobals();
@@ -31,64 +46,183 @@ describe("checkout connection recovery", () => {
   it("queues a cash payment when the API stops while Wi-Fi remains connected", async () => {
     const catalog: Catalog = {
       categories: [{ id: "scoops", name: "Scoops" }],
-      products: [{ id: "vanilla", category_id: "scoops", name: "Vanilla bean", category: "Scoops", description: "Small-batch ice cream", color: "#f5e7bd", active: true, variants: [
-        { id: "vanilla-single", product_id: "vanilla", name: "Single", price_ngwee: 2200, active: true, recipe: [] },
-        { id: "vanilla-double", product_id: "vanilla", name: "Double", price_ngwee: 3200, active: true, recipe: [] },
-      ] }],
+      products: [
+        {
+          id: "vanilla",
+          category_id: "scoops",
+          name: "Vanilla bean",
+          category: "Scoops",
+          description: "Small-batch ice cream",
+          color: "#f5e7bd",
+          active: true,
+          choice_sets: [],
+          variants: [
+            {
+              id: "vanilla-single",
+              product_id: "vanilla",
+              name: "Single",
+              price_ngwee: 2200,
+              active: true,
+              recipe: [],
+            },
+            {
+              id: "vanilla-double",
+              product_id: "vanilla",
+              name: "Double",
+              price_ngwee: 3200,
+              active: true,
+              recipe: [],
+            },
+          ],
+        },
+      ],
       modifier_groups: [
         { id: "serving", name: "Serving", minimum: 1, maximum: 1 },
         { id: "topping", name: "Toppings", minimum: 0, maximum: 3 },
       ],
       modifiers: [
-        { id: "cup", group_id: "serving", name: "Cup", group: "serving", price_ngwee: 0, active: true, recipe: [] },
-        { id: "cone", group_id: "serving", name: "Cone", group: "serving", price_ngwee: 500, active: true, recipe: [] },
-        { id: "oreo", group_id: "topping", name: "Oreo", group: "topping", price_ngwee: 500, active: true, recipe: [] },
+        {
+          id: "cup",
+          group_id: "serving",
+          name: "Cup",
+          group: "serving",
+          price_ngwee: 0,
+          active: true,
+          recipe: [],
+        },
+        {
+          id: "cone",
+          group_id: "serving",
+          name: "Cone",
+          group: "serving",
+          price_ngwee: 500,
+          active: true,
+          recipe: [],
+        },
+        {
+          id: "oreo",
+          group_id: "topping",
+          name: "Oreo",
+          group: "topping",
+          price_ngwee: 500,
+          active: true,
+          recipe: [],
+        },
       ],
     };
-    const day: Day = { id: "live-day", status: "OPEN", opened_at: new Date().toISOString(), closed_at: null, opening_float_ngwee: 50_000, actual_cash_ngwee: null, expected_cash_ngwee: 50_000, variance_ngwee: null, summary: null };
-    const currentUser: User = { id: "manager-live", username: "manager", name: "Live manager", role: "MANAGER", active: true };
+    const day: Day = {
+      id: "live-day",
+      status: "OPEN",
+      opened_at: new Date().toISOString(),
+      closed_at: null,
+      opening_float_ngwee: 50_000,
+      actual_cash_ngwee: null,
+      expected_cash_ngwee: 50_000,
+      variance_ngwee: null,
+      summary: null,
+    };
+    const currentUser: User = {
+      id: "manager-live",
+      username: "manager",
+      name: "Live manager",
+      role: "MANAGER",
+      active: true,
+    };
     const checkoutCalls: CheckoutCommand[] = [];
-    const json = (value: unknown) => new Response(JSON.stringify(value), { status: 200, headers: { "Content-Type": "application/json" } });
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-      if (url.endsWith("/api/session")) return json(currentUser);
-      if (url.endsWith("/api/stand-settings")) return json(defaultStandProfile);
-      if (url.includes("/api/catalog")) return json(catalog);
-      if (url.endsWith("/api/business-day/current")) return json(day);
-      if (url.endsWith("/api/orders/quote")) return json({ lines: [{ variant_id: "vanilla-double", name: "Vanilla bean · Double", quantity: 1, unit_price_ngwee: 4200, total_ngwee: 4200, modifier_names: ["Cone", "Oreo"], notes: "" }], total_ngwee: 4200 });
-      if (url.endsWith("/api/orders") && init?.method === "POST") {
-        const command = JSON.parse(String(init.body)) as CheckoutCommand;
-        checkoutCalls.push(command);
-        throw new DOMException("Timed out", "AbortError");
-      }
-      throw new Error(`Unexpected request: ${url}`);
-    });
+    const json = (value: unknown) =>
+      new Response(JSON.stringify(value), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    const fetchMock = vi.fn(
+      async (
+        input: RequestInfo | URL,
+        init?: RequestInit,
+      ): Promise<Response> => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : input.url;
+        if (url.endsWith("/api/session")) return json(currentUser);
+        if (url.endsWith("/api/stand-settings"))
+          return json(defaultStandProfile);
+        if (url.includes("/api/catalog")) return json(catalog);
+        if (url.endsWith("/api/business-day/current")) return json(day);
+        if (url.endsWith("/api/orders/quote"))
+          return json({
+            lines: [
+              {
+                variant_id: "vanilla-double",
+                name: "Vanilla bean · Double",
+                quantity: 1,
+                unit_price_ngwee: 4200,
+                total_ngwee: 4200,
+                modifier_names: ["Cone", "Oreo"],
+                notes: "",
+              },
+            ],
+            total_ngwee: 4200,
+          });
+        if (url.endsWith("/api/orders") && init?.method === "POST") {
+          const command = JSON.parse(String(init.body)) as CheckoutCommand;
+          checkoutCalls.push(command);
+          throw new DOMException("Timed out", "AbortError");
+        }
+        throw new Error(`Unexpected request: ${url}`);
+      },
+    );
     vi.stubGlobal("fetch", fetchMock);
     localStorage.setItem("happy-cone:tour:v1:manager-live", "complete");
-    sessionStorage.setItem("happy-cone:session-token", JSON.stringify("live-token"));
+    sessionStorage.setItem(
+      "happy-cone:session-token",
+      JSON.stringify("live-token"),
+    );
 
     const user = userEvent.setup();
-    const first = render(<App/>);
+    const first = render(<App />);
     await screen.findByRole("heading", { name: "A little scoop of happy." });
-    await user.click(screen.getByRole("button", { name: "Customize Vanilla bean" }));
+    await user.click(
+      screen.getByRole("button", { name: "Customize Vanilla bean" }),
+    );
     let dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /Double/ }));
     await user.click(within(dialog).getByRole("button", { name: /Cone/ }));
     await user.click(within(dialog).getByRole("button", { name: /Oreo/ }));
-    await user.click(within(dialog).getByRole("button", { name: /Add to sale/ }));
+    await user.click(
+      within(dialog).getByRole("button", { name: /Add to sale/ }),
+    );
     await user.click(screen.getByRole("button", { name: /Take payment/ }));
     dialog = await screen.findByRole("dialog");
     await user.type(within(dialog).getByLabelText("Cash received (K)"), "1.00");
-    await user.click(within(dialog).getByRole("button", { name: /Confirm payment/ }));
-    expect(await within(dialog).findByText("Cash received must cover the sale total.")).toBeInTheDocument();
+    await user.click(
+      within(dialog).getByRole("button", { name: /Confirm payment/ }),
+    );
+    expect(
+      await within(dialog).findByText(
+        "Cash received must cover the sale total.",
+      ),
+    ).toBeInTheDocument();
     expect(within(dialog).queryByText(/order total/i)).not.toBeInTheDocument();
     await user.clear(within(dialog).getByLabelText("Cash received (K)"));
-    await user.type(within(dialog).getByLabelText("Cash received (K)"), "50.00");
-    await user.click(within(dialog).getByRole("button", { name: /Confirm payment/ }));
-    expect(await screen.findByRole("heading", { name: "Cash sale saved on this device" })).toBeInTheDocument();
+    await user.type(
+      within(dialog).getByLabelText("Cash received (K)"),
+      "50.00",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: /Confirm payment/ }),
+    );
+    expect(
+      await screen.findByRole("heading", {
+        name: "Cash sale saved on this device",
+      }),
+    ).toBeInTheDocument();
     expect(screen.getAllByText(/Pending sync/).length).toBeGreaterThan(0);
     expect(screen.getByText("Offline")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Recover saved payment/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Recover saved payment/ }),
+    ).not.toBeInTheDocument();
     expect(checkoutCalls).toHaveLength(1);
     expect(checkoutCalls[0].offline).toBe(false);
     first.unmount();

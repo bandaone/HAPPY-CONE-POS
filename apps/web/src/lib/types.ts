@@ -49,9 +49,14 @@ export interface RecipeComponent {
   quantity: string;
 }
 
-export interface Category { id: string; name: string }
+export interface Category {
+  id: string;
+  name: string;
+}
 export interface CategoryCreateInput extends Category {}
-export interface CategoryUpdateInput { name: string }
+export interface CategoryUpdateInput {
+  name: string;
+}
 
 export interface Variant {
   id: string;
@@ -71,6 +76,7 @@ export interface Product {
   color: string;
   active: boolean;
   variants: Variant[];
+  choice_sets: ProductChoiceSet[];
 }
 
 export interface ProductUpdateInput {
@@ -81,7 +87,9 @@ export interface ProductUpdateInput {
   active: boolean;
 }
 
-export interface ProductCreateInput extends ProductUpdateInput { id: string }
+export interface ProductCreateInput extends ProductUpdateInput {
+  id: string;
+}
 
 export interface CatalogItemUpdate {
   name: string;
@@ -90,7 +98,35 @@ export interface CatalogItemUpdate {
   recipe: RecipeComponent[];
 }
 
-export interface CatalogItemCreate extends CatalogItemUpdate { id: string }
+export interface CatalogItemCreate extends CatalogItemUpdate {
+  id: string;
+}
+
+export interface ProductChoiceSet {
+  group_id: string;
+  name: string;
+  minimum: number;
+  maximum: number;
+  position: number;
+}
+
+export interface ProductChoiceSetInput {
+  group_id: string;
+  minimum: number;
+  maximum: number;
+  position: number;
+}
+
+export interface MenuPriceInput extends CatalogItemCreate {}
+
+export interface MenuItemUpdateInput extends ProductUpdateInput {
+  prices: MenuPriceInput[];
+  choice_sets: ProductChoiceSetInput[];
+}
+
+export interface MenuItemCreateInput extends MenuItemUpdateInput {
+  id: string;
+}
 
 export interface ModifierGroup {
   id: string;
@@ -100,7 +136,11 @@ export interface ModifierGroup {
 }
 
 export interface ModifierGroupCreateInput extends ModifierGroup {}
-export interface ModifierGroupUpdateInput { name: string; minimum: number; maximum: number }
+export interface ModifierGroupUpdateInput {
+  name: string;
+  minimum: number;
+  maximum: number;
+}
 
 export interface Modifier {
   id: string;
@@ -148,8 +188,6 @@ export type OrderStatus = "NEW" | "PREPARING" | "READY" | "SERVED";
 export interface CheckoutPayment {
   method: PaymentMethod;
   tendered_ngwee?: number;
-  provider: string | null;
-  reference: string | null;
 }
 
 export interface CheckoutCommand {
@@ -312,22 +350,33 @@ export interface POSClient {
   session(): Promise<User>;
   standSettings(): Promise<StandProfile>;
   updateStandSettings(input: StandProfile): Promise<StandProfile>;
-  changePassword(currentPassword: string, newPassword: string): Promise<{ ok: true; other_sessions_revoked: number }>;
+  changePassword(
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<{ ok: true; other_sessions_revoked: number }>;
   users(): Promise<User[]>;
   createUser(input: UserCreateInput): Promise<User>;
   updateUser(id: string, input: UserUpdateInput): Promise<User>;
-  resetUserPassword(id: string, password: string): Promise<{ ok: true; sessions_revoked: number }>;
+  resetUserPassword(
+    id: string,
+    password: string,
+  ): Promise<{ ok: true; sessions_revoked: number }>;
   revokeUserSessions(id: string): Promise<{ revoked: number }>;
   catalog(includeInactive?: boolean): Promise<Catalog>;
   createCategory(input: CategoryCreateInput): Promise<Category>;
   updateCategory(id: string, input: CategoryUpdateInput): Promise<Category>;
   createProduct(input: ProductCreateInput): Promise<Product>;
   updateProduct(id: string, input: ProductUpdateInput): Promise<Product>;
+  createMenuItem(input: MenuItemCreateInput): Promise<Product>;
+  updateMenuItem(id: string, input: MenuItemUpdateInput): Promise<Product>;
   createVariant(productId: string, input: CatalogItemCreate): Promise<Variant>;
   updateVariant(id: string, input: CatalogItemUpdate): Promise<Variant>;
   deleteVariant(id: string): Promise<{ id: string; deleted: true }>;
   createModifierGroup(input: ModifierGroupCreateInput): Promise<ModifierGroup>;
-  updateModifierGroup(id: string, input: ModifierGroupUpdateInput): Promise<ModifierGroup>;
+  updateModifierGroup(
+    id: string,
+    input: ModifierGroupUpdateInput,
+  ): Promise<ModifierGroup>;
   createModifier(groupId: string, input: CatalogItemCreate): Promise<Modifier>;
   updateModifier(id: string, input: CatalogItemUpdate): Promise<Modifier>;
   deleteModifier(id: string): Promise<{ id: string; deleted: true }>;

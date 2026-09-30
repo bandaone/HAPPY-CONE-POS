@@ -1,9 +1,17 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, CheckCircle2, Compass, ListChecks, ShoppingBag, WifiOff } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Compass,
+  ListChecks,
+  ShoppingBag,
+  WifiOff,
+} from "lucide-react";
 import { Modal } from "../components/ui";
 import type { Role } from "../lib/types";
 
-type TourPage = "pos" | "sales" | "inventory" | "day" | "reports" | "settings";
+type TourPage = "pos" | "sales" | "menu" | "day" | "reports" | "settings";
 
 interface TourStep {
   title: string;
@@ -32,7 +40,8 @@ function roleSteps(role: Role): TourStep[] {
     },
   ];
 
-  return [...shared,
+  return [
+    ...shared,
     {
       title: "Build and complete a sale",
       eyebrow: "Counter",
@@ -42,19 +51,31 @@ function roleSteps(role: Role): TourStep[] {
       icon: ShoppingBag,
     },
     {
-      title: role === "CASHIER" ? "Your counter is ready" : "Keep the whole stand in view",
+      title:
+        role === "CASHIER"
+          ? "Your counter is ready"
+          : "Keep the whole stand in view",
       eyebrow: role === "CASHIER" ? "Start serving" : "Daily oversight",
-      copy: role === "CASHIER"
-        ? "Sales keeps every completed receipt available. Cash day shows the opening float and the information needed at handover."
-        : "Use Stock to create menu items, set prices, define recipes and manage inventory. Reports and Cash day cover performance and reconciliation.",
+      copy:
+        role === "CASHIER"
+          ? "Sales keeps every completed receipt available. Cash day shows the opening float and the information needed at handover."
+          : "Use Menu to create items, set prices, choose what is available and attach only the choices each item needs. Reports and Cash day cover performance and reconciliation.",
       note: "Settings holds staff access, receipt details and operating guidance. The connection indicator shows when cash sales are waiting to sync.",
-      page: role === "CASHIER" ? "sales" : "inventory",
+      page: role === "CASHIER" ? "sales" : "menu",
       icon: role === "CASHIER" ? WifiOff : ListChecks,
     },
   ];
 }
 
-export function ProductTour({ role, onNavigate, onFinish }: { role: Role; onNavigate: (page: TourPage) => void; onFinish: () => void }) {
+export function ProductTour({
+  role,
+  onNavigate,
+  onFinish,
+}: {
+  role: Role;
+  onNavigate: (page: TourPage) => void;
+  onFinish: () => void;
+}) {
   const [index, setIndex] = useState(0);
   const steps = roleSteps(role);
   const step = steps[index];
@@ -64,22 +85,58 @@ export function ProductTour({ role, onNavigate, onFinish }: { role: Role; onNavi
     if (step.page) onNavigate(step.page);
   }, [step.page, onNavigate]);
 
-  return <Modal title={step.title} eyebrow={step.eyebrow} onClose={onFinish}>
-    <div className="tour-body">
-      <div className="tour-icon" aria-hidden="true"><Icon size={27} strokeWidth={1.7}/></div>
-      <p className="tour-progress" aria-label={`Step ${index + 1} of ${steps.length}`}>{index + 1} of {steps.length}</p>
-      <p className="tour-copy">{step.copy}</p>
-      <p className="tour-note">{step.note}</p>
-      <div className="tour-dots" aria-hidden="true">{steps.map((_, dot) => <span key={dot} className={dot === index ? "active" : ""}/>)}</div>
-    </div>
-    <div className="modal-footer tour-actions">
-      <button className="text-button" type="button" onClick={onFinish}>Skip tour</button>
-      <div>
-        {index > 0 && <button className="button" type="button" onClick={() => setIndex(value => value - 1)}><ArrowLeft size={16}/>Back</button>}
-        {index < steps.length - 1
-          ? <button className="button primary" type="button" onClick={() => setIndex(value => value + 1)}>Next<ArrowRight size={16}/></button>
-          : <button className="button primary" type="button" onClick={onFinish}>Start work<CheckCircle2 size={16}/></button>}
+  return (
+    <Modal title={step.title} eyebrow={step.eyebrow} onClose={onFinish}>
+      <div className="tour-body">
+        <div className="tour-icon" aria-hidden="true">
+          <Icon size={27} strokeWidth={1.7} />
+        </div>
+        <p
+          className="tour-progress"
+          aria-label={`Step ${index + 1} of ${steps.length}`}
+        >
+          {index + 1} of {steps.length}
+        </p>
+        <p className="tour-copy">{step.copy}</p>
+        <p className="tour-note">{step.note}</p>
+        <div className="tour-dots" aria-hidden="true">
+          {steps.map((_, dot) => (
+            <span key={dot} className={dot === index ? "active" : ""} />
+          ))}
+        </div>
       </div>
-    </div>
-  </Modal>;
+      <div className="modal-footer tour-actions">
+        <button className="text-button" type="button" onClick={onFinish}>
+          Skip tour
+        </button>
+        <div>
+          {index > 0 && (
+            <button
+              className="button"
+              type="button"
+              onClick={() => setIndex((value) => value - 1)}
+            >
+              <ArrowLeft size={16} />
+              Back
+            </button>
+          )}
+          {index < steps.length - 1 ? (
+            <button
+              className="button primary"
+              type="button"
+              onClick={() => setIndex((value) => value + 1)}
+            >
+              Next
+              <ArrowRight size={16} />
+            </button>
+          ) : (
+            <button className="button primary" type="button" onClick={onFinish}>
+              Start work
+              <CheckCircle2 size={16} />
+            </button>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
 }
