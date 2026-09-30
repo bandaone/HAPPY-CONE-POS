@@ -35,7 +35,9 @@ def test_authenticated_staff_can_read_stand_settings(client, login):
     assert response.json()['tax_rate_basis_points'] == 500
     assert response.json()['receipt_paper_width'] == '80mm'
     assert response.json()['ticket_guidance'] == 'Receipts use the browser print dialog. A printer problem never removes a completed sale; staff can reprint from Sales.'
-    assert response.json()['guide_workflow'] == 'Open a business day with the counted float. Choose each item, size, serving and extras, then take payment. Print or close the customer receipt and begin the next sale. Stock and reports update when the sale is accepted.'
+    assert response.json()['payment_guidance'] == 'Cash change is calculated at checkout. For mobile money or card, select the confirmed payment method to complete the sale.'
+    assert response.json()['activity_guidance'] == 'Review the recorded actions behind sales, payments, account administration and cash reconciliation.'
+    assert response.json()['guide_workflow'] == 'Open a business day with the counted float. Choose each item and its customer choices, then take payment. Print or close the receipt and begin the next sale. Reports update when the sale is accepted.'
     assert 'order' not in response.json()['guide_controls'].lower()
     assert 'order' not in response.json()['guide_offline'].lower()
     assert 'order' not in response.json()['guide_printing'].lower()

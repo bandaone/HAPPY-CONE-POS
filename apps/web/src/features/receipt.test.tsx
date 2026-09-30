@@ -54,7 +54,7 @@ function order(overrides: Partial<Order> = {}): Order {
         quantity: 2,
         unit_price_ngwee: 3500,
         total_ngwee: 7000,
-        modifier_names: [],
+        modifier_names: ["Vanilla ×2", "Cup"],
         notes: "",
       },
     ],
@@ -98,7 +98,7 @@ describe("operational customer receipt", () => {
     );
   });
 
-  it("prints one receipt number with customer, tax, payment and cashier details", () => {
+  it("prints the business identity, sale, choices, payment and cashier without tax treatment", () => {
     render(<Receipt order={order()} profile={profile} />);
 
     const receipt = screen.getByRole("article", { name: "Receipt A001" });
@@ -120,13 +120,11 @@ describe("operational customer receipt", () => {
     expect(screen.getByText("K100.00")).toBeInTheDocument();
     expect(screen.getByText("K30.00")).toBeInTheDocument();
     expect(screen.getByText("Mwamba Manager")).toBeInTheDocument();
-    expect(screen.getByText("2 units")).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Tax details" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("TURNOVER TAX (TOT)")).toBeInTheDocument();
-    expect(screen.getByText("5% of gross sale")).toBeInTheDocument();
-    expect(screen.getByText("K3.50")).toBeInTheDocument();
+    expect(screen.queryByText("2 units")).not.toBeInTheDocument();
+    expect(screen.getByText("Vanilla ×2 · Cup")).toBeInTheDocument();
+    expect(screen.queryByText("Tax details")).not.toBeInTheDocument();
+    expect(screen.queryByText("TURNOVER TAX (TOT)")).not.toBeInTheDocument();
+    expect(screen.queryByText(/% of gross sale/)).not.toBeInTheDocument();
     expect(screen.queryByText("Taxable sales")).not.toBeInTheDocument();
     expect(screen.queryByText(/VAT/)).not.toBeInTheDocument();
     expect(
@@ -137,7 +135,7 @@ describe("operational customer receipt", () => {
     expect(receipt).not.toHaveTextContent(/customer ticket|serving ticket/i);
   });
 
-  it("shows confirmed external payment details without cash fields", () => {
+  it("shows only the confirmed external payment method without transaction details", () => {
     render(
       <Receipt
         order={order({
@@ -155,8 +153,10 @@ describe("operational customer receipt", () => {
     );
 
     expect(screen.getByText("Mobile money")).toBeInTheDocument();
-    expect(screen.getByText("MTN MoMo")).toBeInTheDocument();
-    expect(screen.getByText("MM-20458")).toBeInTheDocument();
+    expect(screen.queryByText("MTN MoMo")).not.toBeInTheDocument();
+    expect(screen.queryByText("MM-20458")).not.toBeInTheDocument();
+    expect(screen.queryByText("Provider")).not.toBeInTheDocument();
+    expect(screen.queryByText("Payment reference")).not.toBeInTheDocument();
     expect(screen.queryByText("Cash received")).not.toBeInTheDocument();
     expect(screen.queryByText("Change")).not.toBeInTheDocument();
   });

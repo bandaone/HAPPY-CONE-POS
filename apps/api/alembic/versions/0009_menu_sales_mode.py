@@ -9,6 +9,29 @@ branch_labels = None
 depends_on = None
 
 
+GUIDANCE = {
+    'payment_guidance': (
+        'Cash change is calculated at checkout. Staff must confirm mobile money and card payments and record the provider reference before completing a sale.',
+        'Cash change is calculated at checkout. For mobile money or card, select the confirmed payment method to complete the sale.',
+    ),
+    'activity_guidance': (
+        'Review the recorded actions behind sales, payments, stock changes, account administration and cash reconciliation.',
+        'Review the recorded actions behind sales, payments, account administration and cash reconciliation.',
+    ),
+    'guide_workflow': (
+        'Open a business day with the counted float. Choose each item, size, serving and extras, then take payment. Print or close the customer receipt and begin the next sale. Stock and reports update when the sale is accepted.',
+        'Open a business day with the counted float. Choose each item and its customer choices, then take payment. Print or close the receipt and begin the next sale. Reports update when the sale is accepted.',
+    ),
+}
+
+
+def _replace_supplied_guidance(source_index, target_index):
+    for column, values in GUIDANCE.items():
+        op.execute(sa.text(
+            f'UPDATE stand_settings SET {column} = :replacement WHERE {column} = :existing'
+        ).bindparams(existing=values[source_index], replacement=values[target_index]))
+
+
 def upgrade():
     op.add_column(
         'stand_settings',
@@ -37,6 +60,7 @@ def upgrade():
     ))
     with op.batch_alter_table('payments') as batch_op:
         batch_op.drop_constraint('unique_external_payment_reference', type_='unique')
+    _replace_supplied_guidance(0, 1)
 
 
 def downgrade():

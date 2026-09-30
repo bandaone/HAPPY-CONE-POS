@@ -24,6 +24,11 @@ NEW_GUIDANCE = {
     'guide_printing': 'Use the browser print dialog with a 58 or 80 mm receipt printer, or a normal printer. Sales stay saved if printing fails, and receipts can be reprinted from Sales. Use your browser’s zoom and system text settings.',
 }
 
+MENU_SALES_GUIDANCE = {
+    **NEW_GUIDANCE,
+    'guide_workflow': 'Open a business day with the counted float. Choose each item and its customer choices, then take payment. Print or close the receipt and begin the next sale. Reports update when the sale is accepted.',
+}
+
 
 def test_migrate_is_repeatable_and_seed_explicit(tmp_path):
     env = {**os.environ, 'DATABASE_URL':f'sqlite:///{tmp_path}/cli.db', 'SEED_PASSWORD':'safe-test-password'}
@@ -174,7 +179,7 @@ def test_cashier_only_guidance_migration_updates_only_supplied_defaults(tmp_path
     initial = alembic('upgrade', '0006')
     assert initial.returncode == 0, initial.stderr
     engine = create_engine(env['DATABASE_URL'])
-    expected = NEW_GUIDANCE
+    expected = MENU_SALES_GUIDANCE
     if customized:
         expected = {name: f'Owner wording for {name}' for name in OLD_GUIDANCE}
         with engine.begin() as db:
@@ -192,6 +197,48 @@ def test_cashier_only_guidance_migration_updates_only_supplied_defaults(tmp_path
         )).mappings().one()
         assert dict(row) == expected
         assert db.scalar(text('SELECT receipt_paper_width FROM stand_settings WHERE id = 1')) == '80mm'
+    engine.dispose()
+
+
+@pytest.mark.parametrize('customized', [False, True])
+def test_0009_menu_sales_guidance_preserves_owner_wording(tmp_path, customized):
+    env = {**os.environ, 'DATABASE_URL': f'sqlite:///{tmp_path}/menu-guidance.db'}
+    cwd = Path(__file__).resolve().parents[1]
+
+    def alembic(*arguments):
+        return subprocess.run(
+            [sys.executable, '-m', 'alembic', *arguments], env=env, cwd=cwd,
+            capture_output=True, text=True, timeout=20,
+        )
+
+    initial = alembic('upgrade', '0008')
+    assert initial.returncode == 0, initial.stderr
+    engine = create_engine(env['DATABASE_URL'])
+    previous = {
+        'payment_guidance': 'Cash change is calculated at checkout. Staff must confirm mobile money and card payments and record the provider reference before completing a sale.',
+        'activity_guidance': 'Review the recorded actions behind sales, payments, stock changes, account administration and cash reconciliation.',
+        'guide_workflow': NEW_GUIDANCE['guide_workflow'],
+    }
+    expected = {
+        'payment_guidance': 'Cash change is calculated at checkout. For mobile money or card, select the confirmed payment method to complete the sale.',
+        'activity_guidance': 'Review the recorded actions behind sales, payments, account administration and cash reconciliation.',
+        'guide_workflow': MENU_SALES_GUIDANCE['guide_workflow'],
+    }
+    if customized:
+        expected = {name: f'Owner wording for {name}' for name in previous}
+        with engine.begin() as db:
+            db.execute(text(
+                'UPDATE stand_settings SET ' + ', '.join(f'{name} = :{name}' for name in expected)
+                + ' WHERE id = 1'
+            ), expected)
+
+    upgraded = alembic('upgrade', 'head')
+    assert upgraded.returncode == 0, upgraded.stderr
+    with engine.connect() as db:
+        row = db.execute(text(
+            'SELECT ' + ', '.join(previous) + ' FROM stand_settings WHERE id = 1'
+        )).mappings().one()
+        assert dict(row) == expected
     engine.dispose()
 
 
