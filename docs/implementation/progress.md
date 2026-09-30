@@ -26,7 +26,7 @@ Existing database rows with the historic `SERVER` role remain visible to an Owne
 - Browser: 4 Playwright/Chromium journeys passed. They cover WCAG A/AA automated scans, phone reflow, password visibility, manager menu setup, Cash/Mobile money/Card checkout, receipt content and 58 mm/80 mm overflow, offline cash replay exactly once, receipt/stand settings, and staff access.
 - Windows builder: 9 tests passed. The 1.0.6 offline folder was rebuilt from the verified cache, all 192 release-manifest file hashes and sizes matched, the manifest reports schema `0009`, and the 193-entry transfer ZIP passed CRC verification.
 - Production dependency audit: no production web dependency vulnerabilities were reported by `npm audit --omit=dev`.
-- Windows PowerShell parsing and Pester remain a CI/Windows gate because this Ubuntu environment does not currently contain `pwsh`. Physical-computer acceptance, disconnected-LAN operation, backup/restore rehearsal, and exact-model Xprinter output must be recorded before real sales.
+- GitHub Actions run `36694111489` passed the Windows PowerShell parser, Pester suite, offline wheelhouse installation and migration, as well as the API, web, browser, and container jobs. Physical-computer acceptance, disconnected-LAN operation, backup/restore rehearsal, and exact-model Xprinter output must still be recorded before real sales.
 
 ## Deployment boundary
 
@@ -40,7 +40,7 @@ The Windows lifecycle includes preflight, exact Private-network firewall configu
 
 Receipt printing now stores an explicit 58 mm or 80 mm profile and constrains printable content to 48 mm or 72 mm. The Xprinter checklist rejects the incorrect HP DesignJet PostScript driver and requires the exact XP model, matching driver, short/normal/long physical receipts, final feed, and cut or tear verification.
 
-Release `1.0.6` implements menu-and-sales mode and packages migration `0009`. The ready-to-transfer ZIP is 429,039,616 bytes with SHA-256 `ec1edf228e054c7099bea5f93b48ae0c1e8865470bbf487488b66c1c1ebb9c52`. It contains every offline dependency and extracts directly into one release folder. Windows CI and the physical-computer gates must still pass on the published commit.
+Release `1.0.6` implements menu-and-sales mode and packages migration `0009`. The ready-to-transfer ZIP is 429,039,616 bytes with SHA-256 `ec1edf228e054c7099bea5f93b48ae0c1e8865470bbf487488b66c1c1ebb9c52`. It contains every offline dependency and extracts directly into one release folder. GitHub CI passed on the published application commit; the physical-computer gates remain.
 
 Release `1.0.1` corrects Windows preflight for nominal 4 GB computers that report 3.50–3.99 GiB after hardware reservation. Lower-memory computers remain blocked, and preflight now reports the measured memory and free disk values.
 
