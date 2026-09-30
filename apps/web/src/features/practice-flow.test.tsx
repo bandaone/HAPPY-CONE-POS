@@ -55,7 +55,22 @@ describe("checkout connection recovery", () => {
           description: "Small-batch ice cream",
           color: "#f5e7bd",
           active: true,
-          choice_sets: [],
+          choice_sets: [
+            {
+              group_id: "serving",
+              name: "Serve in",
+              minimum: 1,
+              maximum: 1,
+              position: 0,
+            },
+            {
+              group_id: "topping",
+              name: "Toppings",
+              minimum: 0,
+              maximum: 3,
+              position: 1,
+            },
+          ],
           variants: [
             {
               id: "vanilla-single",
@@ -188,8 +203,8 @@ describe("checkout connection recovery", () => {
     );
     let dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /Double/ }));
-    await user.click(within(dialog).getByRole("button", { name: /Cone/ }));
-    await user.click(within(dialog).getByRole("button", { name: /Oreo/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Add Cone" }));
+    await user.click(within(dialog).getByRole("button", { name: "Add Oreo" }));
     await user.click(
       within(dialog).getByRole("button", { name: /Add to sale/ }),
     );
@@ -197,7 +212,7 @@ describe("checkout connection recovery", () => {
     dialog = await screen.findByRole("dialog");
     await user.type(within(dialog).getByLabelText("Cash received (K)"), "1.00");
     await user.click(
-      within(dialog).getByRole("button", { name: /Confirm payment/ }),
+      within(dialog).getByRole("button", { name: /Confirm cash payment/ }),
     );
     expect(
       await within(dialog).findByText(
@@ -211,7 +226,7 @@ describe("checkout connection recovery", () => {
       "50.00",
     );
     await user.click(
-      within(dialog).getByRole("button", { name: /Confirm payment/ }),
+      within(dialog).getByRole("button", { name: /Confirm cash payment/ }),
     );
     expect(
       await screen.findByRole("heading", {

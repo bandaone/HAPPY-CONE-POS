@@ -51,6 +51,15 @@ import {
   dateOf,
 } from "../components/ui";
 import { createIdempotencyKey } from "../lib/ids";
+import { ProductCustomizer } from "./ProductCustomizer";
+
+function summarizeModifiers(names: string[]) {
+  const counts = new Map<string, number>();
+  for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
+  return [...counts].map(([name, count]) =>
+    count > 1 ? `${name} ×${count}` : name,
+  );
+}
 
 export function estimate(lines: CartLine[], catalog: Catalog): Quote {
   return {
@@ -70,7 +79,7 @@ export function estimate(lines: CartLine[], catalog: Catalog): Quote {
         name: `${variant?.name ?? ""} ${product?.name ?? "Unavailable item"}`,
         unit_price_ngwee: price,
         total_ngwee: price * line.quantity,
-        modifier_names: modifiers.map((m) => m.name),
+        modifier_names: summarizeModifiers(modifiers.map((m) => m.name)),
       };
     }),
     total_ngwee: lines.reduce((sum, line) => {
@@ -250,13 +259,25 @@ export function Pos({
                   : p.category.toLowerCase().includes("sundae")
                     ? IceCreamBowl
                     : IceCreamCone;
+              const activeVariants = p.variants.filter((v) => v.active);
+              const directAdd =
+                activeVariants.length === 1 && p.choice_sets.length === 0;
               return (
                 <button
                   className="product-card"
                   key={p.id}
                   disabled={locked}
-                  onClick={() => setProduct(p)}
-                  aria-label={`Customize ${p.name}`}
+                  onClick={() =>
+                    directAdd
+                      ? add({
+                          variant_id: activeVariants[0].id,
+                          quantity: 1,
+                          modifier_ids: [],
+                          notes: "",
+                        })
+                      : setProduct(p)
+                  }
+                  aria-label={`${directAdd ? "Add" : "Customize"} ${p.name}`}
                 >
                   <div
                     className="product-visual"
@@ -433,7 +454,7 @@ export function Pos({
         </a>
       )}
       {product && (
-        <Customizer
+        <ProductCustomizer
           product={product}
           catalog={catalog}
           onClose={() => setProduct(null)}
@@ -441,153 +462,6 @@ export function Pos({
         />
       )}
     </>
-  );
-}
-function Customizer({
-  product,
-  catalog,
-  onClose,
-  onAdd,
-}: {
-  product: Product;
-  catalog: Catalog;
-  onClose: () => void;
-  onAdd: (line: CartLine) => void;
-}) {
-  const [variant, setVariant] = useState(product.variants[0].id);
-  const servings = catalog.modifiers.filter(
-    (m) => m.group.toLowerCase() === "serving" && m.active,
-  );
-  const toppings = catalog.modifiers.filter(
-    (m) => m.group.toLowerCase() !== "serving" && m.active,
-  );
-  const [serving, setServing] = useState(
-    servings.find((m) => m.price_ngwee === 0)?.id ?? servings[0]?.id ?? "",
-  );
-  const [extras, setExtras] = useState<string[]>([]);
-  const [quantity, setQuantity] = useState(1);
-  const [notes, setNotes] = useState("");
-  const line = {
-    variant_id: variant,
-    modifier_ids: [serving, ...extras],
-    quantity,
-    notes,
-  };
-  const price = estimate([line], catalog).total_ngwee;
-  return (
-    <Modal title={product.name} eyebrow="Make it their own" onClose={onClose}>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          onAdd(line);
-        }}
-      >
-        <div className="modal-body">
-          <p>{product.description}</p>
-          <div className="field-label">
-            Choose a size <span>Required</span>
-          </div>
-          <div className="choice-grid">
-            {product.variants.map((v) => (
-              <button
-                type="button"
-                className={`choice ${v.id === variant ? "selected" : ""}`}
-                key={v.id}
-                onClick={() => setVariant(v.id)}
-                aria-pressed={v.id === variant}
-              >
-                {v.name}
-                <small>{money(v.price_ngwee)}</small>
-              </button>
-            ))}
-          </div>
-          <div className="field-label">
-            Serve it in <span>Choose one</span>
-          </div>
-          <div className="choice-grid">
-            {servings.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                className={`choice ${m.id === serving ? "selected" : ""}`}
-                onClick={() => setServing(m.id)}
-                aria-pressed={m.id === serving}
-              >
-                {m.name}
-                <small>
-                  {m.price_ngwee ? `+${money(m.price_ngwee)}` : "Included"}
-                </small>
-              </button>
-            ))}
-          </div>
-          <div className="field-label">
-            A little extra <span>Optional · up to 3</span>
-          </div>
-          <div className="modifier-list">
-            {toppings.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                className={`choice ${extras.includes(m.id) ? "selected" : ""}`}
-                disabled={!extras.includes(m.id) && extras.length >= 3}
-                aria-pressed={extras.includes(m.id)}
-                onClick={() =>
-                  setExtras(
-                    extras.includes(m.id)
-                      ? extras.filter((id) => id !== m.id)
-                      : [...extras, m.id],
-                  )
-                }
-              >
-                {m.name}
-                <small>+{money(m.price_ngwee)}</small>
-              </button>
-            ))}
-          </div>
-          <label className="field">
-            Preparation note{" "}
-            <textarea
-              maxLength={250}
-              placeholder="For example, toppings on the side"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </label>
-          <div className="customizer-summary">
-            <div className="quantity-control">
-              <button
-                type="button"
-                disabled={quantity <= 1}
-                onClick={() => setQuantity(quantity - 1)}
-                aria-label="Decrease quantity"
-              >
-                <Minus size={15} />
-              </button>
-              <span>{quantity}</span>
-              <button
-                type="button"
-                disabled={quantity >= 99}
-                onClick={() => setQuantity(quantity + 1)}
-                aria-label="Increase quantity"
-              >
-                <Plus size={15} />
-              </button>
-            </div>
-            <strong>{money(price)}</strong>
-          </div>
-        </div>
-        <div className="modal-footer">
-          <button
-            className="button primary full"
-            type="submit"
-            disabled={!serving}
-          >
-            <Plus size={17} />
-            Add to sale
-          </button>
-        </div>
-      </form>
-    </Modal>
   );
 }
 export function Payment({
@@ -624,30 +498,44 @@ export function Payment({
   );
   const key = useRef(attempt?.idempotency_key ?? createIdempotencyKey());
   const attempted = useRef<CheckoutCommand | null>(attempt);
+
   useEffect(() => {
     let current = true;
-    if (!offline && !attempt)
+    if (!offline && !attempt) {
       client
         .quote(cart)
-        .then((q) => {
-          if (current) setQuote(q);
+        .then((nextQuote) => {
+          if (current) setQuote(nextQuote);
         })
-        .catch((e) => {
-          if (current) setError(e.message);
+        .catch((cause) => {
+          if (current) setError(cause.message);
         });
+    }
     return () => {
       current = false;
     };
   }, [client, cart, offline, attempt]);
+
   let tendered = 0;
   try {
     tendered = parseMoney(cash || "0");
   } catch {
-    /* Validation is reported on submit. */
+    /* The cash form reports invalid amounts when submitted. */
   }
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    if (!quote) return;
+
+  const paymentLabel = (value: PaymentMethod) =>
+    value === "CASH"
+      ? "Cash"
+      : value === "MOBILE_MONEY_MANUAL"
+        ? "Mobile money"
+        : "Card";
+
+  async function complete(
+    selectedMethod: PaymentMethod,
+    cashReceived?: number,
+  ) {
+    if (!quote || busy) return;
+    setMethod(selectedMethod);
     setError("");
     setBusy(true);
     try {
@@ -656,8 +544,10 @@ export function Payment({
         business_day_id: day?.id ?? "",
         lines: cart,
         payment: {
-          method,
-          ...(method === "CASH" ? { tendered_ngwee: parseMoney(cash) } : {}),
+          method: selectedMethod,
+          ...(selectedMethod === "CASH"
+            ? { tendered_ngwee: cashReceived }
+            : {}),
         },
         offline,
       };
@@ -665,24 +555,37 @@ export function Payment({
         !attempted.current &&
         command.payment.method === "CASH" &&
         (command.payment.tendered_ngwee ?? 0) < quote.total_ngwee
-      )
+      ) {
         throw new Error("Cash received must cover the sale total.");
+      }
       attempted.current = command;
       await onSubmit(command);
-    } catch (e) {
+    } catch (cause) {
       if (
-        e instanceof POSAPIError &&
-        e.status >= 400 &&
-        e.status < 500 &&
-        e.status !== 408
-      )
+        cause instanceof POSAPIError &&
+        cause.status >= 400 &&
+        cause.status < 500 &&
+        cause.status !== 408
+      ) {
         attempted.current = null;
-      setError((e as Error).message);
+      }
+      setError((cause as Error).message);
     } finally {
       setBusy(false);
     }
   }
-  const locked = busy || attempted.current !== null;
+
+  function submitCash(event: FormEvent) {
+    event.preventDefault();
+    try {
+      void complete("CASH", parseMoney(cash));
+    } catch (cause) {
+      setError((cause as Error).message);
+    }
+  }
+
+  const recovery = attempted.current;
+  const showRetry = Boolean(recovery && (attempt || error));
   return (
     <Modal
       title="Take payment"
@@ -697,52 +600,45 @@ export function Payment({
         if (!busy) onClose();
       }}
     >
-      <form onSubmit={submit}>
+      <form onSubmit={submitCash}>
         <div className="modal-body">
           <div className="amount-due">
             <span>
               {attempt
                 ? "Recover the original payment"
                 : quote
-                  ? `${cart.reduce((n, l) => n + l.quantity, 0)} items · Total due`
-                  : "Confirming the current price…"}
+                  ? `${cart.reduce((total, line) => total + line.quantity, 0)} items · Total due`
+                  : "Confirming the current price..."}
             </span>
-            <strong>
-              {attempt
-                ? attempt.payment.method === "CASH"
-                  ? money(attempt.payment.tendered_ngwee ?? 0)
-                  : "Recorded"
-                : quote
-                  ? money(quote.total_ngwee)
-                  : "—"}
-            </strong>
-            {attempt && (
+            <strong>{quote ? money(quote.total_ngwee) : "—"}</strong>
+            {attempt ? (
               <span>
-                {attempt.payment.method === "CASH"
-                  ? "Cash received · final total and change confirmed after recovery"
-                  : "The selected payment method will be reused"}
+                {paymentLabel(attempt.payment.method)} will be retried with the
+                original sale details.
               </span>
-            )}
+            ) : null}
           </div>
-          {attempt && (
+
+          {attempt ? (
             <div className="notice">
               <ShieldCheck size={17} />
               <span>
-                Recovering your saved payment. The service will return the
-                original sale if it was already accepted.
+                Retry returns the original sale if it was already accepted, so
+                it will not create a duplicate.
               </span>
             </div>
-          )}
-          {offline && (
+          ) : null}
+
+          {offline ? (
             <div className="notice">
               <WifiOff size={17} />
               <span>
-                This cash sale will be saved on this device and sent when
-                connection returns. Its receipt remains provisional until sync
-                completes.
+                This cash sale will be saved on this device and sent when the
+                connection returns.
               </span>
             </div>
-          )}
+          ) : null}
+
           <div className="payment-tabs">
             {(
               [
@@ -757,8 +653,14 @@ export function Payment({
                 type="button"
                 onClick={() => {
                   setMethod(id);
+                  if (id !== "CASH") void complete(id);
                 }}
-                disabled={locked || (offline && id !== "CASH")}
+                disabled={
+                  busy ||
+                  !quote ||
+                  Boolean(recovery) ||
+                  (offline && id !== "CASH")
+                }
                 aria-pressed={method === id}
               >
                 <Icon size={19} />
@@ -766,6 +668,7 @@ export function Payment({
               </button>
             ))}
           </div>
+
           {method === "CASH" ? (
             <>
               <label className="field">
@@ -775,66 +678,85 @@ export function Payment({
                   inputMode="decimal"
                   required
                   value={cash}
-                  onChange={(e) => setCash(e.target.value)}
-                  disabled={locked}
+                  onChange={(event) => setCash(event.target.value)}
+                  disabled={busy || Boolean(recovery)}
                   placeholder="0.00"
                 />
               </label>
               <div className="quick-cash">
                 {[quote?.total_ngwee ?? 0, 5000, 10000, 20000]
                   .filter(
-                    (n, i, a) =>
-                      n > 0 &&
-                      a.indexOf(n) === i &&
-                      n >= (quote?.total_ngwee ?? 0),
+                    (amount, index, amounts) =>
+                      amount > 0 &&
+                      amounts.indexOf(amount) === index &&
+                      amount >= (quote?.total_ngwee ?? 0),
                   )
-                  .map((n) => (
+                  .map((amount) => (
                     <button
                       type="button"
-                      key={n}
-                      disabled={locked}
-                      onClick={() => setCash(moneyInput(n))}
+                      key={amount}
+                      disabled={busy || Boolean(recovery)}
+                      onClick={() => setCash(moneyInput(amount))}
                     >
-                      {n === quote?.total_ngwee ? "Exact" : money(n)}
+                      {amount === quote?.total_ngwee ? "Exact" : money(amount)}
                     </button>
                   ))}
               </div>
-              {!attempt && (
+              {!attempt ? (
                 <div className="change-due" aria-live="polite">
                   <span>Change to give</span>
                   <strong>
                     {money(Math.max(0, tendered - (quote?.total_ngwee ?? 0)))}
                   </strong>
                 </div>
-              )}
+              ) : null}
             </>
           ) : (
             <div className="notice">
               <ShieldCheck size={17} />
               <span>
-                Confirm the payment on the customer’s device or card terminal,
-                then complete the sale here.
+                Tap the payment method once after the customer has paid. The
+                sale records only the method used.
               </span>
             </div>
           )}
+
           <ErrorMessage error={error} />
-          {attempted.current && error && (
+          {recovery && error ? (
             <p className="hint-inline">
-              Retry uses the same payment details to prevent a duplicate sale.
-              If the connection failed, check Sales before starting another
-              sale.
+              Retry uses the same sale details to prevent a duplicate.
             </p>
-          )}
+          ) : null}
         </div>
-        <div className="modal-footer">
-          <SubmitButton busy={busy} disabled={!quote || (!!attempt && offline)}>
-            {offline
-              ? "Save cash sale on device"
-              : attempted.current && error
-                ? "Retry this payment"
-                : "Confirm payment"}
-          </SubmitButton>
-        </div>
+
+        {method === "CASH" || showRetry ? (
+          <div className="modal-footer">
+            {method === "CASH" ? (
+              <SubmitButton
+                busy={busy}
+                disabled={!quote || (!!attempt && offline)}
+              >
+                {offline
+                  ? "Save cash sale on device"
+                  : recovery
+                    ? "Retry Cash payment"
+                    : "Confirm cash payment"}
+              </SubmitButton>
+            ) : (
+              <button
+                className="button primary"
+                type="button"
+                disabled={busy || !quote}
+                onClick={() =>
+                  void complete(recovery?.payment.method ?? method)
+                }
+              >
+                {busy ? null : <ArrowRight size={18} />}
+                Retry {paymentLabel(recovery?.payment.method ?? method)} payment
+              </button>
+            )}
+          </div>
+        ) : null}
       </form>
     </Modal>
   );
