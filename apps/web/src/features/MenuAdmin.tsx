@@ -92,7 +92,7 @@ function productUpdate(product: Product, active: boolean): MenuItemUpdateInput {
       id: price.id,
       name: price.name,
       price_ngwee: price.price_ngwee,
-      active,
+      active: price.active,
       recipe: [],
     })),
     choice_sets: product.choice_sets.map(

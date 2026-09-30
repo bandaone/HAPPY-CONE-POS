@@ -79,17 +79,17 @@ const catalog: Catalog = {
   ],
 };
 
-function menuClient() {
+function menuClient(catalogData: Catalog = catalog) {
   return {
-    catalog: vi.fn(async () => structuredClone(catalog)),
+    catalog: vi.fn(async () => structuredClone(catalogData)),
     inventory: vi.fn(async () => []),
     createMenuItem: vi.fn(async (input: MenuItemCreateInput) => ({
-      ...catalog.products[0],
+      ...catalogData.products[0],
       ...input,
       category: "Ice cream",
     })),
     updateMenuItem: vi.fn(async (_id: string, input: MenuItemUpdateInput) => ({
-      ...catalog.products[0],
+      ...catalogData.products[0],
       ...input,
       category: "Ice cream",
     })),
@@ -223,6 +223,64 @@ describe("Menu workspace", () => {
     expect(client.updateMenuItem).toHaveBeenLastCalledWith(
       "sample-cup",
       expect.objectContaining({ active: true }),
+    );
+  });
+
+  it("preserves each price state when an item is archived or restored", async () => {
+    const user = userEvent.setup();
+    const mixedCatalog = structuredClone(catalog);
+    mixedCatalog.products[0].variants.push({
+      id: "single-scoop-old",
+      product_id: "single-scoop",
+      name: "Old price",
+      price_ngwee: 2500,
+      active: false,
+      recipe: [],
+    });
+    mixedCatalog.products[1].variants = [
+      {
+        ...mixedCatalog.products[1].variants[0],
+        active: true,
+      },
+      {
+        id: "sample-cup-old",
+        product_id: "sample-cup",
+        name: "Old price",
+        price_ngwee: 800,
+        active: false,
+        recipe: [],
+      },
+    ];
+    const client = menuClient(mixedCatalog);
+    render(<MenuAdmin client={client} onChanged={vi.fn()} onError={vi.fn()} />);
+    await screen.findByText("Single scoop");
+
+    await user.click(
+      screen.getByRole("button", { name: "Archive Single scoop" }),
+    );
+    expect(client.updateMenuItem).toHaveBeenLastCalledWith(
+      "single-scoop",
+      expect.objectContaining({
+        active: false,
+        prices: [
+          expect.objectContaining({ id: "single-scoop-standard", active: true }),
+          expect.objectContaining({ id: "single-scoop-old", active: false }),
+        ],
+      }),
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Restore Sample cup" }),
+    );
+    expect(client.updateMenuItem).toHaveBeenLastCalledWith(
+      "sample-cup",
+      expect.objectContaining({
+        active: true,
+        prices: [
+          expect.objectContaining({ id: "sample-cup-standard", active: true }),
+          expect.objectContaining({ id: "sample-cup-old", active: false }),
+        ],
+      }),
     );
   });
 

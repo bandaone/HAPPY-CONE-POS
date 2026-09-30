@@ -28,7 +28,7 @@ sha256sum --check HappyCone-Windows-1.0.6.zip.sha256
 2. Install all available Windows updates and restart.
 3. Set the shop network to **Private** in **Settings → Network & internet → Properties**.
 4. Keep at least 10 GB free on the Windows drive. Close unnecessary startup applications on the 4 GB computer.
-5. Copy both release files from USB to the Windows desktop. In Windows PowerShell, run `Get-FileHash "$HOME\Desktop\HappyCone-Windows-1.0.6.zip" -Algorithm SHA256` and confirm it equals `a2172e083e371cbc6f187895600112c462ca299f1734efd5cfaf404291d88a27`.
+5. Copy both release files from USB to the Windows desktop. In Windows PowerShell, run `Get-FileHash "$HOME\Desktop\HappyCone-Windows-1.0.6.zip" -Algorithm SHA256` and confirm it equals `ec1edf228e054c7099bea5f93b48ae0c1e8865470bbf487488b66c1c1ebb9c52`.
 6. Right-click the ZIP, select **Extract All**, keep the default destination, then open the extracted `HappyCone-Windows-1.0.6` folder. `START-HAPPY-CONE.cmd` must be directly inside that folder, beside `api`, `config`, `installers`, `runtime`, `scripts`, `web`, and `wheelhouse`.
 7. Open **Windows PowerShell as Administrator**. Use Windows PowerShell 5.1, the blue Windows application included with Windows.
 
