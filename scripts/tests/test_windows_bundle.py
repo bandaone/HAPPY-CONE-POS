@@ -127,7 +127,7 @@ def test_assemble_bundle_emits_exact_layout_and_verified_manifest(tmp_path):
     manifest = json.loads((release / 'release-manifest.json').read_text())
     assert manifest['version'] == '1.0.0'
     assert manifest['architecture'] == 'win_amd64'
-    assert manifest['database_migration'] == '0008'
+    assert manifest['database_migration'] == '0009'
     recorded = {entry['path']: entry['sha256'] for entry in manifest['files']}
     assert recorded['START-HAPPY-CONE.cmd'] == digest(b'@echo off')
     assert recorded['installers/python.exe'] == digest(b'python')

@@ -2,28 +2,27 @@
 
 ## Product purpose and operating flow
 
-Happy Cone supports the full operating day of a single ice-cream stand from ordinary phones, tablets, laptops, and desktops. The permanent sale is the system's central business record. Payment, receipt, inventory, cash reconciliation, reporting, and audit records derive from it.
+Happy Cone supports the full operating day of a single ice-cream stand from ordinary phones, tablets, laptops, and desktops. The permanent sale is the system's central business record. Payment, receipt, cash reconciliation, reporting, and audit records derive from it.
 
 The intended flow is:
 
 1. A cashier, manager, or owner opens the business day with the opening cash float.
-2. The cashier selects products, variants, a required serving option, and optional toppings. The API calculates prices from the active catalog; client totals are never trusted.
-3. The cashier records cash or a manually confirmed external mobile-money/card payment. An offline checkout may use cash only.
-4. Checkout writes the completed sale, confirmed payment, audit entry, and recipe-component stock movements as one transaction. An idempotency key prevents a retry from creating a second sale or deducting stock twice.
-5. The browser presents one operational receipt with the business identity, TPIN, contact number, quantities, unit prices, payment details, cashier, change, Turnover Tax estimate, and a small receipt number. Printing is optional and a print failure does not undo the sale.
-6. Managers record stock receipts, waste, staff use, returns, and adjustments as immutable ledger movements. A stock count records expected, counted, and variance values; it never silently changes the ledger balance.
-7. A manager or owner closes the day with actual cash. The API freezes a summary including net sales, payment totals, expected cash, actual cash, and variance.
-8. Reports and the audit view retain the evidence needed to reconcile sales and sensitive changes. Completed sales are preserved; a refund is an audited reversal of the financial result.
+2. The cashier taps a simple item once or chooses only the flavour, serving, and topping sets attached to a configurable item. Repeated choices are supported. The API calculates prices from the active menu; client totals are never trusted.
+3. Cash is confirmed after entering the amount received. Mobile money and Card each complete with one tap after the customer has paid, and the sale stores only the method used. Offline checkout uses Cash only.
+4. Checkout writes the completed sale, confirmed payment, and audit entry as one transaction. An idempotency key prevents a retry from creating a second sale. Stock is not counted, enforced, or deducted in this release.
+5. The browser presents one receipt with the business identity, location, TPIN, contact number, date and time, receipt number, items and choices, total, payment method, cashier, and cash/change values when applicable. Printing is optional and a print failure does not undo the sale.
+6. A manager or owner closes the day with actual cash. The API freezes a summary including net sales, payment totals, expected cash, actual cash, and variance.
+7. Reports and the audit view retain the evidence needed to reconcile sales and sensitive changes. Completed sales are preserved; a refund is an audited reversal of the financial result.
 
-The initial payment implementations record cash and manual confirmation of payments completed on an external device. Provider gateways, printer bridges, multi-branch features, and a certified ZRA Smart Invoice/VSDC integration remain future adapter work.
+The payment implementation records Cash, Mobile money, or Card as a method. It does not store provider names, phone numbers, card details, or transaction references. Provider gateways, printer bridges, multi-branch features, stock tracking, and certified fiscal integration remain later work.
 
 ## Roles
 
 | Role | Primary work | Key limits |
 | --- | --- | --- |
-| `CASHIER` | Sign in, read the catalog, open/read the business day, quote and complete sales, view receipts | Cannot change stock, close the day, refund, or use management reports |
-| `MANAGER` | All stand operations; create and edit categories, products, variations, prices, serving choices, extras and recipes; stock movements/counts, refunds, day close, reports and audit | Cannot delete completed financial history; archives menu records instead of deleting them |
-| `OWNER_ADMIN` | Full catalog, staff, operations and reporting administration | Uses the same audited financial and stock rules |
+| `CASHIER` | Sign in, read the menu, open/read the business day, quote and complete sales, view receipts | Cannot change the menu, close the day, refund, or use management reports |
+| `MANAGER` | Create and edit categories, items, prices, choice sets and availability; refunds, day close, reports, settings and audit | Cannot delete completed financial history; archives menu records instead of deleting them |
+| `OWNER_ADMIN` | Full menu, staff, settings, cash-day and reporting administration | Uses the same audited financial rules |
 
 Historic `SERVER` accounts are preserved only for owner-led reassignment or deactivation. They cannot enter an operational workspace, and new accounts cannot be assigned that role.
 
@@ -31,19 +30,19 @@ The API owns authorization. Hiding a browser control is a usability measure and 
 
 ## Menu and price ownership
 
-Owners and managers set prices and item details in **Stock → Menu and stock recipes**. The same Stock page contains current inventory, movement history, physical counts, menu construction and recipes so staff can see the relationship between what is sold and what is consumed. Product creation asks first for a name and category; description and menu colour remain available under optional details. The system generates permanent item codes from names instead of asking staff to type internal identifiers. A product appears on the cashier counter only after it has at least one active variation, so an item being configured cannot interrupt the counter. Each variation is the actual sellable choice and holds its name, selling price and stock recipe. Serving choices and extras are maintained in modifier groups; each extra has its own price, availability and stock recipe.
+Owners and managers set prices and item details on **Menu**. Create categories and reusable choice sets first, then create an item with its selling price. Attach only the choice sets the item needs and set item-specific minimum and maximum counts. For example, Double Scoop can require exactly two Flavours and one Serving choice while Soft serve cup can need no choices and add in one tap. The same flavour may be chosen twice.
 
-Create the stock item in **Stock** before adding it to a recipe. Recipe quantities use the unit shown beside the field. For example, a single scoop can consume `90 g` of an ice-cream stock item and a waffle-cone extra can consume `1 each`. The system rejects duplicate ingredients and quantities that are zero or negative. Every available variation or extra must have at least one recipe ingredient; only an archived item may be saved without a recipe. This rule is enforced by both the form and the API so a sellable item cannot silently bypass stock deductions.
+The system generates permanent item codes from names instead of asking staff to type internal identifiers. An item appears at the counter only when it is available and has at least one active price. Additional price choices are available under **More menu details**. To stop selling an item, archive it; earlier receipts remain unchanged. Cashiers can read the active menu but cannot change descriptions, prices, choices, or availability.
 
-Item codes are generated automatically and remain permanent because reports and audit records use them. To stop selling an item, edit it and turn off **Available for sale**. Earlier receipts remain unchanged. Cashiers can read the active menu but cannot change descriptions, prices, availability or recipes.
+Legacy inventory, recipe, movement, and count data is retained in the database for a later stock project. Menu setup does not ask for recipes, checkout does not validate stock, and accepted sales do not write stock movements while `inventory_tracking_enabled` is false.
 
-Owners and managers edit the stand profile in **Settings**. The dedicated **Receipt details** editor controls the legal business name, shop or branch name, location, TPIN, contact number, tax category, tax rate, and thank-you line. The default tax treatment is **Turnover Tax (TOT) at 5% of gross sales**. The saved profile also controls the displayed currency and timezone, payment and receipt guidance, activity introduction, and operating guide. Each update is audited. Runtime connection status, signed-in identity, historical audit events, and fiscal status are read-only system facts.
+Owners and managers edit the stand profile in **Settings**. The **Receipt details** editor controls the legal business name, shop or branch name, location, TPIN, contact number, paper width, and footer. The saved profile also controls the displayed currency and timezone, payment and receipt guidance, activity introduction, and operating guide. Each update is audited.
 
 ## Receipt status
 
-The current printout is an operational receipt sized for common 58 mm and 80 mm thermal printers. Below the logo it prints the saved legal name, shop or branch, location, TPIN, and contact number. It then records one small **Receipt No.**, date and time, items, modifiers, quantities, unit prices, total, payment details, cashier, and item count. A final tax section shows the configured TOT category and calculates the estimate directly from the gross sale total. The cashier name is copied onto the sale at checkout, so a later staff-account rename does not alter an earlier receipt.
+The current printout is sized for common 58 mm and 80 mm thermal printers. Below the logo it prints the saved legal name, shop or branch, location, TPIN, and contact number. It then records one small **Receipt No.**, date and time, items, repeated choices in compact form such as `Vanilla ×2`, quantities, unit prices, total, payment method, cashier, and cash received/change where applicable. The cashier name is copied onto the sale at checkout, so a later staff-account rename does not alter an earlier receipt.
 
-The receipt does not use the redundant **Customer Receipt** heading or add internal system messages to the customer-facing footer. It identifies the saved TPIN and tax breakdown but must not be presented as a certified Smart Invoice. Smart Invoice/VSDC identifiers, fiscal signatures, SDC/MRC values, and QR verification must come from a separately approved fiscal integration rather than invented fields. Staff can review this boundary in the protected **Fiscal status** section in Settings.
+The receipt omits the redundant **Customer Receipt** heading, tax category, tax rate, tax treatment, payment provider, external transaction reference, serving ticket, queue number, and internal system messages. Any certified fiscal integration must add its approved fields through a separately reviewed project.
 
 ## Architecture
 
@@ -93,7 +92,7 @@ Migrations and seeds are deliberately separate from process startup:
 HAPPYCONE_SEED_PASSWORD='at-least-12-characters' ./scripts/seed-dev.sh
 ```
 
-The seed is development-only. It creates the four role examples, catalog recipes, and opening inventory, but no business day or sales. The supplied password is required each time and is not stored in `.env.example`.
+The seed is development-only. It creates example staff and menu records, but no business day or sales. The supplied password is required each time and is not stored in `.env.example`.
 
 ## Local development
 
@@ -199,6 +198,6 @@ Before a release, reviewers must complete keyboard-only passes for sign-in, day 
 
 The repository implements the approved 15-task MVP roadmap. Consult `docs/implementation/progress.md` for the implementation ledger and release verification evidence. The API contract in `docs/implementation/api-contract.md` is the integration authority.
 
-The delivered scope includes role-based sessions, full owner/manager catalog and recipe administration, inventory ledger/counts, explicit business days, idempotent completed checkout, cash/manual payments, one customer receipt, refunds, audit, daily reports, an offline cash queue, and adapter boundaries. Production payment gateways, certified ZRA fiscal integration, direct ESC/POS bridges, suppliers/procurement, multi-branch stock, customer accounts, delivery, loyalty, self-ordering, and forecasting remain later integrations.
+The delivered scope includes role-based sessions, full Owner administrator and Manager menu administration, product-specific choices, explicit business days, idempotent completed checkout, Cash/Mobile money/Card method recording, one sales receipt, refunds, audit, daily reports, an offline cash queue, and adapter boundaries. Production payment gateways, certified ZRA fiscal integration, direct ESC/POS bridges, stock counting, suppliers/procurement, multi-branch operation, customer accounts, delivery, loyalty, self-ordering, and forecasting remain later integrations.
 
 Do not infer production readiness from a successful local demo. Follow `docs/implementation/deployment-runbook.md`; deployment still requires the recorded accessibility/device review, backup restore rehearsal, TLS and host monitoring, plus organization-specific fiscal/payment approvals.

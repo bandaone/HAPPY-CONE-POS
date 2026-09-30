@@ -8,7 +8,7 @@ Run these commands from **Windows PowerShell as Administrator**. Production scri
 & 'C:\Program Files\HappyCone\current\scripts\Get-HappyConeStatus.ps1'
 ```
 
-Check this after a power cut, Windows restart, failed checkout, or update. All services should be running, `/health` and `/ready` should pass, schema should be `0008`, and the latest backup should be recent.
+Check this after a power cut, Windows restart, failed checkout, or update. All services should be running, `/health` and `/ready` should pass, schema should be `0009`, and the latest backup should be recent.
 
 During a server interruption, keep any already-open cashier tab open and do not clear its browser data. A cash payment that cannot reach the API is retained there as **Pending sync**. Restore service before opening or reloading Happy Cone on staff devices, then confirm every pending sale syncs before closing the business day.
 
@@ -44,7 +44,7 @@ Choose a local unencrypted `.dump` backup with its adjacent `.json` and `.sha256
   -ArchivePath 'C:\ProgramData\HappyCone\backups\happycone-YYYYMMDD-HHMMSS.dump'
 ```
 
-The rehearsal verifies the checksum and archive, restores into a separate temporary database, checks migration `0008`, starts an isolated API on loopback, requires `/ready` to pass, and removes only the temporary database. It does not replace live sales data.
+The rehearsal verifies the checksum and archive, restores into a separate temporary database, checks migration `0009`, starts an isolated API on loopback, requires `/ready` to pass, and removes only the temporary database. It does not replace live sales data.
 
 ## Replace live data after an approved recovery decision
 

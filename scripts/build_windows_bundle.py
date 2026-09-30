@@ -137,7 +137,7 @@ def assemble_bundle(source_root: Path, output_root: Path, cache_root: Path, vers
         manifest = {
             'schema': 1, 'product': 'Happy Cone POS', 'version': version,
             'architecture': lock['architecture'], 'python_version': lock['python_version'],
-            'database_migration': '0008', 'files': files,
+            'database_migration': '0009', 'files': files,
         }
         (staging / 'release-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
         staging.rename(release)

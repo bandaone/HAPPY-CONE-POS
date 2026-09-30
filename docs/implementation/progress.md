@@ -1,37 +1,38 @@
 # Happy Cone implementation status
 
-Current release: cashier-only checkout, completed 2026-09-28.
+Current release: menu-and-sales mode, release candidate 1.0.6.
 
 ## Delivered system
 
 1. Password authentication, hashed sessions, sign-out, expiry, self-service password changes, session revocation, and Cashier, Manager, and Owner administrator access.
 2. A responsive cashier counter with menu search, product customization, cart recovery, server-priced totals, integer-ngwee accounting, and idempotent payment recovery.
-3. Cash and manually confirmed mobile-money or card payments with change calculation and provider references.
+3. Cash with change calculation, plus one-tap Mobile money and Card recording that stores only the method used.
 4. Every accepted checkout becomes a completed sale immediately. There is no serving ticket, server notification, order-number workflow, or digital preparation workspace.
-5. One customer receipt with legal business identity, location, TPIN, contact number, Turnover Tax (TOT) details, item quantities, payment details, cashier, and a small **Receipt No.** value.
+5. One receipt with legal business identity, location, TPIN, contact number, item choices, totals, payment method, cashier, cash/change values, and a small **Receipt No.** value. Tax treatment and external payment references are omitted.
 6. Browser printing for 58 mm and 80 mm receipts, with saved-sale recovery and reprinting from **Sales** when printing is unavailable.
 7. Cash-only offline capture with durable device storage, automatic synchronization, idempotent replay, and clear **Pending sync** status.
-8. Categories, products, descriptions, variations, prices, serving choices, extras, availability, and stock recipes managed from **Stock → Menu and stock recipes** by Managers and Owner administrators.
-9. Append-only stock movements, receiving, waste, adjustments, physical counts, low-stock visibility, and recipe-level deduction exactly once per sale.
+8. Categories, menu items, descriptions, prices, product-specific flavour/serving/topping sets, repeated choices, and availability managed from **Menu** by Managers and Owner administrators.
+9. Existing inventory history retained without stock counting, enforcement, or sale deduction in the current operating mode.
 10. Business-day opening and closing, signed cash movements, refunds, daily sales and payment reports, cash reconciliation, and append-only audit history.
-11. Editable stand, receipt, tax, payment, activity, and counter-guide wording in **Settings**. Exact old supplied defaults migrate to cashier-only wording while owner-customized text is preserved.
+11. Editable stand identity, receipt identity/footer/paper width, payment, activity, and counter-guide wording in **Settings**. Exact old supplied defaults migrate to menu-and-sales wording while owner-customized text is preserved.
 12. Production configuration checks, PostgreSQL migrations, health and readiness endpoints, Docker and Nginx deployment files, backup and restore scripts, and operating documentation.
 
 Existing database rows with the historic `SERVER` role remain visible to an Owner administrator for reassignment or deactivation. Those accounts receive an account-only explanation and cannot enter an operational workspace. New staff accounts can use only Cashier, Manager, or Owner administrator.
 
-## Release verification — 2026-09-28
+## Release verification — 2026-09-30
 
-- API: 53 checks passed across the local test environment and the production API image. Coverage includes checkout completion and retry idempotency, one-time stock deduction, role reassignment and session revocation, catalog and recipe controls, refunds, reports, settings migration, database readiness, and production documentation settings.
-- Web: 10 Vitest files and 43 component/unit tests passed.
-- Browser: 4 Playwright/Chrome journeys passed. They cover WCAG A/AA scans, phone reflow, password visibility, live and offline checkout, one printable receipt, receipt reprint, 58 mm and 80 mm overflow, stock deduction, reports, day close, editable stand and receipt settings, catalog editing, and supported staff creation.
-- Build: TypeScript and Vite completed successfully and generated the versioned offline shell.
-- Production API image: built successfully with the PostgreSQL driver; strict production startup disables interactive API documentation as required.
+- API: 69 tests passed and the selected Ruff error checks passed. Coverage includes atomic menu administration, product-specific repeated choices, completed checkout and retry idempotency, method-only payments, disabled inventory tracking, settings migration, refunds, reports, roles, database readiness, and a populated `0008` to `0009` upgrade that preserves financial, catalog, inventory, and audit records.
+- Web: 13 Vitest files with 55 component and unit tests passed. TypeScript and the production Vite build completed successfully.
+- Browser: 4 Playwright/Chromium journeys passed. They cover WCAG A/AA automated scans, phone reflow, password visibility, manager menu setup, Cash/Mobile money/Card checkout, receipt content and 58 mm/80 mm overflow, offline cash replay exactly once, receipt/stand settings, and staff access.
+- Windows builder: 9 tests passed. The 1.0.6 offline folder was rebuilt from the verified cache, all 192 release-manifest file hashes and sizes matched, the manifest reports schema `0009`, and the 193-entry transfer ZIP passed CRC verification.
+- Production dependency audit: no production web dependency vulnerabilities were reported by `npm audit --omit=dev`.
+- Windows PowerShell parsing and Pester remain a CI/Windows gate because this Ubuntu environment does not currently contain `pwsh`. Physical-computer acceptance, disconnected-LAN operation, backup/restore rehearsal, and exact-model Xprinter output must be recorded before real sales.
 
 ## Deployment boundary
 
-The repository is ready for deployment after the operator supplies production secrets, a PostgreSQL database, TLS termination, scheduled encrypted off-host backups, monitoring, real staff accounts, and the organization’s approved payment and Zambia Revenue Authority integrations. The current receipt records Turnover Tax information but does not claim Smart Invoice or fiscal certification.
+The offline Windows package includes its database, web server, API, dependencies, service setup, backup tools, and first-owner setup. Real use still requires installation on the shop PC, named staff accounts, the real menu and prices, editable stand/receipt details, and the physical checks listed in the Windows guide. The receipt intentionally omits tax type, rate, treatment, and certification wording. A future certified Zambia Revenue Authority integration must be delivered and approved separately.
 
-## Offline Windows shop server — 2026-09-29
+## Offline Windows shop server — 2026-09-30
 
 The repository now includes a reproducible 64-bit Windows release folder for the 4 GB shop computer. It pins and checksums Python 3.12.10, PostgreSQL 16.14 portable binaries, Caddy 2.11.4, WinSW 2.12.0, age 1.3.2, and every Windows Python wheel. The target computer needs no internet, Docker, WSL, Node.js, Git, or compiler.
 
@@ -39,9 +40,7 @@ The Windows lifecycle includes preflight, exact Private-network firewall configu
 
 Receipt printing now stores an explicit 58 mm or 80 mm profile and constrains printable content to 48 mm or 72 mm. The Xprinter checklist rejects the incorrect HP DesignJet PostScript driver and requires the exact XP model, matching driver, short/normal/long physical receipts, final feed, and cut or tear verification.
 
-Automated implementation verification is complete on Ubuntu, including a real PowerShell runtime and Pester. Physical installation on the actual Windows computer, disconnected-internet LAN testing, measured memory, backup/restore rehearsal, and exact-model Xprinter printing remain required before live sales.
-
-Release `1.0.0` candidate evidence: 61 API tests, 47 web tests, four Chromium journeys, 33 Pester tests, eight bundle-builder tests, production web build, migration `0008`, 187 release-manifest entries, and the 391 MB transfer ZIP integrity check all passed. The transfer ZIP SHA-256 is `b5b459b8d861fb1ebc07596e5bb2356d9bdee5e1d84ea8259a3687766bdad0ef`; Windows CI and the physical-computer gates must still pass on the published commit.
+Release `1.0.6` implements menu-and-sales mode and packages migration `0009`. The ready-to-transfer ZIP is 429,039,611 bytes with SHA-256 `a2172e083e371cbc6f187895600112c462ca299f1734efd5cfaf404291d88a27`. It contains every offline dependency and extracts directly into one release folder. Windows CI and the physical-computer gates must still pass on the published commit.
 
 Release `1.0.1` corrects Windows preflight for nominal 4 GB computers that report 3.50–3.99 GiB after hardware reservation. Lower-memory computers remain blocked, and preflight now reports the measured memory and free disk values.
 

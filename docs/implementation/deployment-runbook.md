@@ -7,13 +7,13 @@ This is the operating runbook for the owner and trusted technical administrator.
 Do not move a release to the live stand until all of these checks are recorded:
 
 - CI passes API, web, browser, bundle-builder and Windows Pester tests, the production web build, PowerShell parsing, shell syntax and container builds.
-- The release is exercised through Caddy and PostgreSQL on the actual Windows computer, including migration, sign-in, catalog creation and price edit, sale, receipt, refund, stock effect, day close and report.
+- The release is exercised through Caddy and PostgreSQL on the actual Windows computer, including migration, sign-in, menu creation and price edit, all three payment methods, receipt, refund, unchanged retained stock, day close and report.
 - A backup is created, copied off-host, decrypted and restored into an empty staging database within the agreed recovery time.
 - The Windows Private-profile firewall exposes only Caddy. PostgreSQL and the API remain on loopback; status, disk, service restart and `/ready` checks pass.
 - Owner, manager and cashier accounts are tested; shared production passwords are prohibited.
 - Keyboard-only, 200% zoom, narrow-screen, screen-reader, offline-cash and physical-printer checks pass on the devices used at the stand. Test both 58 mm and 80 mm paper if both widths will be used.
-- The chosen payment procedure is approved. Any direct provider integration must separately pass provider sandbox, webhook and reconciliation tests.
-- The saved legal name, branch, location, TPIN, contact number, Turnover Tax category, and tax rate have been confirmed by the business. The receipt omits ZRA fiscal identifiers and must not be represented as a certified Smart Invoice.
+- The method-only payment procedure is approved. Any future direct provider integration must separately pass provider sandbox, webhook and reconciliation tests.
+- The saved legal name, branch, location, TPIN, contact number, paper width, and receipt footer have been confirmed by the business.
 
 ## Offline Windows shop server
 
@@ -48,9 +48,9 @@ Create the first `OWNER_ADMIN` with `python -m app.cli create-user` and the `--p
 2. Close the business day if the release could interrupt service.
 3. Run an encrypted backup and verify its checksum and off-host copy.
 4. Pull or check out the reviewed release tag and build immutable images.
-5. Run the migration command once, then replace the API and web services. Migration `0008_receipt_paper_width` adds the explicit 58 mm or 80 mm receipt profile while preserving existing settings; confirm `0008` is at head.
+5. Run the migration command once, then replace the API and web services. Migration `0009_menu_sales_mode` adds product-specific choices, disables stock enforcement, and updates untouched supplied guidance while preserving owner wording and existing business data; confirm `0009` is at head.
 6. Run `./scripts/production-check.sh` through the TLS URL by setting `HAPPYCONE_BASE_URL`.
-7. Complete a signed-in smoke test: create or edit a test product variation and recipe as a manager, make a low-value controlled sale, and confirm one receipt, the completed sale in Sales, the stock movement, report, and activity log. Archive the test item afterward if it is not part of the live menu.
+7. Complete a signed-in smoke test: create or edit a test menu item, price, and choice set as a manager; make low-value Cash, Mobile money, and Card sales; confirm each receipt, the completed sales, unchanged inventory history, report, and activity log. Archive the test item afterward if it is not part of the live menu.
 8. Record release version, operator, start/end time, migration result, backup identifier and smoke-test result.
 
 ## Backups and restore rehearsal
@@ -68,11 +68,11 @@ Copy both the `.dump.age` file and its `.sha256` file to access-controlled off-h
 
 At least quarterly, restore the newest backup to an empty staging installation. Verify the checksum, provide `HAPPYCONE_BACKUP_AGE_IDENTITY`, set `HAPPYCONE_RESTORE_CONFIRM=restore-happycone`, and run `scripts/restore.sh BACKUP.dump.age`. Record elapsed time and verify user sign-in, recent orders, stock balances, the last closed day and reports.
 
-## Manual external-payment procedure
+## Mobile money and card procedure
 
-Until a direct provider integration is approved, the cashier completes mobile-money or card payment on the provider device first. They confirm the successful amount and recipient, enter the provider name and unique transaction reference in Happy Cone, then complete the sale. A pending, failed or unverifiable provider transaction is not marked paid. The manager reconciles Happy Cone payment totals and references against provider settlement at day close and investigates every mismatch before sign-off.
+The cashier confirms the customer has completed payment on the external device, then taps **Mobile money** or **Card** once in Happy Cone. Happy Cone records the sale total and method only; it does not collect provider, card, phone, or transaction-reference details. A pending or failed external transaction is not marked paid. The manager reconciles the method totals against external settlements outside Happy Cone.
 
-Refunding an order in Happy Cone records the accounting reversal; it does not automatically send money through an external provider. The manager must complete the provider refund separately, retain its reference in the operating record and reconcile both sides.
+Refunding a sale in Happy Cone records the accounting reversal; it does not send money through an external provider. The manager completes any external refund separately and reconciles both sides outside Happy Cone.
 
 ## Monitoring and incidents
 

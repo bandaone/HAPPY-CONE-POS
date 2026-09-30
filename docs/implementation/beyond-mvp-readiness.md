@@ -14,13 +14,13 @@
 - Verified backup generation, optional age encryption, checksums, retention, guarded restore automation and production preflight checks.
 - A first-owner CLI bootstrap path, deployment/incident/payment runbook and per-release evidence template.
 - Automated owner account-administration browser coverage in addition to the cashier and offline workflows.
-- Built API and Nginx images verified against PostgreSQL 16 through migration, sign-in, checkout, inventory/report persistence, backup, destructive restore and post-restore validation.
+- Built API and Nginx images verified against PostgreSQL 16 through migration, sign-in, checkout, report persistence, backup, destructive restore and post-restore validation.
 
 ## What is already real
 
 - Three supported server-enforced roles with database-backed sessions, plus controlled reassignment of historic Server records.
 - Server-priced sales, integer-ngwee accounting, idempotent checkout, immutable sales history and audited refunds.
-- Recipe-level inventory consumption and an append-only stock ledger.
+- Full menu administration with descriptions, prices, product-specific choices, repeated choices, and availability.
 - Explicit business-day opening, cash control, close and variance records.
 - One customer receipt per completed sale, daily reporting and audit history.
 - Offline cash-sale capture with idempotent synchronization.
@@ -59,15 +59,15 @@ Turn the current visual language into documented tokens and reusable patterns fo
 4. **Implement backup and recovery.** Backup validation and a full destructive restore rehearsal passed on the isolated PostgreSQL stack. Production must schedule age-encrypted backups, copy them off-host, alert on failures and record a timed staging restore. The Docker volume is persistence, not a backup.
 5. **Add operational visibility.** Readiness checks, structured request logs, correlation identifiers and an incident runbook are implemented. The deployment must connect central logs/error reporting and uptime, disk, database, certificate and backup alerts.
 6. **Build production account administration.** Implemented and covered by API, component and browser tests. The first owner can be bootstrapped through the CLI; subsequent staff administration is available in Settings.
-7. **Complete fiscal readiness.** Replace the no-op fiscal adapter with the selected ZRA workflow, persist request/response status and identifiers, retry safely, expose rejected/pending states, render required invoice data, and complete sandbox/UAT before making compliance claims. Current receipts explicitly state that a fiscal invoice is not configured.
-8. **Complete the chosen payment workflow.** The manual-confirmation procedure and reconciliation responsibilities are documented. The business must approve that process or select a provider; direct integrations still require adapters, callbacks/webhooks, reconciliation and provider refunds.
+7. **Complete fiscal readiness.** Add the selected ZRA workflow, persist request/response status and identifiers, retry safely, expose rejected/pending states, render required invoice data, and complete sandbox/UAT before making compliance claims. The current sales receipt does not present itself as a certified fiscal invoice.
+8. **Complete the chosen payment workflow.** Cashiers currently record only Cash, Mobile money, or Card. If the business later selects a direct provider, that project will require adapters, callbacks/webhooks, reconciliation and provider refunds.
 9. **Prove receipt printing.** Test the real printer, grayscale output and both receipt widths; add a monitored print queue and reprint history if browser print is insufficient. Implement a local/network ESC/POS adapter only after the hardware choice.
 10. **Complete the release accessibility review.** Record manual keyboard, screen-reader, zoom, contrast, offline, validation and printed-receipt results for the actual production devices and remediate every release-blocking defect.
 
 ### P1 — operational maturity immediately after the first deployment
 
-1. Add full catalog, price, variant, modifier, recipe and inventory-item administration with effective dates and audit history. The current UI controls product availability only.
-2. Add cancellation/void rules before payment, partial or item-level refunds, explicit stock-return decisions and controlled corrections for closed days.
+1. Add effective dates and richer audit history to the existing menu, price, choice and availability administration if operations require them.
+2. Add cancellation/void rules before payment, partial or item-level refunds, and controlled corrections for closed days.
 3. Add shifts or drawer assignments if more than one cashier shares a business day, including per-operator reconciliation and manager handover.
 4. Add pagination and server-side filters to orders, movements, counts and audit history so record growth does not load the full history into every browser.
 5. Add CSV/PDF exports, date ranges, hourly sales, variant/modifier performance, waste, margin/COGS and owner summaries.

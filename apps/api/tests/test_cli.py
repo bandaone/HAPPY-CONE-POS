@@ -305,10 +305,16 @@ def test_0009_preserves_financial_catalog_and_inventory_data(tmp_path):
             "('payment-id', 'order-id', 'MOBILE_MONEY_MANUAL', 'CONFIRMED', 2500, 0, "
             "'MTN', 'MM-EXISTING', 'owner-id', '2026-09-30 08:30:00')"
         ))
+        db.execute(text(
+            "INSERT INTO audit_events "
+            "(id, actor_id, action, entity, entity_id, details, correlation_id, created_at) "
+            "VALUES ('audit-id', 'owner-id', 'ORDER_CREATED', 'order', 'order-id', "
+            "'{\"total_ngwee\": 2500}', 'correlation-id', '2026-09-30 08:30:00')"
+        ))
         before = {
             table: db.scalar(text(f'SELECT COUNT(*) FROM {table}'))
             for table in ('users', 'orders', 'payments', 'products', 'variants', 'modifiers',
-                          'inventory_items', 'stock_movements')
+                          'inventory_items', 'stock_movements', 'audit_events')
         }
 
     upgraded = alembic('upgrade', 'head')

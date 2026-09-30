@@ -24,7 +24,7 @@ Copy this file for each release and fill every required result. Any blank or fai
 | Playwright full flow, accessibility scan and receipt overflow | |
 | Bundle-builder tests and full release manifest verification | |
 | PowerShell parser and all Pester tests on Windows | |
-| Clean offline wheelhouse install, timezone import and migration `0008` | |
+| Clean offline wheelhouse install, timezone import and migration `0009` | |
 | Container checks for the managed-Linux alternative | |
 
 ## Windows computer gate
@@ -47,20 +47,20 @@ Copy this file for each release and fill every required result. Any blank or fai
 | Workflow / role | Result / evidence |
 | --- | --- |
 | Owner sign-in, staff accounts, settings and receipt details | |
-| Manager catalog, prices, variations, recipes and inventory | |
+| Manager menu, descriptions, prices, choices and availability | |
 | Cashier open day, fast checkout, receipt, reprint and close day | |
-| Cash, manual mobile-money/card reference and reconciliation | |
-| Stock receive, sale deduction exactly once, waste, adjustment and count | |
+| Cash, Mobile money and Card method recording and reconciliation | |
+| Existing inventory history retained without checkout stock changes | |
 | Refund, reports and activity record | |
 | Offline cash sale and reconnect sync | |
-| Archived variation edit, restoration and accurate stock behavior | |
+| Archived price edit and restoration | |
 
 ## Accessibility and device review
 
 | Review | Result / evidence |
 | --- | --- |
 | Keyboard only, visible focus and dialog focus return | |
-| Screen reader: sign-in, checkout, errors, stock and settings | |
+| Screen reader: sign-in, checkout, errors, Menu and settings | |
 | 320 CSS px reflow and 200% zoom | |
 | Text, focus and non-text contrast measurements | |
 | Reduced motion | |
@@ -75,7 +75,7 @@ Copy this file for each release and fill every required result. Any blank or fai
 | Exact XP model and matching 64-bit Xprinter driver recorded | |
 | Hardware self-test and Windows test page pass | |
 | Short, normal and long Happy Cone receipts pass | |
-| Logo, location, TPIN, phone and TOT details are clear | |
+| Logo, location, TPIN and contact number are clear | |
 | Long names wrap; values and totals do not clip | |
 | No browser header/footer or application interface prints | |
 | Final feed and single cut/tear are correct; no continuous blank feed | |

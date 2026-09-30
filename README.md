@@ -1,6 +1,6 @@
 # Happy Cone POS
 
-Happy Cone is a responsive point-of-sale and stand-operations system for a quick-service ice-cream stand in Lusaka. One recorded sale drives payment status, a single customer receipt, recipe-level stock consumption, business-day accounting, reporting, and audit history.
+Happy Cone is a responsive point-of-sale and stand-operations system for a quick-service ice-cream stand in Lusaka. One recorded sale drives payment status, a single customer receipt, business-day accounting, reporting, and audit history. Inventory history remains stored for later use, but this release does not count, enforce, or deduct stock.
 
 The application uses a React/Vite PWA, a FastAPI service, and PostgreSQL 16. Nginx serves the built web app and proxies `/api`, `/api/events`, `/health`, and `/ready` to the API on the same origin.
 
@@ -16,7 +16,7 @@ cp .env.example .env
 HAPPYCONE_SEED_PASSWORD='choose-a-dev-password' ./scripts/seed-dev.sh
 ```
 
-The seed password must be at least 12 characters. The seed command creates development-only `manager`, `cashier`, and `owner` users with that password, plus the example catalog and opening stock. It does not create a business day or demo sales.
+The seed password must be at least 12 characters. The seed command creates development-only `manager`, `cashier`, and `owner` users with that password, plus an example menu. It does not create a business day or demo sales.
 
 Open <http://localhost:8080>. The liveness check is at <http://localhost:8080/health> and the database readiness check is at <http://localhost:8080/ready>. All published ports bind to `127.0.0.1` by default.
 
@@ -43,7 +43,7 @@ Open <http://127.0.0.1:5173>. The SQLite file, migration, and seed are separate 
 
 ## Counter workflow
 
-The cashier opens the business day, selects products and options, takes payment, and prints one customer receipt. An accepted checkout is complete immediately: stock recipes are deducted once, reports update, and the receipt remains available from **Sales** if printing fails. The small sequential value is displayed as **Receipt No.**; staff do not manage a separate order number, serving ticket, server notice, or digital preparation queue.
+The cashier opens the business day, selects products and customer choices, takes payment, and prints one receipt. Simple items add in one tap. Scoop items show only the flavour, serving, or topping sets attached to that item and allow repeated choices such as two scoops of Vanilla. Cash keeps amount and change visible until confirmation; Mobile money and Card each complete the sale with one tap and store only the method used. An accepted checkout is complete immediately, reports update, and the receipt remains available from **Sales** if printing fails. The small sequential value is displayed as **Receipt No.**; staff do not manage a separate order number, serving ticket, server notice, or digital preparation queue.
 
 Printing uses the browser print dialog and supports narrow 58 mm and 80 mm receipt layouts. Browsers cannot silently control a receipt printer without an approved hardware integration, so staff confirm the print dialog and can reprint any saved sale.
 
@@ -72,7 +72,7 @@ The catalog call requires authentication in normal use, so an HTTP `401` confirm
 For the supported offline Windows shop-server package, see [Windows installation](docs/implementation/windows-installation.md). Build a checksummed release folder on the development computer with:
 
 ```bash
-./scripts/build-windows-bundle.sh --version 1.0.0 --cache /path/to/verified-cache --output build/windows
+./scripts/build-windows-bundle.sh --version 1.0.6 --cache /path/to/verified-cache --output build/windows
 ```
 
 The release contains the web app, API, Windows Python wheelhouse, PostgreSQL, Caddy, WinSW, age, and the lifecycle PowerShell commands. The shop computer does not need Docker, Node.js, Git, WSL, compilers, or internet access.
@@ -101,9 +101,9 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml run --rm a
 unset HAPPYCONE_BOOTSTRAP_PASSWORD
 ```
 
-After sign-in, an owner can create staff accounts, change roles and active status, reset passwords, and revoke sessions from **Settings → Staff accounts**. Owners and managers maintain the sellable menu in **Stock → Menu and stock recipes**: categories, product descriptions, variations, prices, serving choices, extras, availability, and the stock quantity consumed by each choice. Keeping menu setup beside inventory makes the link between each sellable option and its stock recipe clear. The forms generate permanent item codes automatically, keep descriptions and menu colour optional, and require every available variation or extra to have a stock recipe so completed sales reduce inventory. Every live user can change their own password from the account menu.
+After sign-in, an owner can create staff accounts, change roles and active status, reset passwords, and revoke sessions from **Settings → Staff accounts**. Owners and managers maintain everything sold from **Menu**: categories, item names and descriptions, one or more prices, reusable choice sets, item-specific minimum and maximum choices, and availability. The forms generate permanent item codes automatically and do not ask for recipes or stock quantities. Every live user can change their own password from the account menu.
 
-Owners and managers can also edit the stand profile from **Settings**. The dedicated **Receipt details** editor controls the legal name, shop or branch name, location, TPIN, contact number, tax category, tax rate, and thank-you line printed on receipts. Happy Cone is configured for **Turnover Tax (TOT) at 5% of gross sales**. The remaining profile fields control display currency, timezone, payment and receipt instructions, activity introduction, and the counter guide. These values are stored in the database and used by the signed-in workspace, money and date display, offline cache, counter guide, and customer receipts. Live connection state, the signed-in identity, audit entries, and fiscal-integration status remain system controlled.
+Owners and managers can also edit the stand profile from **Settings**. The dedicated **Receipt details** editor controls the legal name, shop or branch name, location, TPIN, contact number, 58 mm or 80 mm paper width, and footer printed on receipts. The remaining profile fields control display currency, timezone, payment and receipt instructions, activity introduction, and the counter guide. These values are stored in the database and used by the signed-in workspace, money and date display, offline cache, counter guide, and receipts.
 
 Use `scripts/backup.sh` for verified PostgreSQL custom-format backups. Production scheduling must set `HAPPYCONE_BACKUP_AGE_RECIPIENT`, copy the encrypted backup and checksum off-host, and alert on failure. `scripts/restore.sh` requires an explicit confirmation value and should first be rehearsed on staging. The full procedure is in the [deployment and operations runbook](docs/implementation/deployment-runbook.md).
 
@@ -122,4 +122,4 @@ Use `scripts/backup.sh` for verified PostgreSQL custom-format backups. Productio
 - [Implementation roadmap](docs/superpowers/plans/2026-09-14-icecream-pos-roadmap.md)
 - [Implementation progress](docs/implementation/progress.md)
 
-The system records cash and manual external-payment confirmations. Its printed document includes the saved business identity and an editable Turnover Tax estimate calculated from gross sales, but it does not claim Zambia Revenue Authority fiscal certification. Smart Invoice identifiers, signatures, verification QR codes, live mobile-money/card processing, and certified fiscal integration require separately approved integrations.
+The system records Cash, Mobile money, or Card as the payment method. It does not store provider names, card details, or mobile-money transaction references. The receipt includes the saved business identity, TPIN, contact, receipt number, items and choices, total, payment method, cashier, and cash/change values where applicable. Smart Invoice identifiers, signatures, verification QR codes, live payment processing, and certified fiscal integration require separately approved integrations.

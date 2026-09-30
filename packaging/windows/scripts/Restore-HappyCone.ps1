@@ -29,7 +29,7 @@ function Test-HappyConeRestore {
             if($LASTEXITCODE -ne 0){throw 'Validation restore failed.'}
             $revision=(& (Join-Path $pg 'psql.exe') -h 127.0.0.1 -U happycone -d $validation -tAc 'SELECT version_num FROM alembic_version').Trim()
         }finally{if($null -eq $old){Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue}else{$env:PGPASSWORD=$old}}
-        if($revision -ne '0008'){throw "Backup schema $revision is not compatible with this release (expected 0008)."}
+        if($revision -ne '0009'){throw "Backup schema $revision is not compatible with this release (expected 0009)."}
         Get-Content (Join-Path $DataRoot 'api.env')|Where-Object{$_ -and -not $_.StartsWith('#')}|ForEach-Object{$parts=$_.Split('=',2);$environment[$parts[0]]=$parts[1]}
         $environment.DATABASE_URL=$environment.DATABASE_URL -replace '/happycone$',(('/'+$validation))
         foreach($key in $environment.Keys){$previous[$key]=[Environment]::GetEnvironmentVariable($key,'Process');[Environment]::SetEnvironmentVariable($key,$environment[$key],'Process')}

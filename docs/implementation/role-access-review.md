@@ -8,11 +8,11 @@ The development seed creates Manager, Cashier, and Owner administrator accounts.
 
 | Role | Username | Landing page | Visible navigation |
 | --- | --- | --- | --- |
-| Owner administrator | `owner` | Counter | Counter, Sales, Stock, Cash day, Reports, Settings, Help |
-| Manager | `manager` | Counter | Counter, Sales, Stock, Cash day, Reports, Settings, Help |
+| Owner administrator | `owner` | Counter | Counter, Sales, Menu, Cash day, Reports, Settings, Help |
+| Manager | `manager` | Counter | Counter, Sales, Menu, Cash day, Reports, Settings, Help |
 | Cashier | `cashier` | Counter | Counter, Sales, Cash day, Help |
 
-Owner administrators and Managers maintain the menu, prices, stock recipes, inventory, refunds, cash close, reports, and stand settings. Cashiers operate the counter, receipt history, and business-day opening/cash view within the API’s role checks.
+Owner administrators and Managers maintain the menu, descriptions, prices, product choices and availability. They also handle refunds, cash close, reports, and stand settings. Cashiers operate the counter, receipt history, and business-day opening/cash view within the API’s role checks.
 
 Historic database rows with the retired `SERVER` role remain visible in **Settings → Staff accounts**. An Owner administrator must reassign or deactivate them. A signed-in historic account receives only the reassignment explanation, account details, and Sign out; it has no operational navigation.
 

@@ -37,11 +37,11 @@ Use a training business day and clearly marked test sale. Print and record each 
 - A long receipt with enough items to exceed one screen and an intentionally long product name.
 - A saved-sale reprint from **Sales**.
 - The Happy Cone logo in clear grayscale.
-- Legal name, location, TPIN, phone, and Turnover Tax details below the logo.
+- Legal name, location, TPIN, and contact number below the logo.
 - Item names, quantities, values, totals, payment, cashier, and Receipt No. without clipped text.
 - No application menu, modal background, browser URL, date header, or page number.
 - Correct final feed and one cut or clean tear position; no repeated blank paper.
 
 Run the 58 mm test at no more than 48 mm printable content and the 80 mm test at no more than 72 mm. Keep the working queue name, driver version, width, browser settings, and a photographed short and long receipt in the release evidence.
 
-If continuous feeding or unreadable output returns, cancel the Windows print job, switch off the printer, confirm the job is using the `Happy Cone Receipt` queue, and recheck the exact Xprinter driver. Do not troubleshoot this by changing Happy Cone tax or receipt data.
+If continuous feeding or unreadable output returns, cancel the Windows print job, switch off the printer, confirm the job is using the `Happy Cone Receipt` queue, and recheck the exact Xprinter driver. Do not troubleshoot this by changing Happy Cone receipt data.
