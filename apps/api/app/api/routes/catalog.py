@@ -56,14 +56,41 @@ class CatalogItemUpdate(Command):
             raise ValueError('Each inventory item may appear only once')
         return value
 
+class CatalogItemCreate(CatalogItemUpdate):
+    id: ItemCode
+
+
+class MenuPriceInput(CatalogItemCreate):
+    pass
+
+
+class ProductChoiceSetInput(Command):
+    group_id: ItemCode
+    minimum: StrictInt = Field(ge=0, le=20)
+    maximum: StrictInt = Field(ge=0, le=20)
+    position: StrictInt = Field(ge=0, le=100)
+
     @model_validator(mode='after')
-    def available_items_have_recipe(self):
-        if self.active and not self.recipe:
-            raise ValueError('Available items require at least one stock recipe ingredient')
+    def valid_range(self):
+        if self.minimum > self.maximum:
+            raise ValueError('Minimum selections cannot exceed maximum selections')
         return self
 
 
-class CatalogItemCreate(CatalogItemUpdate):
+class MenuItemUpdate(ProductUpdate):
+    prices: list[MenuPriceInput] = Field(min_length=1, max_length=20)
+    choice_sets: list[ProductChoiceSetInput] = Field(default_factory=list, max_length=20)
+
+    @model_validator(mode='after')
+    def unique_children(self):
+        if len({price.id for price in self.prices}) != len(self.prices):
+            raise ValueError('Each price code may appear only once')
+        if len({choice.group_id for choice in self.choice_sets}) != len(self.choice_sets):
+            raise ValueError('Each choice set may appear only once')
+        return self
+
+
+class MenuItemCreate(MenuItemUpdate):
     id: ItemCode
 
 
@@ -98,6 +125,16 @@ def post_category(command: CategoryCreate, user=Depends(manager), db=Depends(dat
 @router.put('/categories/{category_id}')
 def put_category(category_id: str, command: CategoryUpdate, user=Depends(manager), db=Depends(database)):
     return commit_result(db, service.update_category(db, user, category_id, command))
+
+
+@router.post('/menu-items', status_code=201)
+def post_menu_item(command: MenuItemCreate, user=Depends(manager), db=Depends(database)):
+    return commit_result(db, service.create_menu_item(db, user, command))
+
+
+@router.put('/menu-items/{product_id}')
+def put_menu_item(product_id: str, command: MenuItemUpdate, user=Depends(manager), db=Depends(database)):
+    return commit_result(db, service.update_menu_item(db, user, product_id, command))
 
 
 @router.post('/products', status_code=201)

@@ -1,6 +1,7 @@
 from sqlalchemy import select
 
 from app.models.inventory import StockMovement
+from app.models.stand_settings import StandSettings
 
 
 def recipe(item_id='vanilla-stock', quantity='120.000'):
@@ -219,6 +220,10 @@ def test_catalog_rejects_invalid_creation_and_recipe_without_partial_change(clie
             {'item_id': 'napkins', 'quantity': '2.000'},
         ],
     }).status_code == 422
+    with client.app.state.session_factory.begin() as db:
+        settings = db.get(StandSettings, 1) or StandSettings(id=1)
+        db.add(settings)
+        settings.inventory_tracking_enabled = True
     assert client.put('/api/catalog/variants/vanilla-single', headers=manager, json={
         'name': 'Single scoop', 'price_ngwee': 3500, 'active': True,
         'recipe': [],
@@ -266,3 +271,67 @@ def test_recipe_and_price_changes_apply_only_to_future_sales(client, login):
             StockMovement.reference == second['id'])).all()
     assert next(row.quantity for row in first_movements if row.item_id == 'vanilla-stock') == -80
     assert next(row.quantity for row in second_movements if row.item_id == 'vanilla-stock') == -120
+
+
+def test_manager_creates_and_updates_atomic_menu_item_without_stock_recipe(client, login):
+    manager = login('manager')
+    for group_id, name in [('flavour', 'Flavour'), ('serve-in', 'Serve in'), ('extras', 'Toppings')]:
+        created = client.post('/api/catalog/modifier-groups', headers=manager, json={
+            'id': group_id, 'name': name, 'minimum': 0, 'maximum': 3,
+        })
+        assert created.status_code == 201
+
+    vanilla = client.post('/api/catalog/modifier-groups/flavour/modifiers', headers=manager, json={
+        'id': 'menu-vanilla', 'name': 'Vanilla', 'price_ngwee': 0,
+        'active': True, 'recipe': [],
+    })
+    assert vanilla.status_code == 201
+
+    payload = {
+        'id': 'single-scoop', 'category_id': 'ice-cream', 'name': 'Single Scoop',
+        'description': '', 'color': '#F6E4AB', 'active': True,
+        'prices': [{
+            'id': 'single-scoop-standard', 'name': 'Standard', 'price_ngwee': 2500,
+            'active': True, 'recipe': [],
+        }],
+        'choice_sets': [
+            {'group_id': 'flavour', 'minimum': 1, 'maximum': 1, 'position': 0},
+            {'group_id': 'serve-in', 'minimum': 1, 'maximum': 1, 'position': 1},
+            {'group_id': 'extras', 'minimum': 0, 'maximum': 3, 'position': 2},
+        ],
+    }
+    created = client.post('/api/catalog/menu-items', headers=manager, json=payload)
+    assert created.status_code == 201
+    item = created.json()
+    assert item['variants'] == [{
+        'id': 'single-scoop-standard', 'product_id': 'single-scoop', 'name': 'Standard',
+        'price_ngwee': 2500, 'active': True, 'recipe': [],
+    }]
+    assert item['choice_sets'] == [
+        {'group_id': 'flavour', 'name': 'Flavour', 'minimum': 1, 'maximum': 1, 'position': 0},
+        {'group_id': 'serve-in', 'name': 'Serve in', 'minimum': 1, 'maximum': 1, 'position': 1},
+        {'group_id': 'extras', 'name': 'Toppings', 'minimum': 0, 'maximum': 3, 'position': 2},
+    ]
+
+    update = {**payload, 'description': 'One scoop of any available flavour.'}
+    update.pop('id')
+    update['prices'] = [{**payload['prices'][0], 'price_ngwee': 2700}]
+    update['choice_sets'] = payload['choice_sets'][:2]
+    edited = client.put('/api/catalog/menu-items/single-scoop', headers=manager, json=update)
+    assert edited.status_code == 200
+    assert edited.json()['description'] == 'One scoop of any available flavour.'
+    assert edited.json()['variants'][0]['price_ngwee'] == 2700
+    assert len(edited.json()['choice_sets']) == 2
+
+    invalid = {**update, 'description': 'This must roll back.'}
+    invalid['choice_sets'] = [
+        {'group_id': 'missing-group', 'minimum': 0, 'maximum': 1, 'position': 0},
+    ]
+    rejected = client.put('/api/catalog/menu-items/single-scoop', headers=manager, json=invalid)
+    assert rejected.status_code == 422
+    unchanged = next(product for product in client.get(
+        '/api/catalog?include_inactive=true', headers=manager,
+    ).json()['products'] if product['id'] == 'single-scoop')
+    assert unchanged['description'] == 'One scoop of any available flavour.'
+    assert unchanged['variants'][0]['price_ngwee'] == 2700
+    assert [row['group_id'] for row in unchanged['choice_sets']] == ['flavour', 'serve-in']

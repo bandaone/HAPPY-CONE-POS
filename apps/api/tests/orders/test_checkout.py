@@ -171,3 +171,74 @@ def test_concurrent_close_and_checkout_keep_one_consistent_snapshot(client, logi
     report = client.get('/api/reports/daily',headers=headers).json()
     assert report['expected_cash_ngwee'] == expected_cash
     assert report['order_count'] == int(sale.status_code==201)
+
+
+def test_product_specific_choices_allow_repeated_flavours_and_reject_unrelated_options(client, login):
+    manager = login('manager')
+    for group_id, name, maximum in [
+        ('flavour-choice', 'Flavour', 3),
+        ('unrelated-choice', 'Unrelated', 1),
+    ]:
+        assert client.post('/api/catalog/modifier-groups', headers=manager, json={
+            'id': group_id, 'name': name, 'minimum': 0, 'maximum': maximum,
+        }).status_code == 201
+    for modifier_id, group_id, name, price, active in [
+        ('choice-vanilla', 'flavour-choice', 'Vanilla', 100, True),
+        ('choice-strawberry', 'flavour-choice', 'Strawberry', 100, True),
+        ('choice-unavailable', 'flavour-choice', 'Unavailable', 0, False),
+        ('choice-unrelated', 'unrelated-choice', 'Unrelated', 0, True),
+    ]:
+        assert client.post(f'/api/catalog/modifier-groups/{group_id}/modifiers', headers=manager, json={
+            'id': modifier_id, 'name': name, 'price_ngwee': price,
+            'active': active, 'recipe': [],
+        }).status_code == 201
+
+    def menu_item(item_id, name, required):
+        return client.post('/api/catalog/menu-items', headers=manager, json={
+            'id': item_id, 'category_id': 'ice-cream', 'name': name,
+            'description': '', 'color': '#F6E4AB', 'active': True,
+            'prices': [{
+                'id': f'{item_id}-standard', 'name': 'Standard', 'price_ngwee': 2500,
+                'active': True, 'recipe': [],
+            }],
+            'choice_sets': ([] if required == 0 else [{
+                'group_id': 'flavour-choice', 'minimum': required,
+                'maximum': required, 'position': 0,
+            }]),
+        })
+
+    assert menu_item('single-scoop-menu', 'Single Scoop', 1).status_code == 201
+    assert menu_item('double-scoop-menu', 'Double Scoop', 2).status_code == 201
+    assert menu_item('triple-scoop-menu', 'Triple Scoop', 3).status_code == 201
+    assert menu_item('fixed-special-menu', 'Fixed Special', 0).status_code == 201
+
+    cashier = login('cashier')
+    day = open_day(client, cashier)
+
+    def checkout(key, item_id, choices):
+        return client.post('/api/orders', headers=cashier, json={
+            'business_day_id': day, 'idempotency_key': key,
+            'lines': [{
+                'variant_id': f'{item_id}-standard', 'quantity': 1,
+                'modifier_ids': choices, 'notes': '',
+            }],
+            'payment': {'method': 'CASH', 'tendered_ngwee': 5000},
+            'offline': False,
+        })
+
+    repeated = checkout('repeated-flavour', 'double-scoop-menu', [
+        'choice-vanilla', 'choice-vanilla',
+    ])
+    assert repeated.status_code == 201
+    assert repeated.json()['total_ngwee'] == 2700
+    assert repeated.json()['lines'][0]['modifier_names'] == ['Vanilla ×2']
+
+    assert checkout('missing-choice', 'double-scoop-menu', []).status_code == 422
+    assert checkout('too-many-choices', 'double-scoop-menu', [
+        'choice-vanilla', 'choice-strawberry', 'choice-vanilla',
+    ]).status_code == 422
+    assert checkout('unknown-choice', 'single-scoop-menu', ['missing-choice']).status_code == 409
+    assert checkout('inactive-choice', 'single-scoop-menu', ['choice-unavailable']).status_code == 409
+    assert checkout('unrelated-choice', 'single-scoop-menu', ['choice-unrelated']).status_code == 422
+    assert checkout('choice-on-fixed-item', 'fixed-special-menu', ['choice-vanilla']).status_code == 422
+    assert len(client.get('/api/orders', headers=manager).json()) == 1

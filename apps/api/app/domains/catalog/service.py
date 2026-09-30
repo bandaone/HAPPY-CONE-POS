@@ -6,11 +6,13 @@ from sqlalchemy import delete, select
 
 from app.core.db import lock_branch
 from app.domains.audit.service import record
+from app.domains.settings.service import get_settings
 from app.models.catalog import (
     Category,
     Modifier,
     ModifierGroup,
     Product,
+    ProductModifierGroup,
     RecipeComponent,
     Variant,
 )
@@ -44,6 +46,18 @@ def modifier_group_dto(group):
     return dict(id=group.id, name=group.name, minimum=group.minimum, maximum=group.maximum)
 
 
+def product_choice_sets(db, product_id):
+    query = (select(ProductModifierGroup)
+             .where(ProductModifierGroup.product_id == product_id)
+             .order_by(ProductModifierGroup.position, ProductModifierGroup.group_id))
+    result = []
+    for row in db.scalars(query):
+        group = db.get(ModifierGroup, row.group_id)
+        result.append(dict(group_id=row.group_id, name=group.name, minimum=row.minimum,
+                           maximum=row.maximum, position=row.position))
+    return result
+
+
 def product_dto(db, product, *, include_inactive=False):
     category = db.get(Category, product.category_id)
     query = select(Variant).where(Variant.product_id == product.id)
@@ -52,7 +66,8 @@ def product_dto(db, product, *, include_inactive=False):
     variants = [variant_dto(db, row) for row in db.scalars(query.order_by(Variant.price_ngwee, Variant.name))]
     return dict(id=product.id, category_id=product.category_id, name=product.name,
                 category=category.name, description=product.description, color=product.color,
-                active=product.active, variants=variants)
+                active=product.active, variants=variants,
+                choice_sets=product_choice_sets(db, product.id))
 
 
 def catalog(db, include_inactive=False):
@@ -88,6 +103,8 @@ def _required(db, model, item_id, label, status=404):
 
 
 def _validate_inventory(db, command):
+    if command.active and not command.recipe and get_settings(db).inventory_tracking_enabled:
+        raise HTTPException(422, 'Available items require at least one stock recipe ingredient')
     missing = [row.item_id for row in command.recipe if db.get(InventoryItem, row.item_id) is None]
     if missing:
         raise HTTPException(422, f"Inventory item not found: {missing[0]}")
@@ -136,6 +153,80 @@ def create_product(db, actor, command):
     db.flush()
     after = product_dto(db, product, include_inactive=True)
     record(db, actor, 'PRODUCT_CREATED', 'product', product.id, {'after': after})
+    return after
+
+
+def _validate_choice_sets(db, choices):
+    for choice in choices:
+        _required(db, ModifierGroup, choice.group_id, 'Choice set', 422)
+
+
+def _replace_choice_sets(db, product_id, choices):
+    db.execute(delete(ProductModifierGroup).where(ProductModifierGroup.product_id == product_id))
+    db.add_all([
+        ProductModifierGroup(product_id=product_id, group_id=choice.group_id,
+                             minimum=choice.minimum, maximum=choice.maximum,
+                             position=choice.position)
+        for choice in choices
+    ])
+
+
+def create_menu_item(db, actor, command):
+    lock_branch(db)
+    _existing_or_conflict(db, Product, command.id, 'Menu item')
+    _required(db, Category, command.category_id, 'Category', 422)
+    _validate_choice_sets(db, command.choice_sets)
+    for price in command.prices:
+        _existing_or_conflict(db, Variant, price.id, 'Price')
+        _validate_inventory(db, price)
+    product = Product(id=command.id, **_product_values(command))
+    db.add(product)
+    db.flush()
+    for price in command.prices:
+        variant = Variant(id=price.id, product_id=product.id, **_catalog_item_values(price))
+        db.add(variant)
+        db.flush()
+        _replace_recipe(db, price, variant_id=variant.id)
+    _replace_choice_sets(db, product.id, command.choice_sets)
+    db.flush()
+    after = product_dto(db, product, include_inactive=True)
+    record(db, actor, 'MENU_ITEM_CREATED', 'product', product.id, {'after': after})
+    return after
+
+
+def update_menu_item(db, actor, product_id, command):
+    lock_branch(db)
+    product = _required(db, Product, product_id, 'Menu item')
+    _required(db, Category, command.category_id, 'Category', 422)
+    _validate_choice_sets(db, command.choice_sets)
+    for price in command.prices:
+        existing = db.get(Variant, price.id)
+        if existing is not None and existing.product_id != product_id:
+            raise HTTPException(409, 'Price code is already in use')
+        _validate_inventory(db, price)
+    before = product_dto(db, product, include_inactive=True)
+    for key, value in _product_values(command).items():
+        setattr(product, key, value)
+    submitted_ids = {price.id for price in command.prices}
+    existing_prices = db.scalars(select(Variant).where(Variant.product_id == product_id)).all()
+    for variant in existing_prices:
+        if variant.id not in submitted_ids:
+            variant.active = False
+    for price in command.prices:
+        variant = db.get(Variant, price.id)
+        if variant is None:
+            variant = Variant(id=price.id, product_id=product_id, **_catalog_item_values(price))
+            db.add(variant)
+            db.flush()
+        else:
+            for key, value in _catalog_item_values(price).items():
+                setattr(variant, key, value)
+        _replace_recipe(db, price, variant_id=variant.id)
+    _replace_choice_sets(db, product_id, command.choice_sets)
+    db.flush()
+    after = product_dto(db, product, include_inactive=True)
+    record(db, actor, 'MENU_ITEM_UPDATED', 'product', product.id,
+           {'before': before, 'after': after})
     return after
 
 
@@ -269,24 +360,36 @@ def delete_modifier(db, actor, modifier_id):
 
 def price_lines(db, lines):
     result, consumption = [], Counter()
-    groups = db.scalars(select(ModifierGroup)).all()
     for line in lines:
         variant = db.get(Variant, line.variant_id)
         product = db.get(Product, variant.product_id) if variant else None
         if not variant or not variant.active or not product or not product.active:
             raise HTTPException(409, 'Selected product or variant is unavailable')
-        if len(set(line.modifier_ids)) != len(line.modifier_ids):
-            raise HTTPException(422, 'Duplicate modifiers are not allowed')
         modifiers = [db.get(Modifier, key) for key in line.modifier_ids]
         if any(m is None or not m.active for m in modifiers):
             raise HTTPException(409, 'Selected modifier is unavailable')
+        assignments = db.scalars(select(ProductModifierGroup).where(
+            ProductModifierGroup.product_id == product.id)).all()
+        allowed = {assignment.group_id: assignment for assignment in assignments}
+        if any(modifier.group_id not in allowed for modifier in modifiers):
+            raise HTTPException(422, 'This choice is not available for the selected item')
         counts = Counter(m.group_id for m in modifiers)
-        if any(not g.minimum <= counts[g.id] <= g.maximum for g in groups):
-            raise HTTPException(422, 'Select the required serving choices and allowed extras')
+        if any(not assignment.minimum <= counts[assignment.group_id] <= assignment.maximum
+               for assignment in assignments):
+            raise HTTPException(422, 'Select the required choices for this item')
         unit_price = variant.price_ngwee + sum(m.price_ngwee for m in modifiers)
+        modifier_counts = Counter(line.modifier_ids)
+        seen = set()
+        modifier_names = []
+        for modifier in modifiers:
+            if modifier.id in seen:
+                continue
+            seen.add(modifier.id)
+            count = modifier_counts[modifier.id]
+            modifier_names.append(f'{modifier.name} ×{count}' if count > 1 else modifier.name)
         result.append(dict(variant_id=variant.id, name=f'{product.name} · {variant.name}', quantity=line.quantity,
                            unit_price_ngwee=unit_price, total_ngwee=unit_price * line.quantity,
-                           modifier_names=[m.name for m in modifiers], notes=line.notes))
+                           modifier_names=modifier_names, notes=line.notes))
         ingredients = recipe(db, variant_id=variant.id)
         for modifier in modifiers:
             ingredients += recipe(db, modifier_id=modifier.id)

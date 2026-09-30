@@ -6,7 +6,7 @@ from .common import Command, Money, Reason
 class LineCommand(Command):
     variant_id: str = Field(min_length=1,max_length=60)
     quantity: StrictInt = Field(ge=1,le=100)
-    modifier_ids: list[str] = Field(default_factory=list,max_length=4)
+    modifier_ids: list[str] = Field(default_factory=list,max_length=12)
     notes: str = Field(default='',max_length=300)
 
 
