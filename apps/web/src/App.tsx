@@ -9,6 +9,7 @@ import {
 import {
   BarChart3,
   BookOpen,
+  Boxes,
   CheckCircle2,
   ChevronDown,
   CircleHelp,
@@ -64,12 +65,13 @@ import {
   readable,
   timeOf,
 } from "./components/ui";
-import { Payment, PendingReceipt, Pos } from "./features/Pos";
+import { Payment, PendingReceipt, Pos, PreparedWaste } from "./features/Pos";
 import { Receipt, ReceiptModal } from "./features/Receipt";
 import {
   AccountPassword,
   Audit,
   BusinessDay,
+  Inventory,
   Reports,
   Sales,
   StaffAccounts,
@@ -78,7 +80,7 @@ import { MenuAdmin } from "./features/MenuAdmin";
 import { ProductTour } from "./features/ProductTour";
 import { StandSettingsCards } from "./features/StandSettings";
 
-type Page = "pos" | "sales" | "menu" | "day" | "reports" | "audit" | "settings";
+type Page = "pos" | "sales" | "menu" | "stock" | "day" | "reports" | "audit" | "settings";
 const emptyCatalog: Catalog = {
   categories: [],
   products: [],
@@ -136,6 +138,7 @@ const navigation = [
   { id: "pos", label: "Counter", icon: LayoutGrid },
   { id: "sales", label: "Sales", icon: ClipboardList },
   { id: "menu", label: "Menu", icon: BookOpen },
+  { id: "stock", label: "Stock", icon: Boxes },
   { id: "day", label: "Cash day", icon: Wallet },
   { id: "reports", label: "Reports", icon: BarChart3 },
 ] as const;
@@ -157,6 +160,7 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [online, setOnline] = useState(navigator.onLine);
   const [payment, setPayment] = useState(false);
+  const [preparedWaste, setPreparedWaste] = useState(false);
   const [checkoutAttempt, setCheckoutAttempt] =
     useState<CheckoutCommand | null>(null);
   const [receipt, setReceipt] = useState<Order | null>(null);
@@ -705,6 +709,7 @@ export default function App() {
                     locked={!!checkoutAttempt}
                     onPay={() => setPayment(true)}
                     onOpenDay={() => setOpenDay(true)}
+                    onWaste={() => setPreparedWaste(true)}
                   />
                 )}
                 {page === "sales" && canSell && (
@@ -729,6 +734,14 @@ export default function App() {
                 )}
                 {page === "menu" && canManage && (
                   <MenuAdmin
+                    client={client}
+                    onChanged={refresh}
+                    onError={setError}
+                  />
+                )}
+                {page === "stock" && canManage && (
+                  <Inventory
+                    key={`stock-${revision}`}
                     client={client}
                     onChanged={refresh}
                     onError={setError}
@@ -804,6 +817,20 @@ export default function App() {
           correctsOrderId={correctingOrderId}
           onClose={() => setPayment(false)}
           onSubmit={submitCheckout}
+        />
+      )}
+      {preparedWaste && cart.length === 1 && (
+        <PreparedWaste
+          client={client}
+          line={cart[0]}
+          catalog={catalog}
+          onClose={() => setPreparedWaste(false)}
+          onDone={async () => {
+            setPreparedWaste(false);
+            setCart([]);
+            await refresh();
+            notify("Waste recorded. Stock and today’s report were updated.");
+          }}
         />
       )}
       {receipt && (

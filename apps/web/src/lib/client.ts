@@ -13,6 +13,7 @@ import type {
   Day,
   InventoryItem,
   InventoryItemInput,
+  IngredientWasteInput,
   LoginResult,
   MenuItemCreateInput,
   MenuItemUpdateInput,
@@ -29,6 +30,7 @@ import type {
   ProductActiveResult,
   ProductCreateInput,
   ProductUpdateInput,
+  PreparedWasteInput,
   Quote,
   StockCount,
   Summary,
@@ -37,6 +39,7 @@ import type {
   UserCreateInput,
   UserUpdateInput,
   Variant,
+  WasteRecord,
 } from "./types";
 
 export * from "./types";
@@ -380,6 +383,16 @@ export class ApiClient implements POSClient {
       body: JSON.stringify(input),
     });
   counts = () => this.request<StockCount[]>("/inventory/counts");
+  preparedWaste = (input: PreparedWasteInput) =>
+    this.request<WasteRecord>("/inventory/waste/prepared", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  ingredientWaste = (input: IngredientWasteInput) =>
+    this.request<WasteRecord>("/inventory/waste/ingredient", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   report = (dayId?: string) =>
     this.request<Summary>(
       `/reports/daily${dayId ? `?business_day_id=${encodeURIComponent(dayId)}` : ""}`,

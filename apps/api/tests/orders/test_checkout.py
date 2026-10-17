@@ -161,7 +161,7 @@ def test_competing_sales_cannot_oversell_stock(client, login):
     headers = login()
     day = open_day(client, headers)
     stock = client.post('/api/inventory/movements', headers=headers, json={
-        'item_id':'cones','type':'WASTE','quantity':'199','reason':'Leave one cone'})
+        'item_id':'cones','type':'ADJUSTMENT_OUT','quantity':'199','reason':'Leave one cone'})
     assert stock.status_code == 201
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(lambda key: client.post('/api/orders', headers=headers,
@@ -269,7 +269,7 @@ def test_sales_mode_checkout_ignores_stock_and_writes_no_consumption(client, log
         ('oreo-stock', '3000'), ('napkins', '500'),
     ]:
         response = client.post('/api/inventory/movements', headers=manager, json={
-            'item_id': item_id, 'type': 'WASTE', 'quantity': quantity,
+            'item_id': item_id, 'type': 'ADJUSTMENT_OUT', 'quantity': quantity,
             'reason': 'Prove sales mode does not depend on stock',
         })
         assert response.status_code == 201

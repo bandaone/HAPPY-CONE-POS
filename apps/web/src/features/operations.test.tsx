@@ -180,6 +180,7 @@ describe("simple stock setup", () => {
       inventory: vi.fn().mockResolvedValue([]),
       movements: vi.fn().mockResolvedValue([]),
       counts: vi.fn().mockResolvedValue([]),
+      catalog: vi.fn().mockResolvedValue({ categories: [], products: [], modifier_groups: [], modifiers: [] }),
       createInventoryItem: vi.fn().mockResolvedValue({}),
     } as unknown as POSClient;
     render(<Inventory client={client} onError={vi.fn()} onChanged={vi.fn()} />);
@@ -209,6 +210,7 @@ describe("simple stock setup", () => {
       counts: vi.fn().mockResolvedValue([]), activateInventory: vi.fn().mockResolvedValue({
         inventory_tracking_enabled: true, started_at: "2026-10-17T10:00:00Z",
       }),
+      catalog: vi.fn().mockResolvedValue({ categories: [], products: [], modifier_groups: [], modifiers: [] }),
     } as unknown as POSClient;
     render(<Inventory client={client} onError={vi.fn()} onChanged={vi.fn()} />);
 
@@ -216,6 +218,39 @@ describe("simple stock setup", () => {
     await user.type(screen.getByLabelText("Opening quantity for Vanilla mix"), "20000");
     await user.click(screen.getByRole("button", { name: "Start tracking" }));
     expect(client.activateInventory).toHaveBeenCalledWith([{ item_id: "vanilla", quantity: "20000" }]);
+  });
+
+  it("records ingredient waste with a required reason and selling-value source", async () => {
+    const user = userEvent.setup();
+    const item = { id: "vanilla", name: "Vanilla mix", unit: "ml", base_unit: "ml",
+      pack_name: null, units_per_pack: "1.000", active: true, on_hand: "20000.000",
+      low_stock_threshold: "500.000" };
+    const client = {
+      inventory: vi.fn().mockResolvedValue([item]), movements: vi.fn().mockResolvedValue([]),
+      counts: vi.fn().mockResolvedValue([]),
+      catalog: vi.fn().mockResolvedValue({
+        categories: [], modifier_groups: [], modifiers: [],
+        products: [{ id: "vanilla-product", category_id: "ice-cream", category: "Ice cream",
+          name: "Vanilla", description: "", color: "#fff", active: true, choice_sets: [],
+          variants: [{ id: "vanilla-double", product_id: "vanilla-product", name: "Double",
+            price_ngwee: 3200, active: true, recipe: [{ item_id: "vanilla", quantity: "160.000" }] }],
+        }],
+      }),
+      ingredientWaste: vi.fn().mockResolvedValue({}),
+    } as unknown as POSClient;
+    render(<Inventory client={client} onError={vi.fn()} onChanged={vi.fn()} />);
+
+    await user.click(await screen.findByRole("button", { name: "Record waste" }));
+    await user.click(screen.getByRole("button", { name: "Ingredient" }));
+    await user.type(screen.getByLabelText("Wasted quantity"), "160");
+    await user.selectOptions(screen.getByLabelText("Reason"), "MELTED_OR_SPOILED");
+    await user.selectOptions(screen.getByLabelText("Related menu price"), "vanilla-double");
+    await user.click(screen.getByRole("button", { name: "Record ingredient waste" }));
+
+    expect(client.ingredientWaste).toHaveBeenCalledWith(expect.objectContaining({
+      item_id: "vanilla", quantity: "160", reason: "MELTED_OR_SPOILED",
+      related_variant_id: "vanilla-double",
+    }));
   });
 
 });

@@ -10,6 +10,7 @@ from app.models.inventory import InventoryItem, StockMovement
 from app.models.order import Order, OrderLine
 from app.models.payment import Payment, Refund
 from app.models.user import User
+from app.models.waste import WasteRecord
 
 METHODS = ('CASH', 'MOBILE_MONEY_MANUAL', 'CARD_MANUAL')
 
@@ -191,6 +192,17 @@ def daily_summary(db, day):
             quantity=format(used, '.3f'), unit=item.unit if item else '',
         ))
     summary['stock_usage'].sort(key=lambda item: item['name'])
+    waste_rows = db.scalars(
+        select(WasteRecord)
+        .where(WasteRecord.business_day_id == day.id)
+        .order_by(WasteRecord.created_at, WasteRecord.id)
+    ).all()
+    summary['waste'] = [dict(
+        id=item.id, kind=item.kind, label=item.label,
+        quantity=format(item.quantity, '.3f'), reason=item.reason,
+        comment=item.comment, value_ngwee=item.value_ngwee,
+        actor_name=_staff_name(db, item.actor_id), created_at=_iso(item.created_at),
+    ) for item in waste_rows]
     return summary
 
 

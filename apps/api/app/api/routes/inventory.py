@@ -1,21 +1,25 @@
 from fastapi import APIRouter, Depends
 
-from app.api.deps import commit_result, database, manager
-from app.domains.inventory import service
+from app.api.deps import cashier, commit_result, database, manager
+from app.domains.inventory import service, waste
 from app.schemas.inventory import (
     ActivateInventoryCommand,
     ArchiveStockItemCommand,
     CountCommand,
+    IngredientWasteCommand,
     MovementCommand,
+    PreparedWasteCommand,
     StockItemCommand,
     StockItemUpdate,
 )
 
-router = APIRouter(prefix="/api/inventory", dependencies=[Depends(manager)])
+router = APIRouter(prefix="/api/inventory")
 
 
 @router.get("")
-def inventory(include_inactive: bool = False, db=Depends(database)):
+def inventory(
+    include_inactive: bool = False, user=Depends(manager), db=Depends(database)
+):
     return service.inventory(db, include_inactive)
 
 
@@ -49,7 +53,7 @@ def activate(
 
 
 @router.get("/movements")
-def movements(item_id: str | None = None, db=Depends(database)):
+def movements(item_id: str | None = None, user=Depends(manager), db=Depends(database)):
     return service.movements(db, item_id)
 
 
@@ -59,10 +63,24 @@ def movement(command: MovementCommand, user=Depends(manager), db=Depends(databas
 
 
 @router.get("/counts")
-def counts(db=Depends(database)):
+def counts(user=Depends(manager), db=Depends(database)):
     return service.counts(db)
 
 
 @router.post("/counts", status_code=201)
 def count(command: CountCommand, user=Depends(manager), db=Depends(database)):
     return commit_result(db, service.record_count(db, user, command))
+
+
+@router.post("/waste/prepared", status_code=201)
+def prepared_waste(
+    command: PreparedWasteCommand, user=Depends(cashier), db=Depends(database)
+):
+    return commit_result(db, waste.record_prepared_waste(db, user, command))
+
+
+@router.post("/waste/ingredient", status_code=201)
+def ingredient_waste(
+    command: IngredientWasteCommand, user=Depends(manager), db=Depends(database)
+):
+    return commit_result(db, waste.record_ingredient_waste(db, user, command))

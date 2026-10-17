@@ -119,6 +119,7 @@ export function Pos({
   locked,
   onPay,
   onOpenDay,
+  onWaste,
 }: {
   catalog: Catalog;
   cart: CartLine[];
@@ -127,6 +128,7 @@ export function Pos({
   locked: boolean;
   onPay: () => void;
   onOpenDay: () => void;
+  onWaste?: () => void;
 }) {
   const [category, setCategory] = useState("All items");
   const [query, setQuery] = useState("");
@@ -439,6 +441,16 @@ export function Pos({
               </span>
               <ArrowRight size={18} />
             </button>
+            {onWaste && (
+              <button
+                className="button"
+                type="button"
+                onClick={onWaste}
+                disabled={!day || locked || cart.length !== 1}
+              >
+                Record selected item as waste
+              </button>
+            )}
             <p className="order-footnote">
               <ShieldCheck size={11} />
               Sale saved before the receipt is printed
@@ -462,6 +474,72 @@ export function Pos({
         />
       )}
     </>
+  );
+}
+
+const wasteReasons = [
+  ["DROPPED", "Dropped before serving"],
+  ["PREPARATION_MISTAKE", "Preparation mistake"],
+  ["MELTED_OR_SPOILED", "Melted or spoiled"],
+  ["OTHER", "Other"],
+] as const;
+
+export function PreparedWaste({
+  client,
+  line,
+  catalog,
+  onClose,
+  onDone,
+}: {
+  client: POSClient;
+  line: CartLine;
+  catalog: Catalog;
+  onClose: () => void;
+  onDone: () => void | Promise<void>;
+}) {
+  const [reason, setReason] = useState<(typeof wasteReasons)[number][0]>("DROPPED");
+  const [comment, setComment] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const priced = estimate([line], catalog).lines[0];
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      await client.preparedWaste({
+        variant_id: line.variant_id,
+        modifier_ids: line.modifier_ids,
+        quantity: line.quantity,
+        reason,
+        comment,
+      });
+      await onDone();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Waste could not be recorded.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal title="Record prepared item as waste" eyebrow="Current item" onClose={() => !busy && onClose()}>
+      <form onSubmit={submit}>
+        <div className="modal-body">
+          <div className="payment-summary">
+            <strong>{priced.name}</strong>
+            <span>{line.quantity} × {money(priced.unit_price_ngwee)}</span>
+          </div>
+          <p>This permanently records the item, stock used and selling-price value.</p>
+          <label className="field">Reason<select aria-label="Waste reason" value={reason} onChange={(event) => setReason(event.target.value as (typeof wasteReasons)[number][0])}>{wasteReasons.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label className="field">Comment{reason === "OTHER" ? " (required)" : " (optional)"}<textarea aria-label="Waste comment" required={reason === "OTHER"} minLength={reason === "OTHER" ? 3 : undefined} maxLength={300} value={comment} onChange={(event) => setComment(event.target.value)}/></label>
+          <ErrorMessage error={error}/>
+        </div>
+        <div className="modal-footer">
+          <button className="button" type="button" disabled={busy} onClick={onClose}>Cancel</button>
+          <SubmitButton busy={busy}>Record waste</SubmitButton>
+        </div>
+      </form>
+    </Modal>
   );
 }
 export function Payment({

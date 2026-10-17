@@ -2,8 +2,8 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Catalog, Day, Product } from "../lib/types";
-import { Pos } from "./Pos";
+import type { Catalog, Day, POSClient, Product } from "../lib/types";
+import { Pos, PreparedWaste } from "./Pos";
 import { ProductCustomizer } from "./ProductCustomizer";
 
 const doubleScoop: Product = {
@@ -74,5 +74,35 @@ describe("counter item choices", () => {
       variant_id: "double-scoop-standard", quantity: 1,
       modifier_ids: ["vanilla", "vanilla", "cup"], notes: "",
     });
+  });
+
+  it("records the selected prepared item with its quantity and reason", async () => {
+    const user = userEvent.setup();
+    const client = {
+      preparedWaste: vi.fn().mockResolvedValue({}),
+    } as unknown as POSClient;
+    const onDone = vi.fn();
+    render(
+      <PreparedWaste
+        client={client}
+        catalog={catalog}
+        line={{ variant_id: "soft-serve-cup-standard", quantity: 1, modifier_ids: [], notes: "" }}
+        onClose={vi.fn()}
+        onDone={onDone}
+      />,
+    );
+
+    await user.selectOptions(screen.getByLabelText("Waste reason"), "PREPARATION_MISTAKE");
+    await user.type(screen.getByLabelText("Waste comment"), "Wrong flavour served");
+    await user.click(screen.getByRole("button", { name: "Record waste" }));
+
+    expect(client.preparedWaste).toHaveBeenCalledWith({
+      variant_id: "soft-serve-cup-standard",
+      modifier_ids: [],
+      quantity: 1,
+      reason: "PREPARATION_MISTAKE",
+      comment: "Wrong flavour served",
+    });
+    expect(onDone).toHaveBeenCalled();
   });
 });

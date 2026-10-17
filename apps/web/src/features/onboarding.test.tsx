@@ -236,7 +236,7 @@ describe("first-time guidance", () => {
     },
   );
 
-  it("gives managers a Menu workspace without stock terminology", async () => {
+  it("gives managers separate Menu and Stock workspaces", async () => {
     const manager: User = {
       id: "manager-id",
       username: "manager",
@@ -256,9 +256,7 @@ describe("first-time guidance", () => {
     expect(
       await screen.findByRole("button", { name: "Menu" }),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Stock" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stock" })).toBeInTheDocument();
   });
 
   it("keeps a legacy server account out of every operational workspace", async () => {

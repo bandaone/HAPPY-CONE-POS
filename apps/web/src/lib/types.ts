@@ -275,7 +275,50 @@ export interface ReportCashMovement {
 
 export interface HourlySales { hour: string; order_count: number; net_sales_ngwee: number; }
 export interface StockUsage { item_id: string; name: string; quantity: string; unit: string; }
-export interface WasteSummary { name: string; quantity: string; selling_value_ngwee: number; reason: string; }
+export type WasteReason =
+  | "DROPPED"
+  | "PREPARATION_MISTAKE"
+  | "MELTED_OR_SPOILED"
+  | "DAMAGED_PACKAGING"
+  | "SPOILED"
+  | "OTHER";
+
+export interface WasteRecord {
+  id: string;
+  business_day_id: string;
+  kind: "PREPARED" | "INGREDIENT";
+  label: string;
+  variant_id: string | null;
+  modifier_ids: string[];
+  item_id: string | null;
+  quantity: string;
+  reason: WasteReason;
+  comment: string;
+  value_ngwee: number;
+  actor_name: string | null;
+  created_at: string;
+}
+export type WasteSummary = Pick<
+  WasteRecord,
+  "id" | "kind" | "label" | "quantity" | "reason" | "comment" | "value_ngwee" | "actor_name" | "created_at"
+>;
+
+export interface PreparedWasteInput {
+  variant_id: string;
+  modifier_ids: string[];
+  quantity: number;
+  reason: WasteReason;
+  comment: string;
+}
+
+export interface IngredientWasteInput {
+  item_id: string;
+  quantity: string;
+  reason: WasteReason;
+  comment: string;
+  related_variant_id: string | null;
+  estimated_value_ngwee: number | null;
+}
 export interface CashReconciliation {
   opening_float_ngwee: number;
   cash_sales_ngwee: number;
@@ -378,7 +421,7 @@ export interface Movement {
 
 export interface MovementInput {
   item_id: string;
-  type: Exclude<MovementType, "SALE_CONSUMPTION">;
+  type: Exclude<MovementType, "SALE_CONSUMPTION" | "WASTE">;
   quantity: string;
   reason: string;
 }
@@ -476,6 +519,8 @@ export interface POSClient {
   movement(input: MovementInput): Promise<Movement>;
   count(input: CountInput): Promise<StockCount>;
   counts(): Promise<StockCount[]>;
+  preparedWaste(input: PreparedWasteInput): Promise<WasteRecord>;
+  ingredientWaste(input: IngredientWasteInput): Promise<WasteRecord>;
   report(dayId?: string): Promise<Summary>;
   audit(): Promise<AuditEvent[]>;
   setProductActive(id: string, active: boolean): Promise<ProductActiveResult>;

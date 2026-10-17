@@ -26,9 +26,11 @@ import {
 import { currencySymbol, money, parseMoney } from "../lib/client";
 import type {
   AuditEvent,
+  Catalog,
   Day,
   InventoryItem,
   InventoryItemInput,
+  IngredientWasteInput,
   Movement,
   MovementInput,
   Order,
@@ -37,6 +39,7 @@ import type {
   StockCount,
   Summary,
   User,
+  WasteReason,
 } from "../lib/types";
 
 type Changed = () => void | Promise<void>;
@@ -78,12 +81,21 @@ async function notifyChanged(callback: Changed): Promise<void> {
 
 type InventoryTab = "stock" | "ledger" | "counts";
 type InventoryAction =
-  "RECEIPT" | "WASTE" | "ADJUSTMENT_IN" | "ADJUSTMENT_OUT" | "COUNT";
+  "RECEIPT" | "ADJUSTMENT_IN" | "ADJUSTMENT_OUT" | "COUNT";
+
+const wasteReasons: Array<[WasteReason, string]> = [
+  ["DROPPED", "Dropped before serving"],
+  ["PREPARATION_MISTAKE", "Preparation mistake"],
+  ["MELTED_OR_SPOILED", "Melted or spoiled"],
+  ["DAMAGED_PACKAGING", "Damaged packaging"],
+  ["OTHER", "Other"],
+];
 
 export function Inventory({ client, onError, onChanged }: CoreProps) {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [counts, setCounts] = useState<StockCount[]>([]);
+  const [catalog, setCatalog] = useState<Catalog>({ categories: [], products: [], modifier_groups: [], modifiers: [] });
   const [tab, setTab] = useState<InventoryTab>("stock");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -95,6 +107,16 @@ export function Inventory({ client, onError, onChanged }: CoreProps) {
   const [activationOpen, setActivationOpen] = useState(false);
   const [openingQuantities, setOpeningQuantities] = useState<Record<string, string>>({});
   const [editingItem, setEditingItem] = useState<InventoryItem | "new" | null>(null);
+  const [wasteOpen, setWasteOpen] = useState(false);
+  const [wasteMode, setWasteMode] = useState<"PREPARED" | "INGREDIENT">("PREPARED");
+  const [wasteVariantId, setWasteVariantId] = useState("");
+  const [wasteModifierIds, setWasteModifierIds] = useState<string[]>([]);
+  const [wasteItemId, setWasteItemId] = useState("");
+  const [wasteQuantity, setWasteQuantity] = useState("1");
+  const [wasteReason, setWasteReason] = useState<WasteReason>("DROPPED");
+  const [wasteComment, setWasteComment] = useState("");
+  const [wasteRelatedVariantId, setWasteRelatedVariantId] = useState("");
+  const [wasteEstimate, setWasteEstimate] = useState("");
   const [itemForm, setItemForm] = useState<InventoryItemInput>({
     id: "", name: "", base_unit: "", pack_name: null,
     units_per_pack: "1", low_stock_threshold: "0",
@@ -102,14 +124,16 @@ export function Inventory({ client, onError, onChanged }: CoreProps) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [nextItems, nextMovements, nextCounts] = await Promise.all([
+      const [nextItems, nextMovements, nextCounts, nextCatalog] = await Promise.all([
         client.inventory(true),
         client.movements(),
         client.counts(),
+        client.catalog(true),
       ]);
       setItems(nextItems);
       setMovements(nextMovements);
       setCounts(nextCounts);
+      setCatalog(nextCatalog);
       setError("");
     } catch (failure) {
       setError(errorText(failure));
@@ -201,6 +225,55 @@ export function Inventory({ client, onError, onChanged }: CoreProps) {
     setActivationOpen(true);
     setError("");
   };
+  const openWaste = () => {
+    const firstVariant = catalog.products.flatMap((product) => product.variants).find((variant) => variant.active);
+    setWasteMode("PREPARED");
+    setWasteVariantId(firstVariant?.id ?? "");
+    setWasteModifierIds([]);
+    setWasteItemId(items.find((item) => item.active)?.id ?? "");
+    setWasteQuantity("1");
+    setWasteReason("DROPPED");
+    setWasteComment("");
+    setWasteRelatedVariantId("");
+    setWasteEstimate("");
+    setWasteOpen(true);
+    setError("");
+  };
+  const submitWaste = async (event: FormEvent) => {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (wasteMode === "PREPARED") {
+        await client.preparedWaste({
+          variant_id: wasteVariantId,
+          modifier_ids: wasteModifierIds,
+          quantity: Number(wasteQuantity),
+          reason: wasteReason,
+          comment: wasteComment,
+        });
+      } else {
+        const input: IngredientWasteInput = {
+          item_id: wasteItemId,
+          quantity: wasteQuantity,
+          reason: wasteReason,
+          comment: wasteComment,
+          related_variant_id: wasteRelatedVariantId || null,
+          estimated_value_ngwee: wasteRelatedVariantId || !wasteEstimate ? null : parseMoney(wasteEstimate),
+        };
+        await client.ingredientWaste(input);
+      }
+      setWasteOpen(false);
+      await load();
+      await notifyChanged(onChanged);
+    } catch (failure) {
+      const message = errorText(failure);
+      setError(message);
+      onError(message);
+    } finally {
+      setBusy(false);
+    }
+  };
   const submitActivation = async (event: FormEvent) => {
     event.preventDefault();
     if (busy) return;
@@ -247,7 +320,7 @@ export function Inventory({ client, onError, onChanged }: CoreProps) {
           <button
             className="button"
             type="button"
-            onClick={() => openAction("WASTE")}
+            onClick={openWaste}
           >
             Record waste
           </button>
@@ -454,6 +527,38 @@ export function Inventory({ client, onError, onChanged }: CoreProps) {
           </form>
         </Modal>
       )}
+      {wasteOpen && (
+        <Modal title="Record waste" eyebrow="Permanent stock record" onClose={() => !busy && setWasteOpen(false)} wide>
+          <form onSubmit={submitWaste}>
+            <div className="modal-body">
+              <div className="segmented" role="group" aria-label="Waste type">
+                <button className={`button ${wasteMode === "PREPARED" ? "active" : ""}`} type="button" aria-pressed={wasteMode === "PREPARED"} onClick={() => { setWasteMode("PREPARED"); setWasteQuantity("1"); }}>Prepared item</button>
+                <button className={`button ${wasteMode === "INGREDIENT" ? "active" : ""}`} type="button" aria-pressed={wasteMode === "INGREDIENT"} onClick={() => { setWasteMode("INGREDIENT"); setWasteQuantity(""); }}>Ingredient</button>
+              </div>
+              {wasteMode === "PREPARED" ? (
+                <>
+                  <label className="field">Menu price<select aria-label="Wasted menu price" required value={wasteVariantId} onChange={(event) => setWasteVariantId(event.target.value)}>
+                    {catalog.products.flatMap((product) => product.variants.filter((variant) => variant.active).map((variant) => <option key={variant.id} value={variant.id}>{product.name} · {variant.name} · {money(variant.price_ngwee)}</option>))}
+                  </select></label>
+                  {!!catalog.modifiers.length && <fieldset className="menu-choice-picker"><legend>Choices used</legend>{catalog.modifiers.filter((modifier) => modifier.active).map((modifier) => <label className="choice compact" key={modifier.id}><span><strong>{modifier.name}</strong><small>{modifier.group}</small></span><input type="checkbox" checked={wasteModifierIds.includes(modifier.id)} onChange={(event) => setWasteModifierIds(event.target.checked ? [...wasteModifierIds, modifier.id] : wasteModifierIds.filter((id) => id !== modifier.id))}/></label>)}</fieldset>}
+                  <label className="field">Number wasted<input aria-label="Number wasted" type="number" min="1" max="100" required value={wasteQuantity} onChange={(event) => setWasteQuantity(event.target.value)}/></label>
+                </>
+              ) : (
+                <>
+                  <label className="field">Ingredient<select aria-label="Wasted ingredient" required value={wasteItemId} onChange={(event) => setWasteItemId(event.target.value)}>{items.filter((item) => item.active).map((item) => <option key={item.id} value={item.id}>{item.name} ({item.unit})</option>)}</select></label>
+                  <label className="field">Wasted quantity<input aria-label="Wasted quantity" inputMode="decimal" required value={wasteQuantity} onChange={(event) => setWasteQuantity(event.target.value)}/></label>
+                  <label className="field">Related menu price<select aria-label="Related menu price" value={wasteRelatedVariantId} onChange={(event) => setWasteRelatedVariantId(event.target.value)}><option value="">Use a value estimate</option>{catalog.products.flatMap((product) => product.variants.filter((variant) => variant.active).map((variant) => <option key={variant.id} value={variant.id}>{product.name} · {variant.name}</option>))}</select></label>
+                  {!wasteRelatedVariantId && <label className="field">Estimated selling value ({currencySymbol()})<input aria-label="Estimated selling value" inputMode="decimal" required value={wasteEstimate} onChange={(event) => setWasteEstimate(event.target.value)}/></label>}
+                </>
+              )}
+              <label className="field">Reason<select aria-label="Reason" required value={wasteReason} onChange={(event) => setWasteReason(event.target.value as WasteReason)}>{wasteReasons.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              <label className="field">Comment{wasteReason === "OTHER" ? " (required)" : " (optional)"}<textarea aria-label="Waste comment" required={wasteReason === "OTHER"} minLength={wasteReason === "OTHER" ? 3 : undefined} maxLength={300} value={wasteComment} onChange={(event) => setWasteComment(event.target.value)}/></label>
+              <ErrorMessage error={error}/>
+            </div>
+            <div className="modal-footer"><button className="button" type="button" disabled={busy} onClick={() => setWasteOpen(false)}>Cancel</button><SubmitButton busy={busy}>{wasteMode === "PREPARED" ? "Record prepared waste" : "Record ingredient waste"}</SubmitButton></div>
+          </form>
+        </Modal>
+      )}
       {editingItem && (
         <Modal title={editingItem === "new" ? "Add ingredient" : `Edit ${editingItem.name}`} eyebrow="Simple stock setup" onClose={() => !busy && setEditingItem(null)}>
           <form onSubmit={submitItem}>
@@ -476,9 +581,7 @@ export function Inventory({ client, onError, onChanged }: CoreProps) {
           title={
             action === "RECEIPT"
               ? "Receive stock"
-              : action === "WASTE"
-                ? "Record waste"
-                : action === "ADJUSTMENT_IN"
+              : action === "ADJUSTMENT_IN"
                   ? "Adjust stock in"
                   : action === "ADJUSTMENT_OUT"
                     ? "Adjust stock out"
@@ -531,9 +634,7 @@ export function Inventory({ client, onError, onChanged }: CoreProps) {
                   placeholder={
                     action === "RECEIPT"
                       ? "Supplier delivery"
-                      : action === "WASTE"
-                        ? "Damaged during service"
-                        : action === "COUNT"
+                      : action === "COUNT"
                           ? "Evening count"
                           : "Reason for manual correction"
                   }
@@ -1071,6 +1172,12 @@ export function Reports({ client }: { client: POSClient }) {
               </div>
             </section>
           </div>
+          <section className="panel report-detail-panel">
+            <div className="panel-head"><h2>Waste</h2><small className="muted">Selling-price value</small></div>
+            <div className="table-scroll">
+              {report.waste.length ? <table><thead><tr><th>Time / staff</th><th>Item</th><th>Reason</th><th className="table-numeric">Quantity</th><th className="table-numeric">Value</th></tr></thead><tbody>{report.waste.map((item) => <tr key={item.id}><td>{timeOf(item.created_at)}<div className="table-detail">{item.actor_name}</div></td><td><strong>{item.label}</strong><div className="table-detail">{readable(item.kind)}</div></td><td>{readable(item.reason)}{item.comment && <div className="table-detail">{item.comment}</div>}</td><td className="table-numeric">{item.quantity}</td><td className="table-numeric"><strong>{money(item.value_ngwee)}</strong></td></tr>)}</tbody></table> : <Empty title="No waste recorded">Waste recorded during this business day will appear here.</Empty>}
+            </div>
+          </section>
         </>
       )}
     </>
