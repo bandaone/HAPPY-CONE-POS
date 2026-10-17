@@ -84,6 +84,8 @@ def test_worker_delivers_in_sequence_accepts_duplicates_and_retries(client):
 
     def accepting_transport(url, headers, payload):
         calls.append(payload)
+        assert headers["apikey"] == "secret-test-key"
+        assert "Authorization" not in headers
         sequences = [event["sequence"] for event in payload["events"]]
         assert sequences == sorted(sequences)
         return {"accepted": [first_id], "duplicates": [second_id]}
@@ -113,3 +115,40 @@ def test_sync_status_keeps_one_store_identity(client, login):
     assert first.status_code == 200
     assert first.json()["configured"] is False
     assert first.json()["store_id"] == second.json()["store_id"]
+
+
+def test_worker_accepts_current_supabase_secret_key(client):
+    settings = Settings(
+        database_url="sqlite:///unused.db",
+        supabase_url="https://example.supabase.co",
+        supabase_secret_key="sb_secret_current-key",
+    )
+    with client.app.state.session_factory.begin() as db:
+        event = enqueue(db, "day", "one", "DAY_UPDATED", {"safe": True})
+
+    def transport(_url, headers, _payload):
+        assert headers == {
+            "Content-Type": "application/json",
+            "apikey": "sb_secret_current-key",
+        }
+        return {"accepted": [event.event_id], "duplicates": []}
+
+    assert (
+        push_batch(client.app.state.session_factory, settings, transport=transport)[
+            "delivered"
+        ]
+        == 1
+    )
+
+
+def test_blank_reporting_credentials_leave_sync_disabled():
+    settings = Settings(
+        database_url="sqlite:///unused.db",
+        supabase_url="https://example.supabase.co",
+        supabase_secret_key="",
+    )
+    assert push_batch(None, settings) == {
+        "configured": False,
+        "delivered": 0,
+        "error": None,
+    }

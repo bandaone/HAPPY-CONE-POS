@@ -1,6 +1,6 @@
 # Happy Cone POS
 
-Happy Cone is a responsive point-of-sale and stand-operations system for a quick-service ice-cream stand in Lusaka. One recorded sale drives payment status, a single customer receipt, business-day accounting, reporting, and audit history. Inventory history remains stored for later use, but this release does not count, enforce, or deduct stock.
+Happy Cone is a responsive point-of-sale and stand-operations system for a quick-service ice-cream stand in Lusaka. One recorded sale drives payment status, a single customer receipt, business-day accounting, detailed reporting, audit history, and optional recipe-based stock use. It works locally without internet and can send a read-only reporting copy to an owner dashboard when connectivity is available.
 
 The application uses a React/Vite PWA, a FastAPI service, and PostgreSQL 16. Nginx serves the built web app and proxies `/api`, `/api/events`, `/health`, and `/ready` to the API on the same origin.
 
@@ -56,6 +56,10 @@ cd apps/api
 cd ../web
 npm test
 npm run build
+
+cd ../owner-dashboard
+npm test
+npm run build
 ```
 
 With the Compose stack running, check the routed services with:
@@ -101,7 +105,7 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml run --rm a
 unset HAPPYCONE_BOOTSTRAP_PASSWORD
 ```
 
-After sign-in, an owner can create staff accounts, change roles and active status, reset passwords, and revoke sessions from **Settings → Staff accounts**. Owners and managers maintain everything sold from **Menu**: categories, item names and descriptions, one or more prices, reusable choice sets, item-specific minimum and maximum choices, and availability. The forms generate permanent item codes automatically and do not ask for recipes or stock quantities. Every live user can change their own password from the account menu.
+After sign-in, an owner can create staff accounts, change roles and active status, reset passwords, and revoke sessions from **Settings → Staff accounts**. Owners and managers maintain everything sold from **Menu**: categories, clear item names and descriptions, one or more prices, reusable customer choices, item-specific choice limits, availability, and optional simple recipes. Stock tracking starts only when opening quantities are entered and explicitly activated, so menu setup can be completed first. Every live user can change their own password from the account menu.
 
 Owners and managers can also edit the stand profile from **Settings**. The dedicated **Receipt details** editor controls the legal name, shop or branch name, location, TPIN, contact number, 58 mm or 80 mm paper width, and footer printed on receipts. The remaining profile fields control display currency, timezone, payment and receipt instructions, activity introduction, and the counter guide. These values are stored in the database and used by the signed-in workspace, money and date display, offline cache, counter guide, and receipts.
 
@@ -111,6 +115,7 @@ Use `scripts/backup.sh` for verified PostgreSQL custom-format backups. Productio
 
 - [Project and operations guide](docs/implementation/project-guide.md)
 - [Install the offline Windows shop server](docs/implementation/windows-installation.md)
+- [Set up read-only remote owner reporting](docs/implementation/remote-reporting.md)
 - [Windows backup, recovery, updates and support](docs/implementation/windows-recovery.md)
 - [Xprinter commissioning checklist](docs/implementation/xprinter-commissioning.md)
 - [Deployment and operations runbook](docs/implementation/deployment-runbook.md)

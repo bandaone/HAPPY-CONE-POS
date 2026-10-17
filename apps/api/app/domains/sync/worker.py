@@ -21,8 +21,22 @@ def _http_transport(url, headers, payload):
         return json.loads(response.read().decode("utf-8"))
 
 
+def _credential(settings):
+    for candidate in (
+        settings.supabase_secret_key,
+        settings.supabase_service_role_key,
+    ):
+        if candidate and candidate.get_secret_value():
+            return candidate
+    return None
+
+
 def configured(settings):
-    return bool(settings.supabase_url and settings.supabase_service_role_key)
+    return bool(
+        settings.supabase_url
+        and settings.supabase_url.strip()
+        and _credential(settings)
+    )
 
 
 def push_batch(session_factory, settings, *, transport=None):
@@ -58,10 +72,10 @@ def push_batch(session_factory, settings, *, transport=None):
                 for row in rows
             ],
         }
-        key = settings.supabase_service_role_key.get_secret_value()
+        credential = _credential(settings)
+        key = credential.get_secret_value()
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {key}",
             "apikey": key,
         }
         url = (
