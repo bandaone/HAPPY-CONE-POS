@@ -771,8 +771,7 @@ export function Reports({ client }: { client: POSClient }) {
         <div>
           <h1>Daily report</h1>
           <p>
-            Sales, refunds, payment methods and product performance by business
-            day.
+            Sales, corrections, cash movements, stock use and payment totals for each business day.
           </p>
         </div>
         <label className="field">
@@ -798,12 +797,12 @@ export function Reports({ client }: { client: POSClient }) {
             <div className="metric accent">
               <span className="metric-label">Net sales</span>
               <strong>{money(report.net_sales_ngwee)}</strong>
-              <small>Gross less full refunds</small>
+              <small>Completed sales after reversals</small>
             </div>
             <div className="metric">
               <span className="metric-label">Sales</span>
-              <strong>{report.order_count}</strong>
-              <small>Average {money(report.average_order_ngwee)}</small>
+              <strong>{report.completed_sale_count}</strong>
+              <small>{report.units_sold} items · Average {money(report.average_order_ngwee)}</small>
             </div>
             <div className="metric">
               <span className="metric-label">Gross sales</span>
@@ -849,11 +848,19 @@ export function Reports({ client }: { client: POSClient }) {
               <div className="panel-body">
                 <div className="balance-row">
                   <span>Opening float</span>
-                  <strong>{money(report.opening_float_ngwee)}</strong>
+                  <strong>{money(report.cash_reconciliation.opening_float_ngwee)}</strong>
                 </div>
                 <div className="balance-row">
-                  <span>Cash movements</span>
-                  <strong>{money(report.cash_movements_ngwee)}</strong>
+                  <span>Cash sales</span>
+                  <strong>{money(report.cash_reconciliation.cash_sales_ngwee)}</strong>
+                </div>
+                <div className="balance-row">
+                  <span>Cash reversals</span>
+                  <strong>{money(report.cash_reconciliation.cash_reversals_ngwee)}</strong>
+                </div>
+                <div className="balance-row">
+                  <span>Cash added or removed</span>
+                  <strong>{money(report.cash_reconciliation.cash_movements_ngwee)}</strong>
                 </div>
                 <div className="balance-row">
                   <span>Expected cash</span>
@@ -882,7 +889,7 @@ export function Reports({ client }: { client: POSClient }) {
             <div className="panel-head">
               <h2>Product breakdown</h2>
               <span className="muted">
-                <small>Gross before refunds</small>
+                <small>Corrected and refunded sales excluded</small>
               </span>
             </div>
             <div className="table-scroll">
@@ -892,7 +899,7 @@ export function Reports({ client }: { client: POSClient }) {
                     <tr>
                       <th>Product</th>
                       <th className="table-numeric">Quantity</th>
-                      <th className="table-numeric">Gross total</th>
+                      <th className="table-numeric">Net total</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -916,6 +923,40 @@ export function Reports({ client }: { client: POSClient }) {
               )}
             </div>
           </section>
+          <section className="panel report-detail-panel">
+            <div className="panel-head"><h2>Sale details</h2><small className="muted">Every receipt and reversal</small></div>
+            <div className="table-scroll">
+              <table>
+                <thead><tr><th>Receipt</th><th>Time / cashier</th><th>Payment</th><th>Status</th><th className="table-numeric">Net</th></tr></thead>
+                <tbody>{report.sales.map((sale) => <tr key={sale.order_id}>
+                  <td><strong>{sale.receipt_number}</strong>{sale.corrects_receipt_number && <div className="table-detail">Corrects {sale.corrects_receipt_number}</div>}</td>
+                  <td>{timeOf(sale.created_at)}<div className="table-detail">{sale.cashier_name}</div></td>
+                  <td>{readable(sale.payment_method)}</td>
+                  <td>{sale.reversal_ngwee ? <Badge tone="red">Reversed</Badge> : <Badge tone="green">Completed</Badge>}{sale.reason && <div className="table-detail">{sale.reason}</div>}</td>
+                  <td className="table-numeric"><strong>{money(sale.net_ngwee)}</strong></td>
+                </tr>)}</tbody>
+              </table>
+            </div>
+          </section>
+          <div className="two-columns report-detail-grid">
+            <section className="panel">
+              <div className="panel-head"><h2>Cash activity</h2></div>
+              <div className="panel-body activity-list">
+                {report.cash_activity.map((entry, index) => <div className="balance-row" key={`${entry.kind}-${entry.created_at}-${index}`}>
+                  <span><strong>{readable(entry.kind)}</strong><small className="table-detail">{timeOf(entry.created_at)}{entry.receipt_number ? ` · ${entry.receipt_number}` : ""} · {entry.reason}</small></span>
+                  <strong>{money(entry.amount_ngwee)}</strong>
+                </div>)}
+              </div>
+            </section>
+            <section className="panel">
+              <div className="panel-head"><h2>Stock used</h2><small className="muted">From net sales</small></div>
+              <div className="panel-body">
+                {report.stock_usage.length ? report.stock_usage.map((item) => <div className="balance-row" key={item.item_id}>
+                  <span><strong>{item.name}</strong></span><strong>{item.quantity} {item.unit}</strong>
+                </div>) : <p className="hint-inline">Stock tracking was not active for these sales.</p>}
+              </div>
+            </section>
+          </div>
         </>
       )}
     </>

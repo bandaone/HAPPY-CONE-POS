@@ -241,11 +241,57 @@ export interface PaymentTotals {
   CARD_MANUAL: number;
 }
 
+
+export interface ReportSale {
+  order_id: string;
+  receipt_number: string;
+  created_at: string;
+  cashier_name: string;
+  payment_method: PaymentMethod;
+  gross_ngwee: number;
+  reversal_ngwee: number;
+  net_ngwee: number;
+  correction_status: "PENDING" | "COMPLETED" | "LOCKED" | null;
+  corrects_receipt_number: string | null;
+  reason: string | null;
+}
+
+export interface ReportCashActivity {
+  kind: "OPENING_FLOAT" | "SALE" | "REFUND" | "CORRECTION" | "CASH_MOVEMENT";
+  created_at: string;
+  receipt_number: string | null;
+  amount_ngwee: number;
+  reason: string;
+  actor_name: string | null;
+}
+
+export interface ReportCashMovement {
+  id: string;
+  created_at: string;
+  amount_ngwee: number;
+  reason: string;
+  actor_name: string | null;
+}
+
+export interface HourlySales { hour: string; order_count: number; net_sales_ngwee: number; }
+export interface StockUsage { item_id: string; name: string; quantity: string; unit: string; }
+export interface WasteSummary { name: string; quantity: string; selling_value_ngwee: number; reason: string; }
+export interface CashReconciliation {
+  opening_float_ngwee: number;
+  cash_sales_ngwee: number;
+  cash_reversals_ngwee: number;
+  cash_movements_ngwee: number;
+  expected_cash_ngwee: number;
+}
+
 export interface Summary {
   business_day_id: string | null;
   order_count: number;
+  completed_sale_count: number;
+  units_sold: number;
   gross_sales_ngwee: number;
   refunds_ngwee: number;
+  corrections_ngwee: number;
   net_sales_ngwee: number;
   average_order_ngwee: number;
   payment_totals: PaymentTotals;
@@ -255,6 +301,17 @@ export interface Summary {
   actual_cash_ngwee: number | null;
   variance_ngwee: number | null;
   products: ProductSummary[];
+  opened_at: string | null;
+  closed_at: string | null;
+  opened_by_name: string | null;
+  closed_by_name: string | null;
+  sales: ReportSale[];
+  cash_activity: ReportCashActivity[];
+  cash_movements: ReportCashMovement[];
+  hourly_sales: HourlySales[];
+  stock_usage: StockUsage[];
+  waste: WasteSummary[];
+  cash_reconciliation: CashReconciliation;
 }
 
 export interface Day {

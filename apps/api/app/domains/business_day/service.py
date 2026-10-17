@@ -1,10 +1,11 @@
-from sqlalchemy import select
 from fastapi import HTTPException
-from app.models.business_day import BusinessDay, CashMovement
-from app.models.base import utcnow
+from sqlalchemy import select
+
 from app.core.db import lock_branch
 from app.domains.audit.service import record
 from app.domains.reporting.service import daily_summary
+from app.models.base import utcnow
+from app.models.business_day import BusinessDay, CashMovement
 
 
 def current(db, required=False):
@@ -39,8 +40,9 @@ def close_day(db,actor,actual_cash):
     lock_branch(db)
     day = current(db,required=True)
     day.actual_cash_ngwee = actual_cash
+    day.closed_by, day.closed_at = actor.id, utcnow()
     day.close_snapshot = daily_summary(db,day)
-    day.status, day.closed_by, day.closed_at = 'CLOSED', actor.id, utcnow()
+    day.status = 'CLOSED'
     record(db,actor,'DAY_CLOSED','business_day',day.id,day.close_snapshot)
     return day_dto(db,day)
 

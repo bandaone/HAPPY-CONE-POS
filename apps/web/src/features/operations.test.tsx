@@ -127,7 +127,32 @@ describe("daily report payment labels", () => {
       expected_cash_ngwee: 4200,
       actual_cash_ngwee: null,
       variance_ngwee: null,
-      products: [],
+      products: [{ name: "Vanilla · Double", quantity: 3, total_ngwee: 12600 }],
+      completed_sale_count: 3,
+      units_sold: 3,
+      corrections_ngwee: 0,
+      opened_at: "2026-09-28T08:00:00Z",
+      closed_at: null,
+      opened_by_name: "Mwansa Banda",
+      closed_by_name: null,
+      sales: [{
+        order_id: "sale-1", receipt_number: "A001", created_at: "2026-09-28T08:30:00Z",
+        cashier_name: "Mwansa Banda", payment_method: "CASH", gross_ngwee: 4200,
+        reversal_ngwee: 0, net_ngwee: 4200, correction_status: null,
+        corrects_receipt_number: null, reason: null,
+      }],
+      cash_activity: [{
+        kind: "SALE", created_at: "2026-09-28T08:30:00Z", receipt_number: "A001",
+        amount_ngwee: 4200, reason: "Cash sale", actor_name: "Mwansa Banda",
+      }],
+      cash_movements: [],
+      hourly_sales: [{ hour: "08:00", order_count: 1, net_sales_ngwee: 4200 }],
+      stock_usage: [{ item_id: "vanilla", name: "Vanilla mix", quantity: "160.000", unit: "ml" }],
+      waste: [],
+      cash_reconciliation: {
+        opening_float_ngwee: 0, cash_sales_ngwee: 4200,
+        cash_reversals_ngwee: 0, cash_movements_ngwee: 0, expected_cash_ngwee: 4200,
+      },
     } as Summary;
     const client = {
       days: vi.fn().mockResolvedValue([day]),
@@ -139,5 +164,10 @@ describe("daily report payment labels", () => {
     expect(await screen.findByText("Mobile money")).toBeInTheDocument();
     expect(screen.getByText("Card")).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/manual/i);
+    expect(screen.getByRole("heading", { name: "Sale details" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Cash activity" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Stock used" })).toBeInTheDocument();
+    expect(screen.getByText("A001")).toBeInTheDocument();
+    expect(screen.getByText("Vanilla mix")).toBeInTheDocument();
   });
 });
