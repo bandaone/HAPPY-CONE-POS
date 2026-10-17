@@ -12,6 +12,7 @@ import type {
   CountInput,
   Day,
   InventoryItem,
+  InventoryItemInput,
   LoginResult,
   MenuItemCreateInput,
   MenuItemUpdateInput,
@@ -354,7 +355,16 @@ export class ApiClient implements POSClient {
       method: "POST",
       body: JSON.stringify({ reason }),
     });
-  inventory = () => this.request<InventoryItem[]>("/inventory");
+  inventory = (includeInactive?: boolean) =>
+    this.request<InventoryItem[]>(`/inventory${includeInactive ? "?include_inactive=true" : ""}`);
+  createInventoryItem = (input: InventoryItemInput) =>
+    this.request<InventoryItem>("/inventory/items", { method: "POST", body: JSON.stringify(input) });
+  updateInventoryItem = (id: string, input: Omit<InventoryItemInput, "id">) =>
+    this.request<InventoryItem>(`/inventory/items/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) });
+  setInventoryItemActive = (id: string, active: boolean) =>
+    this.request<InventoryItem>(`/inventory/items/${encodeURIComponent(id)}/archive`, { method: "PATCH", body: JSON.stringify({ active }) });
+  activateInventory = (openingQuantities: Array<{ item_id: string; quantity: string }>) =>
+    this.request<{ inventory_tracking_enabled: true; started_at: string }>("/inventory/activate", { method: "POST", body: JSON.stringify({ opening_quantities: openingQuantities }) });
   movements = (itemId?: string) =>
     this.request<Movement[]>(
       `/inventory/movements${itemId ? `?item_id=${encodeURIComponent(itemId)}` : ""}`,

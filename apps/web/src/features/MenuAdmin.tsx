@@ -19,6 +19,7 @@ import { currencySymbol, money, parseMoney } from "../lib/client";
 import type {
   Catalog,
   Category,
+  InventoryItem,
   MenuItemCreateInput,
   MenuItemUpdateInput,
   Modifier,
@@ -26,6 +27,7 @@ import type {
   POSClient,
   Product,
   ProductChoiceSetInput,
+  RecipeComponent,
 } from "../lib/types";
 
 interface Props {
@@ -46,6 +48,7 @@ interface DraftPrice {
   name: string;
   amount: string;
   active: boolean;
+  recipe: RecipeComponent[];
 }
 
 interface DraftSet {
@@ -93,7 +96,7 @@ function productUpdate(product: Product, active: boolean): MenuItemUpdateInput {
       name: price.name,
       price_ngwee: price.price_ngwee,
       active: price.active,
-      recipe: [],
+      recipe: price.recipe,
     })),
     choice_sets: product.choice_sets.map(
       ({ group_id, minimum, maximum, position }) => ({
@@ -104,6 +107,88 @@ function productUpdate(product: Product, active: boolean): MenuItemUpdateInput {
       }),
     ),
   };
+}
+
+interface RecipeSource {
+  id: string;
+  label: string;
+  recipe: RecipeComponent[];
+}
+
+function recipeSources(catalog: Catalog): RecipeSource[] {
+  return [
+    ...catalog.products.flatMap((product) =>
+      product.variants.map((price) => ({
+        id: price.id,
+        label: `${product.name} · ${price.name}`,
+        recipe: price.recipe,
+      })),
+    ),
+    ...catalog.modifiers.map((choice) => ({
+      id: choice.id,
+      label: `${choice.group} · ${choice.name}`,
+      recipe: choice.recipe,
+    })),
+  ];
+}
+
+function RecipeEditor({
+  label,
+  inventory,
+  recipe,
+  sources,
+  onChange,
+}: {
+  label: string;
+  inventory: InventoryItem[];
+  recipe: RecipeComponent[];
+  sources: RecipeSource[];
+  onChange: (recipe: RecipeComponent[]) => void;
+}) {
+  const setQuantity = (itemId: string, quantity: string) => {
+    const next = recipe.filter((row) => row.item_id !== itemId);
+    if (quantity) next.push({ item_id: itemId, quantity });
+    onChange(next);
+  };
+  return (
+    <details className="catalog-optional">
+      <summary>Stock used when {label} is sold</summary>
+      <div>
+        {!!sources.length && (
+          <label className="field">
+            Copy quantities from
+            <select
+              aria-label={`Copy stock recipe for ${label}`}
+              value=""
+              onChange={(event) => {
+                const source = sources.find((option) => option.id === event.target.value);
+                if (source) onChange(source.recipe.map((row) => ({ ...row })));
+              }}
+            >
+              <option value="">Choose another price or choice…</option>
+              {sources.map((source) => (
+                <option key={source.id} value={source.id}>{source.label}</option>
+              ))}
+            </select>
+          </label>
+        )}
+        {inventory.map((stockItem) => (
+          <label className="field" key={stockItem.id}>
+            {stockItem.name} ({stockItem.unit})
+            <input
+              aria-label={`${label}: ${stockItem.name} used per sale`}
+              inputMode="decimal"
+              min="0"
+              placeholder="0"
+              value={recipe.find((row) => row.item_id === stockItem.id)?.quantity ?? ""}
+              onChange={(event) => setQuantity(stockItem.id, event.target.value)}
+            />
+          </label>
+        ))}
+        {!inventory.length && <p>Add ingredients on the Stock page before setting quantities.</p>}
+      </div>
+    </details>
+  );
 }
 
 function CategoryForm({
@@ -253,11 +338,15 @@ function ChoiceSetForm({
 
 function ChoiceForm({
   client,
+  catalog,
+  inventory,
   group,
   item,
   finish,
 }: {
   client: POSClient;
+  catalog: Catalog;
+  inventory: InventoryItem[];
   group: ModifierGroup;
   item?: Modifier;
   finish: (error?: string) => Promise<void>;
@@ -267,6 +356,7 @@ function ChoiceForm({
     item ? (item.price_ngwee / 100).toFixed(2) : "0.00",
   );
   const [active, setActive] = useState(item?.active ?? true);
+  const [recipe, setRecipe] = useState<RecipeComponent[]>(item?.recipe.map((row) => ({ ...row })) ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const submit = async (event: FormEvent) => {
@@ -279,7 +369,7 @@ function ChoiceForm({
       setError(errorText(reason));
       return;
     }
-    const values = { name, price_ngwee: priceNgwee, active, recipe: [] };
+    const values = { name, price_ngwee: priceNgwee, active, recipe };
     setBusy(true);
     try {
       if (item) await client.updateModifier(item.id, values);
@@ -334,6 +424,13 @@ function ChoiceForm({
             />
           </label>
         )}
+        <RecipeEditor
+          label={name || "this choice"}
+          inventory={inventory}
+          recipe={recipe}
+          sources={recipeSources(catalog).filter((source) => source.id !== item?.id)}
+          onChange={setRecipe}
+        />
         <ErrorMessage error={error} />
       </div>
       <div className="modal-footer">
@@ -348,11 +445,13 @@ function ChoiceForm({
 function MenuItemForm({
   client,
   catalog,
+  inventory,
   item,
   finish,
 }: {
   client: POSClient;
   catalog: Catalog;
+  inventory: InventoryItem[];
   item?: Product;
   finish: (error?: string) => Promise<void>;
 }) {
@@ -371,6 +470,7 @@ function MenuItemForm({
           name: price.name,
           amount: (price.price_ngwee / 100).toFixed(2),
           active: price.active,
+          recipe: price.recipe.map((row) => ({ ...row })),
         }))
       : [
           {
@@ -379,6 +479,7 @@ function MenuItemForm({
             name: "Standard",
             amount: "0.00",
             active: true,
+            recipe: [],
           },
         ],
   );
@@ -417,6 +518,7 @@ function MenuItemForm({
         name: "",
         amount: "0.00",
         active: true,
+        recipe: [],
       },
     ]);
   const submit = async (event: FormEvent) => {
@@ -433,7 +535,7 @@ function MenuItemForm({
           name: price.name || "Standard",
           price_ngwee: parseMoney(price.amount),
           active: price.active,
-          recipe: [],
+          recipe: price.recipe,
         });
       }
     } catch (reason) {
@@ -652,8 +754,9 @@ function MenuItemForm({
               </button>
             </div>
             {prices.map((price, index) => (
-              <div className="menu-price-row" key={price.key}>
-                <label className="field">
+              <div key={price.key}>
+                <div className="menu-price-row">
+                  <label className="field">
                   Name
                   <input
                     aria-label={`Price choice ${index + 1} name`}
@@ -663,8 +766,8 @@ function MenuItemForm({
                       updatePrice(price.key, { name: event.target.value })
                     }
                   />
-                </label>
-                <label className="field">
+                  </label>
+                  <label className="field">
                   Price ({currencySymbol()})
                   <input
                     aria-label={`Price choice ${index + 1} price`}
@@ -675,8 +778,8 @@ function MenuItemForm({
                       updatePrice(price.key, { amount: event.target.value })
                     }
                   />
-                </label>
-                {prices.length > 1 && (
+                  </label>
+                  {prices.length > 1 && (
                   <button
                     className="text-button danger-text"
                     type="button"
@@ -688,7 +791,15 @@ function MenuItemForm({
                   >
                     Remove
                   </button>
-                )}
+                  )}
+                </div>
+                <RecipeEditor
+                  label={price.name || `price choice ${index + 1}`}
+                  inventory={inventory}
+                  recipe={price.recipe}
+                  sources={recipeSources(catalog).filter((source) => source.id !== price.id)}
+                  onChange={(recipe) => updatePrice(price.key, { recipe })}
+                />
               </div>
             ))}
           </div>
@@ -706,6 +817,7 @@ function MenuItemForm({
 
 export function MenuAdmin({ client, onChanged, onError }: Props) {
   const [catalog, setCatalog] = useState<Catalog>(emptyCatalog);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -714,7 +826,12 @@ export function MenuAdmin({ client, onChanged, onError }: Props) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setCatalog(await client.catalog(true));
+      const [nextCatalog, nextInventory] = await Promise.all([
+        client.catalog(true),
+        client.inventory(true),
+      ]);
+      setCatalog(nextCatalog);
+      setInventory(nextInventory);
       setError("");
     } catch (reason) {
       const message = errorText(reason);
@@ -1039,6 +1156,7 @@ export function MenuAdmin({ client, onChanged, onError }: Props) {
           <MenuItemForm
             client={client}
             catalog={catalog}
+            inventory={inventory}
             item={dialog.item}
             finish={finish}
           />
@@ -1061,6 +1179,8 @@ export function MenuAdmin({ client, onChanged, onError }: Props) {
         >
           <ChoiceForm
             client={client}
+            catalog={catalog}
+            inventory={inventory}
             group={dialog.group}
             item={dialog.item}
             finish={finish}

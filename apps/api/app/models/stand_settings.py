@@ -9,28 +9,58 @@ from .base import Base, utcnow
 
 
 class StandSettings(Base):
-    __tablename__ = 'stand_settings'
+    __tablename__ = "stand_settings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
-    business_name: Mapped[str] = mapped_column(String(120), default='CREAMY HEAVEN LIMITED')
-    stand_name: Mapped[str] = mapped_column(String(120), default='Lusaka stand')
-    location: Mapped[str] = mapped_column(String(160), default='Lusaka')
-    currency_name: Mapped[str] = mapped_column(String(80), default='Zambian kwacha')
-    currency_code: Mapped[str] = mapped_column(String(3), default='ZMW')
-    currency_symbol: Mapped[str] = mapped_column(String(6), default='K')
-    timezone: Mapped[str] = mapped_column(String(80), default='Africa/Lusaka')
-    tax_id: Mapped[str] = mapped_column(String(40), default='1002681530')
-    contact_number: Mapped[str] = mapped_column(String(40), default='0771450074')
-    tax_label: Mapped[str] = mapped_column(String(80), default='TURNOVER TAX (TOT)')
+    business_name: Mapped[str] = mapped_column(
+        String(120), default="CREAMY HEAVEN LIMITED"
+    )
+    stand_name: Mapped[str] = mapped_column(String(120), default="Lusaka stand")
+    location: Mapped[str] = mapped_column(String(160), default="Lusaka")
+    currency_name: Mapped[str] = mapped_column(String(80), default="Zambian kwacha")
+    currency_code: Mapped[str] = mapped_column(String(3), default="ZMW")
+    currency_symbol: Mapped[str] = mapped_column(String(6), default="K")
+    timezone: Mapped[str] = mapped_column(String(80), default="Africa/Lusaka")
+    tax_id: Mapped[str] = mapped_column(String(40), default="1002681530")
+    contact_number: Mapped[str] = mapped_column(String(40), default="0771450074")
+    tax_label: Mapped[str] = mapped_column(String(80), default="TURNOVER TAX (TOT)")
     tax_rate_basis_points: Mapped[int] = mapped_column(Integer, default=500)
-    payment_guidance: Mapped[str] = mapped_column(Text, default='Cash change is calculated at checkout. For mobile money or card, select the confirmed payment method to complete the sale.')
-    ticket_guidance: Mapped[str] = mapped_column(Text, default='Receipts use the browser print dialog. A printer problem never removes a completed sale; staff can reprint from Sales.')
-    receipt_footer: Mapped[str] = mapped_column(Text, default='Thank you for choosing Happy Cone.')
-    receipt_paper_width: Mapped[str] = mapped_column(String(4), default='80mm')
+    payment_guidance: Mapped[str] = mapped_column(
+        Text,
+        default="Cash change is calculated at checkout. For mobile money or card, select the confirmed payment method to complete the sale.",
+    )
+    ticket_guidance: Mapped[str] = mapped_column(
+        Text,
+        default="Receipts use the browser print dialog. A printer problem never removes a completed sale; staff can reprint from Sales.",
+    )
+    receipt_footer: Mapped[str] = mapped_column(
+        Text, default="Thank you for choosing Happy Cone."
+    )
+    receipt_paper_width: Mapped[str] = mapped_column(String(4), default="80mm")
     inventory_tracking_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
-    activity_guidance: Mapped[str] = mapped_column(Text, default='Review the recorded actions behind sales, payments, account administration and cash reconciliation.')
-    guide_workflow: Mapped[str] = mapped_column(Text, default='Open a business day with the counted float. Choose each item and its customer choices, then take payment. Print or close the receipt and begin the next sale. Reports update when the sale is accepted.')
-    guide_controls: Mapped[str] = mapped_column(Text, default='Press / to search the menu. Use Tab and Shift + Tab to move between controls, Enter or Space to select, and Escape to close a dialog. On a phone, use the floating sale button to jump to checkout.')
-    guide_offline: Mapped[str] = mapped_column(Text, default='After signing in, the cached menu stays available. Cash sales can be saved on this device. Keep the device and browser data until every sale has synced; rejected sales stay in the sync list for manager review. Mobile money and card payments need a connection.')
-    guide_printing: Mapped[str] = mapped_column(Text, default='Use the browser print dialog with a 58 or 80 mm receipt printer, or a normal printer. Sales stay saved if printing fails, and receipts can be reprinted from Sales. Use your browser’s zoom and system text settings.')
-    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, onupdate=utcnow)
+    inventory_tracking_started_at: Mapped[datetime | None] = mapped_column(
+        UTCDateTime()
+    )
+    activity_guidance: Mapped[str] = mapped_column(
+        Text,
+        default="Review the recorded actions behind sales, payments, account administration and cash reconciliation.",
+    )
+    guide_workflow: Mapped[str] = mapped_column(
+        Text,
+        default="Open a business day with the counted float. Choose each item and its customer choices, then take payment. Print or close the receipt and begin the next sale. Reports update when the sale is accepted.",
+    )
+    guide_controls: Mapped[str] = mapped_column(
+        Text,
+        default="Press / to search the menu. Use Tab and Shift + Tab to move between controls, Enter or Space to select, and Escape to close a dialog. On a phone, use the floating sale button to jump to checkout.",
+    )
+    guide_offline: Mapped[str] = mapped_column(
+        Text,
+        default="After signing in, the cached menu stays available. Cash sales can be saved on this device. Keep the device and browser data until every sale has synced; rejected sales stay in the sync list for manager review. Mobile money and card payments need a connection.",
+    )
+    guide_printing: Mapped[str] = mapped_column(
+        Text,
+        default="Use the browser print dialog with a 58 or 80 mm receipt printer, or a normal printer. Sales stay saved if printing fails, and receipts can be reprinted from Sales. Use your browser’s zoom and system text settings.",
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), default=utcnow, onupdate=utcnow
+    )

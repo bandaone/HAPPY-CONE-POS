@@ -28,6 +28,7 @@ import type {
   AuditEvent,
   Day,
   InventoryItem,
+  InventoryItemInput,
   Movement,
   MovementInput,
   Order,
@@ -91,11 +92,18 @@ export function Inventory({ client, onError, onChanged }: CoreProps) {
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [activationOpen, setActivationOpen] = useState(false);
+  const [openingQuantities, setOpeningQuantities] = useState<Record<string, string>>({});
+  const [editingItem, setEditingItem] = useState<InventoryItem | "new" | null>(null);
+  const [itemForm, setItemForm] = useState<InventoryItemInput>({
+    id: "", name: "", base_unit: "", pack_name: null,
+    units_per_pack: "1", low_stock_threshold: "0",
+  });
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [nextItems, nextMovements, nextCounts] = await Promise.all([
-        client.inventory(),
+        client.inventory(true),
         client.movements(),
         client.counts(),
       ]);
@@ -152,6 +160,69 @@ export function Inventory({ client, onError, onChanged }: CoreProps) {
       setBusy(false);
     }
   };
+  const openItem = (item?: InventoryItem) => {
+    setEditingItem(item ?? "new");
+    setItemForm(item ? {
+      id: item.id, name: item.name, base_unit: item.base_unit,
+      pack_name: item.pack_name, units_per_pack: item.units_per_pack,
+      low_stock_threshold: item.low_stock_threshold,
+    } : { id: "", name: "", base_unit: "", pack_name: null,
+          units_per_pack: "1", low_stock_threshold: "0" });
+    setError("");
+  };
+  const submitItem = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!editingItem || busy) return;
+    setBusy(true);
+    try {
+      if (editingItem === "new") await client.createInventoryItem(itemForm);
+      else {
+        const { id: _id, ...update } = itemForm;
+        await client.updateInventoryItem(editingItem.id, update);
+      }
+      setEditingItem(null);
+      await load();
+      await notifyChanged(onChanged);
+    } catch (failure) {
+      const message = errorText(failure);
+      setError(message);
+      onError(message);
+    } finally { setBusy(false); }
+  };
+  const toggleItem = async (item: InventoryItem) => {
+    try {
+      await client.setInventoryItemActive(item.id, !item.active);
+      await load();
+      await notifyChanged(onChanged);
+    } catch (failure) { onError(errorText(failure)); }
+  };
+  const openActivation = () => {
+    setOpeningQuantities(Object.fromEntries(items.filter((item) => item.active).map((item) => [item.id, ""])));
+    setActivationOpen(true);
+    setError("");
+  };
+  const submitActivation = async (event: FormEvent) => {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    try {
+      await client.activateInventory(
+        items.filter((item) => item.active).map((item) => ({
+          item_id: item.id,
+          quantity: openingQuantities[item.id] || "0",
+        })),
+      );
+      setActivationOpen(false);
+      await load();
+      await notifyChanged(onChanged);
+    } catch (failure) {
+      const message = errorText(failure);
+      setError(message);
+      onError(message);
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <>
       <div className="page-heading">
@@ -164,6 +235,8 @@ export function Inventory({ client, onError, onChanged }: CoreProps) {
           </p>
         </div>
         <div className="heading-aside">
+          <button className="button" type="button" onClick={openActivation}>Start stock tracking</button>
+          <button className="button primary" type="button" onClick={() => openItem()}>Add ingredient</button>
           <button
             className="button"
             type="button"
@@ -255,13 +328,9 @@ export function Inventory({ client, onError, onChanged }: CoreProps) {
                       {item.low_stock_threshold}
                     </td>
                     <td>
-                      <button
-                        className="text-button"
-                        type="button"
-                        onClick={() => openAction("COUNT", item.id)}
-                      >
-                        Count
-                      </button>
+                      <button className="text-button" type="button" onClick={() => openItem(item)}>Edit</button>
+                      <button className="text-button" type="button" onClick={() => void toggleItem(item)}>{item.active ? "Archive" : "Restore"}</button>
+                      {item.active && <button className="text-button" type="button" onClick={() => openAction("COUNT", item.id)}>Count</button>}
                     </td>
                   </tr>
                 );
@@ -356,6 +425,51 @@ export function Inventory({ client, onError, onChanged }: CoreProps) {
             </Empty>
           )}
         </div>
+      )}
+      {activationOpen && (
+        <Modal title="Start stock tracking" eyebrow="Opening quantities" onClose={() => !busy && setActivationOpen(false)}>
+          <form onSubmit={submitActivation}>
+            <div className="modal-body">
+              <p>Enter what is physically available now. Earlier sales stay unchanged; stock starts from these opening quantities.</p>
+              {items.filter((item) => item.active).map((item) => (
+                <label className="field" key={item.id}>
+                  {item.name} ({item.unit})
+                  <input
+                    aria-label={`Opening quantity for ${item.name}`}
+                    required
+                    min="0"
+                    inputMode="decimal"
+                    value={openingQuantities[item.id] ?? ""}
+                    onChange={(event) => setOpeningQuantities({ ...openingQuantities, [item.id]: event.target.value })}
+                  />
+                </label>
+              ))}
+              {items.every((item) => !item.active) && <p>Add at least one ingredient before starting stock tracking.</p>}
+              <ErrorMessage error={error}/>
+            </div>
+            <div className="modal-footer">
+              <button className="button" type="button" disabled={busy} onClick={() => setActivationOpen(false)}>Cancel</button>
+              <SubmitButton busy={busy} disabled={items.every((item) => !item.active)}>Start tracking</SubmitButton>
+            </div>
+          </form>
+        </Modal>
+      )}
+      {editingItem && (
+        <Modal title={editingItem === "new" ? "Add ingredient" : `Edit ${editingItem.name}`} eyebrow="Simple stock setup" onClose={() => !busy && setEditingItem(null)}>
+          <form onSubmit={submitItem}>
+            <div className="modal-body">
+              <p>Use the unit you count this ingredient in. Add a pack only when deliveries arrive in a standard tub, bag or box.</p>
+              <label className="field">Ingredient name<input aria-label="Ingredient name" required value={itemForm.name} onChange={(event) => setItemForm({...itemForm, name:event.target.value})}/></label>
+              <label className="field">Item code<input aria-label="Item code" required disabled={editingItem !== "new"} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={itemForm.id} onChange={(event) => setItemForm({...itemForm, id:event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-")})}/><small>Lowercase words joined with dashes, for example vanilla-mix.</small></label>
+              <label className="field">Counting unit<input aria-label="Counting unit" required placeholder="ml, g, piece" value={itemForm.base_unit} onChange={(event) => setItemForm({...itemForm, base_unit:event.target.value})}/></label>
+              <label className="field">Pack name (optional)<input aria-label="Pack name (optional)" placeholder="tub, bag, box" value={itemForm.pack_name ?? ""} onChange={(event) => setItemForm({...itemForm, pack_name:event.target.value || null})}/></label>
+              <label className="field">Units in one pack<input aria-label="Units in one pack" required inputMode="decimal" value={itemForm.units_per_pack} onChange={(event) => setItemForm({...itemForm, units_per_pack:event.target.value})}/></label>
+              <label className="field">Low stock warning<input aria-label="Low stock warning" required inputMode="decimal" value={itemForm.low_stock_threshold} onChange={(event) => setItemForm({...itemForm, low_stock_threshold:event.target.value})}/></label>
+              <ErrorMessage error={error}/>
+            </div>
+            <div className="modal-footer"><button className="button" type="button" disabled={busy} onClick={() => setEditingItem(null)}>Cancel</button><SubmitButton busy={busy}>Save ingredient</SubmitButton></div>
+          </form>
+        </Modal>
       )}
       {action && (
         <Modal

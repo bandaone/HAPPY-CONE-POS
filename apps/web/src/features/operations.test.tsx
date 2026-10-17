@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { Reports, Sales } from "./Operations";
+import { Inventory, Reports, Sales } from "./Operations";
 import type { Day, Order, POSClient, Summary } from "../lib/types";
 
 const completedSale: Order = {
@@ -170,4 +170,52 @@ describe("daily report payment labels", () => {
     expect(screen.getByText("A001")).toBeInTheDocument();
     expect(screen.getByText("Vanilla mix")).toBeInTheDocument();
   });
+});
+
+
+describe("simple stock setup", () => {
+  it("creates an ingredient with an optional pack conversion", async () => {
+    const user = userEvent.setup();
+    const client = {
+      inventory: vi.fn().mockResolvedValue([]),
+      movements: vi.fn().mockResolvedValue([]),
+      counts: vi.fn().mockResolvedValue([]),
+      createInventoryItem: vi.fn().mockResolvedValue({}),
+    } as unknown as POSClient;
+    render(<Inventory client={client} onError={vi.fn()} onChanged={vi.fn()} />);
+
+    await user.click(await screen.findByRole("button", { name: "Add ingredient" }));
+    await user.type(screen.getByLabelText("Ingredient name"), "Vanilla mix");
+    await user.type(screen.getByLabelText("Item code"), "vanilla-mix");
+    await user.type(screen.getByLabelText("Counting unit"), "ml");
+    await user.type(screen.getByLabelText("Pack name (optional)"), "tub");
+    await user.clear(screen.getByLabelText("Units in one pack"));
+    await user.type(screen.getByLabelText("Units in one pack"), "5000");
+    await user.click(screen.getByRole("button", { name: "Save ingredient" }));
+
+    expect(client.createInventoryItem).toHaveBeenCalledWith(expect.objectContaining({
+      id: "vanilla-mix", name: "Vanilla mix", base_unit: "ml",
+      pack_name: "tub", units_per_pack: "5000",
+    }));
+  });
+
+  it("starts tracking from explicit opening quantities", async () => {
+    const user = userEvent.setup();
+    const item = { id: "vanilla", name: "Vanilla mix", unit: "ml", base_unit: "ml",
+      pack_name: null, units_per_pack: "1.000", active: true, on_hand: "0.000",
+      low_stock_threshold: "500.000" };
+    const client = {
+      inventory: vi.fn().mockResolvedValue([item]), movements: vi.fn().mockResolvedValue([]),
+      counts: vi.fn().mockResolvedValue([]), activateInventory: vi.fn().mockResolvedValue({
+        inventory_tracking_enabled: true, started_at: "2026-10-17T10:00:00Z",
+      }),
+    } as unknown as POSClient;
+    render(<Inventory client={client} onError={vi.fn()} onChanged={vi.fn()} />);
+
+    await user.click(await screen.findByRole("button", { name: "Start stock tracking" }));
+    await user.type(screen.getByLabelText("Opening quantity for Vanilla mix"), "20000");
+    await user.click(screen.getByRole("button", { name: "Start tracking" }));
+    expect(client.activateInventory).toHaveBeenCalledWith([{ item_id: "vanilla", quantity: "20000" }]);
+  });
+
 });

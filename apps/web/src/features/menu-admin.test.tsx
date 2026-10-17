@@ -114,7 +114,7 @@ function menuClient(catalogData: Catalog = catalog) {
 }
 
 describe("Menu workspace", () => {
-  it("loads the complete menu without requesting inventory or showing stock language", async () => {
+  it("loads the complete menu and stock ingredients without cluttering the menu list", async () => {
     const client = menuClient();
     render(<MenuAdmin client={client} onChanged={vi.fn()} onError={vi.fn()} />);
 
@@ -123,7 +123,7 @@ describe("Menu workspace", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Single scoop")).toBeInTheDocument();
     expect(client.catalog).toHaveBeenCalledWith(true);
-    expect(client.inventory).not.toHaveBeenCalled();
+    expect(client.inventory).toHaveBeenCalledWith(true);
     expect(document.body).not.toHaveTextContent(
       /stock|recipe|ingredient|quantity used|low threshold|variation/i,
     );
@@ -332,5 +332,55 @@ describe("Menu workspace", () => {
       recipe: [],
     });
     await waitFor(() => expect(client.catalog).toHaveBeenCalled());
+  });
+
+  it("copies a stock recipe between price choices and saves the quantities", async () => {
+    const user = userEvent.setup();
+    const recipeCatalog = structuredClone(catalog);
+    recipeCatalog.products[0].variants = [
+      {
+        ...recipeCatalog.products[0].variants[0],
+        recipe: [{ item_id: "vanilla-stock", quantity: "80.000" }],
+      },
+      {
+        id: "single-scoop-double",
+        product_id: "single-scoop",
+        name: "Double",
+        price_ngwee: 5000,
+        active: true,
+        recipe: [{ item_id: "vanilla-stock", quantity: "160.000" }],
+      },
+    ];
+    const client = menuClient(recipeCatalog);
+    vi.mocked(client.inventory).mockResolvedValue([
+      {
+        id: "vanilla-stock", name: "Vanilla mix", unit: "ml", base_unit: "ml",
+        pack_name: "tub", units_per_pack: "5000.000", active: true,
+        on_hand: "20000.000", low_stock_threshold: "1000.000",
+      },
+    ]);
+    render(<MenuAdmin client={client} onChanged={vi.fn()} onError={vi.fn()} />);
+    await screen.findByText("Single scoop");
+
+    await user.click(screen.getByRole("button", { name: "Edit Single scoop" }));
+    const dialog = screen.getByRole("dialog", { name: "Edit menu item" });
+    await user.click(within(dialog).getByText("More menu details"));
+    await user.selectOptions(
+      within(dialog).getByLabelText("Copy stock recipe for Standard"),
+      "single-scoop-double",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Save menu item" }));
+
+    expect(client.updateMenuItem).toHaveBeenCalledWith(
+      "single-scoop",
+      expect.objectContaining({
+        prices: expect.arrayContaining([
+          expect.objectContaining({
+            id: "single-scoop-standard",
+            recipe: [{ item_id: "vanilla-stock", quantity: "160.000" }],
+          }),
+        ]),
+      }),
+    );
   });
 });

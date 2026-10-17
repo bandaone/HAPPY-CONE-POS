@@ -336,7 +336,20 @@ export interface InventoryItem {
   id: string;
   name: string;
   unit: string;
+  base_unit: string;
+  pack_name: string | null;
+  units_per_pack: string;
+  active: boolean;
   on_hand: string;
+  low_stock_threshold: string;
+}
+
+export interface InventoryItemInput {
+  id: string;
+  name: string;
+  base_unit: string;
+  pack_name: string | null;
+  units_per_pack: string;
   low_stock_threshold: string;
 }
 
@@ -454,7 +467,11 @@ export interface POSClient {
   transition(order: Order, status: OrderStatus): Promise<Order>;
   refund(order: Order, reason: string): Promise<Order>;
   correct(order: Order, reason: string): Promise<Order>;
-  inventory(): Promise<InventoryItem[]>;
+  inventory(includeInactive?: boolean): Promise<InventoryItem[]>;
+  createInventoryItem(input: InventoryItemInput): Promise<InventoryItem>;
+  updateInventoryItem(id: string, input: Omit<InventoryItemInput, "id">): Promise<InventoryItem>;
+  setInventoryItemActive(id: string, active: boolean): Promise<InventoryItem>;
+  activateInventory(openingQuantities: Array<{ item_id: string; quantity: string }>): Promise<{ inventory_tracking_enabled: true; started_at: string }>;
   movements(itemId?: string): Promise<Movement[]>;
   movement(input: MovementInput): Promise<Movement>;
   count(input: CountInput): Promise<StockCount>;
