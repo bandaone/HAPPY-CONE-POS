@@ -102,6 +102,7 @@ describe("operational customer receipt", () => {
     render(<Receipt order={order()} profile={profile} />);
 
     const receipt = screen.getByRole("article", { name: "Receipt A001" });
+    expect(receipt.querySelector("img")).toBeNull();
     expect(receipt).toHaveTextContent(/Receipt No\.\s*A001/);
     expect(
       screen.queryByRole("heading", { name: "Customer Receipt" }),

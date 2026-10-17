@@ -1,6 +1,6 @@
 import { CheckCircle2, Printer } from "lucide-react";
 
-import { BrandLogo, Modal, dateOf, timeOf } from "../components/ui";
+import { Modal, dateOf, timeOf } from "../components/ui";
 import { money } from "../lib/client";
 import type { Order, StandProfile } from "../lib/types";
 
@@ -14,43 +14,32 @@ const receiptDefaults = {
   receipt_footer: "Thank you for choosing Happy Cone.",
 };
 
-function ReceiptRow({
-  label,
-  value,
-  strong = false,
-}: {
-  label: string;
-  value: string;
-  strong?: boolean;
-}) {
+function ReceiptRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div
-      className={`receipt-value-row ${strong ? "receipt-value-strong" : ""}`}
-    >
+    <div className={`receipt-value-row ${strong ? "receipt-value-strong" : ""}`}>
       <dt>{label}</dt>
       <dd>{value}</dd>
     </div>
   );
 }
 
-export function Receipt({
-  order,
-  profile,
-}: {
-  order: Order;
-  profile?: StandProfile;
-}) {
+function paymentName(method: Order["payment"]["method"]) {
+  if (method === "CASH") return "Cash";
+  if (method === "CARD_MANUAL") return "Card";
+  return "Mobile money";
+}
+
+export function Receipt({ order, profile }: { order: Order; profile?: StandProfile }) {
   const identity = profile ?? receiptDefaults;
+  const paperWidth = identity.receipt_paper_width ?? "80mm";
+
   return (
     <article
-      className={`receipt receipt-paper-${identity.receipt_paper_width.slice(0, 2)}`}
+      className={`receipt receipt-paper-${paperWidth.slice(0, 2)}`}
       aria-label={`Receipt ${order.number}`}
     >
       <header className="receipt-header">
-        <BrandLogo variant="receipt" />
-        <strong className="receipt-business-name">
-          {identity.business_name}
-        </strong>
+        <strong className="receipt-business-name">{identity.business_name}</strong>
         <p>{identity.stand_name}</p>
         <p>{identity.location}</p>
         <p>TPIN: {identity.tax_id}</p>
@@ -69,99 +58,42 @@ export function Receipt({
       )}
       <section className="receipt-lines" aria-label="Items bought">
         {order.lines.map((line, index) => (
-          <div
-            className="receipt-line-block"
-            key={`${line.variant_id}-${index}`}
-          >
-            <div className="receipt-item-head">
-              <strong>{line.name}</strong>
-            </div>
+          <div className="receipt-line-block" key={`${line.variant_id}-${index}`}>
+            <div className="receipt-item-head"><strong>{line.name}</strong></div>
             <div className="receipt-item-price">
-              <span>
-                {line.quantity} × {money(line.unit_price_ngwee)}
-              </span>
+              <span>{line.quantity} × {money(line.unit_price_ngwee)}</span>
               <span>{money(line.total_ngwee)}</span>
             </div>
-            {line.modifier_names.length > 0 && (
-              <p>{line.modifier_names.join(" · ")}</p>
-            )}
+            {line.modifier_names.length > 0 && <p>{line.modifier_names.join(" · ")}</p>}
             {line.notes && <p>Note: {line.notes}</p>}
           </div>
         ))}
       </section>
       <dl className="receipt-totals">
-        <ReceiptRow
-          label="Sale total"
-          value={money(order.total_ngwee)}
-          strong
-        />
-        <ReceiptRow
-          label="Payment"
-          value={
-            order.payment.method === "CASH"
-              ? "Cash"
-              : order.payment.method === "CARD_MANUAL"
-                ? "Card"
-                : "Mobile money"
-          }
-        />
-        {order.payment.method === "CASH" ? (
+        <ReceiptRow label="Sale total" value={money(order.total_ngwee)} strong />
+        <ReceiptRow label="Payment" value={paymentName(order.payment.method)} />
+        {order.payment.method === "CASH" && (
           <>
-            <ReceiptRow
-              label="Cash received"
-              value={money(
-                order.payment.tendered_ngwee ?? order.payment.amount_ngwee,
-              )}
-            />
-            <ReceiptRow
-              label="Change"
-              value={money(order.payment.change_ngwee ?? 0)}
-            />
+            <ReceiptRow label="Cash received" value={money(order.payment.tendered_ngwee ?? order.payment.amount_ngwee)} />
+            <ReceiptRow label="Change" value={money(order.payment.change_ngwee ?? 0)} />
           </>
-        ) : null}
+        )}
       </dl>
       <dl className="receipt-details receipt-service-details">
         <ReceiptRow label="Cashier" value={order.cashier_name} />
       </dl>
-      <footer className="receipt-footer">
-        <strong>{identity.receipt_footer}</strong>
-      </footer>
+      <footer className="receipt-footer"><strong>{identity.receipt_footer}</strong></footer>
     </article>
   );
 }
 
-export function ReceiptModal({
-  order,
-  profile,
-  onClose,
-  onPrint,
-}: {
-  order: Order;
-  profile?: StandProfile;
-  onClose: () => void;
-  onPrint: () => void;
-}) {
+export function ReceiptModal({ order, profile, onClose, onPrint }: { order: Order; profile?: StandProfile; onClose: () => void; onPrint: () => void }) {
   return (
-    <Modal
-      title={`Receipt ${order.number}`}
-      eyebrow={order.refunded ? "Refunded sale" : "Sale saved"}
-      onClose={onClose}
-    >
+    <Modal title={`Receipt ${order.number}`} eyebrow={order.refunded ? "Refunded sale" : "Sale saved"} onClose={onClose}>
       <Receipt order={order} profile={profile} />
       <div className="modal-footer">
-        <button
-          className="button primary"
-          type="button"
-          autoFocus
-          onClick={onPrint}
-        >
-          <Printer size={16} />
-          Print receipt
-        </button>
-        <button className="button" type="button" onClick={onClose}>
-          <CheckCircle2 size={16} />
-          Done
-        </button>
+        <button className="button primary" type="button" autoFocus onClick={onPrint}><Printer size={16} />Print receipt</button>
+        <button className="button" type="button" onClick={onClose}><CheckCircle2 size={16} />Done</button>
       </div>
     </Modal>
   );
