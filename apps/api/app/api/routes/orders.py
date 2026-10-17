@@ -1,13 +1,19 @@
-from app.api.deps import server,manager
-from app.schemas.order import StatusCommand,RefundCommand
-from app.domains.orders.transitions import transition
-from app.domains.orders.refunds import refund_order
 from fastapi import APIRouter, Depends
-from app.api.deps import database, current_user, cashier
-from app.schemas.order import QuoteCommand, CheckoutCommand
+
+from app.api.deps import cashier, current_user, database, manager, server
 from app.domains.catalog.service import price_lines
 from app.domains.orders import service
+from app.domains.orders.corrections import start_correction
+from app.domains.orders.refunds import refund_order
+from app.domains.orders.transitions import transition
 from app.domains.tickets.service import ticket
+from app.schemas.order import (
+    CheckoutCommand,
+    CorrectionCommand,
+    QuoteCommand,
+    RefundCommand,
+    StatusCommand,
+)
 
 router=APIRouter(prefix='/api/orders')
 
@@ -51,5 +57,12 @@ def status(order_id: str,command: StatusCommand,user=Depends(server),db=Depends(
 @router.post('/{order_id}/refund')
 def refund(order_id: str,command: RefundCommand,user=Depends(manager),db=Depends(database)):
     result=refund_order(db,user,order_id,command.reason)
+    db.commit()
+    return result
+
+
+@router.post('/{order_id}/correction')
+def correction(order_id: str, command: CorrectionCommand, user=Depends(cashier), db=Depends(database)):
+    result = start_correction(db, user, order_id, command.reason)
     db.commit()
     return result

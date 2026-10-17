@@ -926,14 +926,16 @@ interface SalesProps {
   client: POSClient;
   canManage: boolean;
   onReceipt: (order: Order) => void;
+  onCorrect: (order: Order) => void;
   onChanged: Changed;
 }
-export function Sales({ client, canManage, onReceipt, onChanged }: SalesProps) {
+export function Sales({ client, canManage, onReceipt, onCorrect, onChanged }: SalesProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("ALL");
   const [selected, setSelected] = useState<Order | null>(null);
   const [refundOrder, setRefundOrder] = useState<Order | null>(null);
+  const [correctionOrder, setCorrectionOrder] = useState<Order | null>(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -969,6 +971,22 @@ export function Sales({ client, canManage, onReceipt, onChanged }: SalesProps) {
       ),
     [orders, search, status],
   );
+  const submitCorrection = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!correctionOrder || busy) return;
+    setBusy(true);
+    try {
+      const corrected = await client.correct(correctionOrder, reason);
+      setCorrectionOrder(null);
+      setReason("");
+      onCorrect(corrected);
+      await notifyChanged(onChanged);
+    } catch (failure) {
+      setError(errorText(failure));
+    } finally {
+      setBusy(false);
+    }
+  };
   const submitRefund = async (event: FormEvent) => {
     event.preventDefault();
     if (!refundOrder || busy) return;
@@ -1087,6 +1105,19 @@ export function Sales({ client, canManage, onReceipt, onChanged }: SalesProps) {
                       >
                         Receipt
                       </button>
+                      {order.correctable && (
+                        <button
+                          className="text-button"
+                          type="button"
+                          onClick={() => {
+                            setCorrectionOrder(order);
+                            setReason("");
+                            setError("");
+                          }}
+                        >
+                          Correct latest sale
+                        </button>
+                      )}
                       {canManage && !order.refunded && (
                         <button
                           className="text-button"
@@ -1185,6 +1216,32 @@ export function Sales({ client, canManage, onReceipt, onChanged }: SalesProps) {
               Done
             </button>
           </div>
+        </Modal>
+      )}
+      {correctionOrder && (
+        <Modal
+          title={`Correct receipt ${correctionOrder.number}`}
+          eyebrow="Latest sale only"
+          onClose={() => !busy && setCorrectionOrder(null)}
+        >
+          <form onSubmit={submitCorrection}>
+            <div className="modal-body">
+              <p>This reverses the latest sale and reopens its items at the counter. Check the items, then take payment again.</p>
+              <div className="notice">After another sale is recorded, this correction cannot be completed.</div>
+              <label className="field">
+                Required reason
+                <textarea autoFocus required value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                  placeholder="Customer changed their choice" />
+              </label>
+              <ErrorMessage error={error} />
+            </div>
+            <div className="modal-footer">
+              <button className="button" type="button" disabled={busy}
+                onClick={() => setCorrectionOrder(null)}>Cancel</button>
+              <SubmitButton busy={busy} disabled={!reason.trim()}>Reverse and edit sale</SubmitButton>
+            </div>
+          </form>
         </Modal>
       )}
       {refundOrder && (

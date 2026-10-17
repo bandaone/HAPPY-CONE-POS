@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { Reports, Sales } from "./Operations";
 import type { Day, Order, POSClient, Summary } from "../lib/types";
@@ -17,6 +18,7 @@ const completedSale: Order = {
       quantity: 1,
       unit_price_ngwee: 4200,
       total_ngwee: 4200,
+      modifier_ids: ["waffle-cone"],
       modifier_names: ["Waffle cone"],
       notes: "",
     },
@@ -34,6 +36,10 @@ const completedSale: Order = {
   refunded: false,
   refund_reason: null,
   offline: false,
+  correctable: true,
+  correction_status: null,
+  corrected_by_order_id: null,
+  corrects_order_id: null,
 };
 
 describe("sales history", () => {
@@ -47,6 +53,7 @@ describe("sales history", () => {
         client={client}
         canManage
         onReceipt={vi.fn()}
+        onCorrect={vi.fn()}
         onChanged={vi.fn()}
       />,
     );
@@ -71,6 +78,29 @@ describe("sales history", () => {
       screen.queryByText(/Recent orders|order number/i),
     ).not.toBeInTheDocument();
   });
+
+  it("reopens the latest sale for correction after a required reason", async () => {
+    const user = userEvent.setup();
+    const corrected = { ...completedSale, refunded: true, correction_status: "PENDING" as const };
+    const client = {
+      orders: vi.fn().mockResolvedValue([completedSale]),
+      correct: vi.fn().mockResolvedValue(corrected),
+    } as unknown as POSClient;
+    const onCorrect = vi.fn();
+
+    render(
+      <Sales client={client} canManage={false} onReceipt={vi.fn()}
+        onCorrect={onCorrect} onChanged={vi.fn()} />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Correct latest sale" }));
+    await user.type(screen.getByLabelText("Required reason"), "Customer changed their choice");
+    await user.click(screen.getByRole("button", { name: "Reverse and edit sale" }));
+
+    expect(client.correct).toHaveBeenCalledWith(completedSale, "Customer changed their choice");
+    expect(onCorrect).toHaveBeenCalledWith(corrected);
+  });
+
 });
 
 describe("daily report payment labels", () => {

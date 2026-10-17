@@ -389,7 +389,7 @@ def price_lines(db, lines):
             modifier_names.append(f'{modifier.name} ×{count}' if count > 1 else modifier.name)
         result.append(dict(variant_id=variant.id, name=f'{product.name} · {variant.name}', quantity=line.quantity,
                            unit_price_ngwee=unit_price, total_ngwee=unit_price * line.quantity,
-                           modifier_names=modifier_names, notes=line.notes))
+                           modifier_ids=list(line.modifier_ids), modifier_names=modifier_names, notes=line.notes))
         ingredients = recipe(db, variant_id=variant.id)
         for modifier in modifiers:
             ingredients += recipe(db, modifier_id=modifier.id)

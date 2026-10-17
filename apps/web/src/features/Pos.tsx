@@ -471,6 +471,7 @@ export function Payment({
   day,
   attempt,
   offline,
+  correctsOrderId = null,
   onClose,
   onSubmit,
 }: {
@@ -480,6 +481,7 @@ export function Payment({
   day: Day | null;
   attempt: CheckoutCommand | null;
   offline: boolean;
+  correctsOrderId?: string | null;
   onClose: () => void;
   onSubmit: (command: CheckoutCommand) => Promise<void>;
 }) {
@@ -550,6 +552,7 @@ export function Payment({
             : {}),
         },
         offline,
+        ...(correctsOrderId ? { corrects_order_id: correctsOrderId } : {}),
       };
       if (
         !attempted.current &&

@@ -1,7 +1,10 @@
-from app.core.time import UTCDateTime
 from datetime import datetime
-from sqlalchemy import String, ForeignKey, CheckConstraint, UniqueConstraint, JSON
+
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
+
+from app.core.time import UTCDateTime
+
 from .base import Base, new_id, utcnow
 
 
@@ -34,5 +37,6 @@ class OrderLine(Base):
     quantity: Mapped[int]
     unit_price_ngwee: Mapped[int]
     total_ngwee: Mapped[int]
+    modifier_ids: Mapped[list] = mapped_column(JSON, default=list)
     modifier_names: Mapped[list] = mapped_column(JSON)
     notes: Mapped[str] = mapped_column(String(300),default='')

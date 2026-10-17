@@ -2,80 +2,150 @@ import hashlib
 import json
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from app.core.db import lock_branch
 from app.domains.audit.service import record
 from app.domains.business_day.service import current
 from app.domains.catalog.service import price_lines
 from app.domains.inventory import service as inventory
+from app.domains.orders.corrections import latest_order_id
 from app.domains.payments.service import payment_dto, record_payment
 from app.domains.settings.service import get_settings
-from app.models.base import new_id
+from app.models.base import new_id, utcnow
+from app.models.correction import SaleCorrection
 from app.models.order import Order, OrderLine
 from app.models.payment import Payment, Refund
 
 
-def get_order(db,order_id):
-    order=db.get(Order,order_id)
+def get_order(db, order_id):
+    order = db.get(Order, order_id)
     if not order:
-        raise HTTPException(404,'Order not found')
+        raise HTTPException(404, 'Order not found')
     return order
 
 
 def line_dto(line):
-    return {key:getattr(line,key) for key in ('variant_id','name','quantity','unit_price_ngwee','total_ngwee','modifier_names','notes')}
+    return {key: getattr(line, key) for key in (
+        'variant_id', 'name', 'quantity', 'unit_price_ngwee',
+        'total_ngwee', 'modifier_ids', 'modifier_names', 'notes',
+    )}
 
 
-def order_dto(db,order):
-    payment=db.scalar(select(Payment).where(Payment.order_id==order.id))
-    refund=db.scalar(select(Refund).where(Refund.order_id==order.id))
-    lines=db.scalars(select(OrderLine).where(OrderLine.order_id==order.id).order_by(OrderLine.position))
-    return dict(id=order.id,number=order.number,business_day_id=order.business_day_id,status=order.status,
-                created_at=order.created_at,cashier_name=order.cashier_name,
-                lines=[line_dto(line) for line in lines],total_ngwee=order.total_ngwee,
-                payment=payment_dto(payment),refunded=refund is not None,refund_reason=refund.reason if refund else None,offline=order.offline)
+def order_dto(db, order):
+    payment = db.scalar(select(Payment).where(Payment.order_id == order.id))
+    refund = db.scalar(select(Refund).where(Refund.order_id == order.id))
+    lines = db.scalars(select(OrderLine).where(OrderLine.order_id == order.id).order_by(OrderLine.position))
+    correction = db.scalar(select(SaleCorrection).where(or_(
+        SaleCorrection.original_order_id == order.id,
+        SaleCorrection.replacement_order_id == order.id,
+    )))
+    day = current(db)
+    correctable = bool(
+        day and day.id == order.business_day_id and refund is None
+        and latest_order_id(db, day.id) == order.id
+    )
+    return dict(
+        id=order.id, number=order.number, business_day_id=order.business_day_id,
+        status=order.status, created_at=order.created_at, cashier_name=order.cashier_name,
+        lines=[line_dto(line) for line in lines], total_ngwee=order.total_ngwee,
+        payment=payment_dto(payment), refunded=refund is not None,
+        refund_reason=refund.reason if refund else None, offline=order.offline,
+        correctable=correctable,
+        correction_status=correction.status if correction else None,
+        corrected_by_order_id=(correction.replacement_order_id if correction and correction.original_order_id == order.id else None),
+        corrects_order_id=(correction.original_order_id if correction and correction.replacement_order_id == order.id else None),
+    )
 
 
-def checkout(db,actor,command):
+def _correction_for_checkout(db, actor, day, original_order_id):
+    correction = db.scalar(select(SaleCorrection).where(
+        SaleCorrection.original_order_id == original_order_id,
+    ))
+    if not correction or correction.status != 'PENDING':
+        raise HTTPException(409, 'This correction is no longer available')
+    if correction.actor_id != actor.id:
+        raise HTTPException(403, 'Only the staff member who started this correction can complete it')
+    if correction.business_day_id != day.id or latest_order_id(db, day.id) != original_order_id:
+        correction.status = 'LOCKED'
+        raise HTTPException(409, 'A newer sale has locked this correction')
+    return correction
+
+
+def _lock_abandoned_corrections(db, day):
+    corrections = db.scalars(select(SaleCorrection).where(
+        SaleCorrection.business_day_id == day.id,
+        SaleCorrection.status == 'PENDING',
+    )).all()
+    for correction in corrections:
+        correction.status = 'LOCKED'
+
+
+def checkout(db, actor, command):
     lock_branch(db)
-    payload=command.model_dump(mode='json')
-    digest=hashlib.sha256(json.dumps(payload,sort_keys=True,separators=(',',':')).encode()).hexdigest()
-    existing=db.scalar(select(Order).where(Order.idempotency_key==command.idempotency_key))
+    payload = command.model_dump(mode='json')
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    existing = db.scalar(select(Order).where(Order.idempotency_key == command.idempotency_key))
     if existing:
-        if existing.payload_hash!=digest or existing.actor_id!=actor.id:
-            raise HTTPException(409,'Idempotency key is already used for a different checkout')
-        return order_dto(db,existing)
-    day=current(db,required=True)
-    if day.id!=command.business_day_id:
-        raise HTTPException(409,'This sale belongs to a different or closed business day; manager review is required')
-    quote,consumption=price_lines(db,command.lines)
+        if existing.payload_hash != digest or existing.actor_id != actor.id:
+            raise HTTPException(409, 'Idempotency key is already used for a different checkout')
+        return order_dto(db, existing)
+
+    day = current(db, required=True)
+    if day.id != command.business_day_id:
+        raise HTTPException(409, 'This sale belongs to a different or closed business day; manager review is required')
+    correction = (_correction_for_checkout(db, actor, day, command.corrects_order_id)
+                  if command.corrects_order_id else None)
+    if correction is None:
+        _lock_abandoned_corrections(db, day)
+
+    quote, consumption = price_lines(db, command.lines)
     if quote['total_ngwee'] > 2_000_000_000:
-        raise HTTPException(422,'Order exceeds the supported amount')
+        raise HTTPException(422, 'Order exceeds the supported amount')
     tracking_inventory = get_settings(db).inventory_tracking_enabled
     if tracking_inventory:
-        for item_id,quantity in consumption.items():
-            if inventory.expected_on_hand(db,item_id)<quantity:
-                raise HTTPException(409,'Insufficient stock for this order')
-    order=Order(id=new_id(),number=f'A{day.next_order_number:03d}',business_day_id=day.id,actor_id=actor.id,status='SERVED',
-                cashier_name=actor.name,
-                total_ngwee=quote['total_ngwee'],idempotency_key=command.idempotency_key,payload_hash=digest,offline=command.offline)
-    day.next_order_number+=1
+        for item_id, quantity in consumption.items():
+            if inventory.expected_on_hand(db, item_id) < quantity:
+                raise HTTPException(409, 'Insufficient stock for this order')
+
+    order = Order(
+        id=new_id(), number=f'A{day.next_order_number:03d}', business_day_id=day.id,
+        actor_id=actor.id, status='SERVED', cashier_name=actor.name,
+        total_ngwee=quote['total_ngwee'], idempotency_key=command.idempotency_key,
+        payload_hash=digest, offline=command.offline,
+    )
+    day.next_order_number += 1
     db.add(order)
     db.flush()
-    db.add_all([OrderLine(order_id=order.id,position=position,**line) for position,line in enumerate(quote['lines'])])
-    record_payment(db,actor,order,command.payment)
+    db.add_all([OrderLine(order_id=order.id, position=position, **line)
+                for position, line in enumerate(quote['lines'])])
+    record_payment(db, actor, order, command.payment)
     if tracking_inventory:
-        for item_id,quantity in consumption.items():
-            inventory.record_movement(db,actor,item_id,'SALE_CONSUMPTION',-quantity,'Recipe consumption',reference=order.id,correlation_id=order.id)
-    record(db,actor,'ORDER_CREATED','order',order.id,{'total_ngwee':order.total_ngwee,'number':order.number,'offline':order.offline},order.id)
-    return order_dto(db,order)
+        for item_id, quantity in consumption.items():
+            inventory.record_movement(
+                db, actor, item_id, 'SALE_CONSUMPTION', -quantity,
+                'Recipe consumption', reference=order.id, correlation_id=order.id,
+            )
+    if correction:
+        correction.replacement_order_id = order.id
+        correction.status = 'COMPLETED'
+        correction.completed_at = utcnow()
+        record(db, actor, 'ORDER_CORRECTION_COMPLETED', 'order', order.id, {
+            'original_order_id': correction.original_order_id,
+            'correction_id': correction.id,
+        }, correction.id)
+    record(db, actor, 'ORDER_CREATED', 'order', order.id, {
+        'total_ngwee': order.total_ngwee, 'number': order.number,
+        'offline': order.offline, 'corrects_order_id': command.corrects_order_id,
+    }, order.id)
+    return order_dto(db, order)
 
 
-def list_orders(db,active=False):
-    query=select(Order)
+def list_orders(db, active=False):
+    query = select(Order)
     if active:
-        query=query.where(Order.status!='SERVED',~select(Refund.id).where(Refund.order_id==Order.id).exists()).order_by(Order.created_at)
+        query = query.where(Order.status != 'SERVED', ~select(Refund.id).where(
+            Refund.order_id == Order.id).exists()).order_by(Order.created_at)
     else:
-        query=query.order_by(Order.created_at.desc()).limit(200)
-    return [order_dto(db,order) for order in db.scalars(query)]
+        query = query.order_by(Order.created_at.desc()).limit(200)
+    return [order_dto(db, order) for order in db.scalars(query)]

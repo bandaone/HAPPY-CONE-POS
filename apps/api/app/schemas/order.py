@@ -36,6 +36,7 @@ class CheckoutCommand(QuoteCommand):
     business_day_id: str = Field(min_length=1,max_length=36)
     payment: PaymentCommand
     offline: StrictBool = False
+    corrects_order_id: str | None = Field(default=None, min_length=1, max_length=36)
 
     @model_validator(mode='after')
     def offline_cash_only(self):
@@ -50,4 +51,8 @@ class StatusCommand(Command):
 
 
 class RefundCommand(Command):
+    reason: Reason
+
+
+class CorrectionCommand(Command):
     reason: Reason

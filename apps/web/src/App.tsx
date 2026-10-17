@@ -160,6 +160,7 @@ export default function App() {
   const [checkoutAttempt, setCheckoutAttempt] =
     useState<CheckoutCommand | null>(null);
   const [receipt, setReceipt] = useState<Order | null>(null);
+  const [correctingOrderId, setCorrectingOrderId] = useState<string | null>(null);
   const [pendingReceipt, setPendingReceipt] = useState<PendingCheckout | null>(
     null,
   );
@@ -441,6 +442,7 @@ export default function App() {
       clearAttempt(namespace);
       setCheckoutAttempt(null);
       setCart([]);
+      setCorrectingOrderId(null);
       setPayment(false);
       setReceipt(order);
       await refresh();
@@ -711,6 +713,17 @@ export default function App() {
                     client={client}
                     canManage={canManage}
                     onReceipt={setReceipt}
+                    onCorrect={(order) => {
+                      setCart(order.lines.map((line) => ({
+                        variant_id: line.variant_id,
+                        quantity: line.quantity,
+                        modifier_ids: line.modifier_ids ?? [],
+                        notes: line.notes,
+                      })));
+                      setCorrectingOrderId(order.id);
+                      navigate("pos");
+                      notify(`Receipt ${order.number} is ready to correct. Check the cart and take payment again.`);
+                    }}
                     onChanged={refresh}
                   />
                 )}
@@ -788,6 +801,7 @@ export default function App() {
           day={day}
           attempt={checkoutAttempt}
           offline={offline}
+          correctsOrderId={correctingOrderId}
           onClose={() => setPayment(false)}
           onSubmit={submitCheckout}
         />

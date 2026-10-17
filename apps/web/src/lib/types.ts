@@ -172,6 +172,7 @@ export interface PricedLine {
   quantity: number;
   unit_price_ngwee: number;
   total_ngwee: number;
+  modifier_ids?: string[];
   modifier_names: string[];
   notes: string;
 }
@@ -196,6 +197,7 @@ export interface CheckoutCommand {
   lines: CartLine[];
   payment: CheckoutPayment;
   offline: boolean;
+  corrects_order_id?: string | null;
 }
 
 export interface OrderPayment {
@@ -221,6 +223,10 @@ export interface Order {
   refunded: boolean;
   refund_reason: string | null;
   offline: boolean;
+  correctable?: boolean;
+  correction_status?: "PENDING" | "COMPLETED" | "LOCKED" | null;
+  corrected_by_order_id?: string | null;
+  corrects_order_id?: string | null;
 }
 
 export interface ProductSummary {
@@ -390,6 +396,7 @@ export interface POSClient {
   orders(active?: boolean): Promise<Order[]>;
   transition(order: Order, status: OrderStatus): Promise<Order>;
   refund(order: Order, reason: string): Promise<Order>;
+  correct(order: Order, reason: string): Promise<Order>;
   inventory(): Promise<InventoryItem[]>;
   movements(itemId?: string): Promise<Movement[]>;
   movement(input: MovementInput): Promise<Movement>;

@@ -349,6 +349,11 @@ export class ApiClient implements POSClient {
       method: "POST",
       body: JSON.stringify({ reason }),
     });
+  correct = (order: Order, reason: string) =>
+    this.request<Order>(`/orders/${encodeURIComponent(order.id)}/correction`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    });
   inventory = () => this.request<InventoryItem[]>("/inventory");
   movements = (itemId?: string) =>
     this.request<Movement[]>(

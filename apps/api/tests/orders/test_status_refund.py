@@ -57,3 +57,116 @@ def test_closed_day_blocks_refund(client,login):
     assert closed['variance_ngwee']==0
     assert client.post(f"/api/orders/{sale['id']}/refund",headers=headers,json={'reason':'Late request'}).status_code==409
     assert client.get('/api/reports/daily',headers=headers).json()==closed['summary']
+
+
+def test_cashier_corrects_latest_sale_and_replacement_links_exact_stock(client, login):
+    from decimal import Decimal
+
+    from sqlalchemy import select
+
+    from app.models.inventory import StockMovement
+
+    enable_inventory_tracking(client)
+    cashier = login('cashier')
+    day = open_day(client, cashier)
+    sale = client.post('/api/orders', headers=cashier,
+                       json=command(day, key='original-sale')).json()
+    assert sale['lines'][0]['modifier_ids'] == ['cone', 'oreo']
+
+    corrected = client.post(f"/api/orders/{sale['id']}/correction", headers=cashier,
+                            json={'reason': 'Customer changed to another item'})
+    assert corrected.status_code == 200
+    assert corrected.json()['payment']['status'] == 'REFUNDED'
+    assert corrected.json()['correction_status'] == 'PENDING'
+    assert corrected.json()['correctable'] is False
+
+    with client.app.state.session_factory() as db:
+        movements = db.scalars(select(StockMovement).where(
+            StockMovement.reference == sale['id'])).all()
+        by_item = {}
+        for movement in movements:
+            by_item[movement.item_id] = by_item.get(movement.item_id, Decimal('0')) + movement.quantity
+        assert by_item == {
+            'vanilla-stock': Decimal('0'), 'cones': Decimal('0'),
+            'oreo-stock': Decimal('0'), 'napkins': Decimal('0'),
+        }
+        assert {movement.type for movement in movements} == {
+            'SALE_CONSUMPTION', 'SALE_CORRECTION_RETURN',
+        }
+
+    replacement_command = command(day, key='replacement-sale')
+    replacement_command['corrects_order_id'] = sale['id']
+    replacement = client.post('/api/orders', headers=cashier, json=replacement_command)
+    assert replacement.status_code == 201
+    assert replacement.json()['corrects_order_id'] == sale['id']
+    assert replacement.json()['correction_status'] == 'COMPLETED'
+    original = client.get(f"/api/orders/{sale['id']}", headers=cashier).json()
+    assert original['corrected_by_order_id'] == replacement.json()['id']
+
+
+def test_only_latest_sale_can_be_corrected_and_unrelated_sale_locks_pending(client, login):
+    cashier = login('cashier')
+    day = open_day(client, cashier)
+    first = client.post('/api/orders', headers=cashier,
+                        json=command(day, key='first-sale')).json()
+    second = client.post('/api/orders', headers=cashier,
+                         json=command(day, key='second-sale')).json()
+    blocked = client.post(f"/api/orders/{first['id']}/correction", headers=cashier,
+                          json={'reason': 'Too late to correct'})
+    assert blocked.status_code == 409
+    assert 'latest' in blocked.json()['detail'].lower()
+
+    started = client.post(f"/api/orders/{second['id']}/correction", headers=cashier,
+                          json={'reason': 'Customer changed order'})
+    assert started.status_code == 200
+    unrelated = client.post('/api/orders', headers=cashier,
+                            json=command(day, key='unrelated-sale'))
+    assert unrelated.status_code == 201
+    attempted = command(day, key='late-replacement')
+    attempted['corrects_order_id'] = second['id']
+    response = client.post('/api/orders', headers=cashier, json=attempted)
+    assert response.status_code == 409
+    assert client.get(f"/api/orders/{second['id']}", headers=cashier).json()['correction_status'] == 'LOCKED'
+
+
+def test_correction_requires_reason_and_open_day(client, login):
+    cashier = login('cashier')
+    manager = login('manager')
+    day = open_day(client, cashier)
+    sale = client.post('/api/orders', headers=cashier,
+                       json=command(day, key='close-before-correction')).json()
+    assert client.post(f"/api/orders/{sale['id']}/correction", headers=cashier,
+                       json={'reason': ''}).status_code == 422
+    client.post('/api/business-day/close', headers=manager,
+                json={'actual_cash_ngwee': 54200})
+    assert client.post(f"/api/orders/{sale['id']}/correction", headers=manager,
+                       json={'reason': 'Found after close'}).status_code == 409
+
+
+def test_competing_correction_requests_reverse_sale_once(client, login):
+    from concurrent.futures import ThreadPoolExecutor
+
+    from sqlalchemy import func, select
+
+    from app.models.correction import SaleCorrection
+    from app.models.inventory import StockMovement
+
+    enable_inventory_tracking(client)
+    cashier = login('cashier')
+    day = open_day(client, cashier)
+    sale = client.post('/api/orders', headers=cashier,
+                       json=command(day, key='competing-correction')).json()
+    path = f"/api/orders/{sale['id']}/correction"
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses = list(pool.map(
+            lambda _: client.post(path, headers=cashier,
+                                  json={'reason': 'Correct once'}),
+            range(2),
+        ))
+    assert sorted(response.status_code for response in responses) == [200, 409]
+    with client.app.state.session_factory() as db:
+        assert db.scalar(select(func.count()).select_from(SaleCorrection)) == 1
+        assert db.scalar(select(func.count()).select_from(StockMovement).where(
+            StockMovement.reference == sale['id'],
+            StockMovement.type == 'SALE_CORRECTION_RETURN',
+        )) == 4

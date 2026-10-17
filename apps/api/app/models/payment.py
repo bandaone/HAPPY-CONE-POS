@@ -1,7 +1,10 @@
-from app.core.time import UTCDateTime
 from datetime import datetime
-from sqlalchemy import String, ForeignKey, CheckConstraint
+
+from sqlalchemy import CheckConstraint, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
+
+from app.core.time import UTCDateTime
+
 from .base import Base, new_id, utcnow
 
 
@@ -25,12 +28,13 @@ class Payment(Base):
 
 class Refund(Base):
     __tablename__ = 'refunds'
-    __table_args__ = (CheckConstraint('amount_ngwee >= 0'),)
+    __table_args__ = (CheckConstraint('amount_ngwee >= 0'), CheckConstraint("kind IN ('REFUND','CORRECTION')"))
     id: Mapped[str] = mapped_column(String(36),primary_key=True,default=new_id)
     order_id: Mapped[str] = mapped_column(ForeignKey('orders.id'),unique=True)
     payment_id: Mapped[str] = mapped_column(ForeignKey('payments.id'))
     business_day_id: Mapped[str] = mapped_column(ForeignKey('business_days.id'),index=True)
     amount_ngwee: Mapped[int]
+    kind: Mapped[str] = mapped_column(String(20), default='REFUND')
     reason: Mapped[str] = mapped_column(String(300))
     approved_by: Mapped[str] = mapped_column(ForeignKey('users.id'))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(),default=utcnow)
