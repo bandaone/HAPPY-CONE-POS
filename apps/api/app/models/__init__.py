@@ -13,6 +13,7 @@ from .catalog import (
 from .correction import SaleCorrection
 from .inventory import InventoryItem, StockCount, StockMovement
 from .order import Order, OrderLine
+from .outbox import ReportingOutbox, SyncState
 from .payment import Payment, Refund
 from .stand_settings import StandSettings
 from .user import AuthSession, User

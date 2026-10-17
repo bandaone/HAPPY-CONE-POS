@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import threading
 import time
 from uuid import uuid4
 
@@ -8,17 +9,21 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+
+from app.api.routes.auth import router as auth_router
+from app.api.routes.business_day import router as day_router
+from app.api.routes.catalog import router as catalog_router
+from app.api.routes.inventory import router as inventory_router
+from app.api.routes.orders import router as orders_router
+from app.api.routes.reports import router as reports_router
+from app.api.routes.stand_settings import router as stand_settings_router
+from app.api.routes.sync import router as sync_router
+from app.api.routes.users import router as users_router
 from app.core.config import Settings
 from app.core.db import make_database
 from app.core.rate_limit import LoginRateLimitMiddleware
-from app.api.routes.auth import router as auth_router
-from app.api.routes.catalog import router as catalog_router
-from app.api.routes.inventory import router as inventory_router
-from app.api.routes.business_day import router as day_router
-from app.api.routes.orders import router as orders_router
-from app.api.routes.reports import router as reports_router
-from app.api.routes.users import router as users_router
-from app.api.routes.stand_settings import router as stand_settings_router
+from app.domains.sync.worker import configured as sync_configured
+from app.domains.sync.worker import push_batch
 from app.realtime.orders import router as events_router
 
 
@@ -92,6 +97,7 @@ def create_app(settings: Settings | None = None, *, initialize: bool = False) ->
     api.include_router(reports_router)
     api.include_router(users_router)
     api.include_router(stand_settings_router)
+    api.include_router(sync_router)
     api.include_router(events_router)
 
     @api.get('/health')
@@ -103,6 +109,26 @@ def create_app(settings: Settings | None = None, *, initialize: bool = False) ->
         with api.state.session_factory() as db:
             db.execute(text('SELECT 1'))
         return {'status': 'ready', 'database': 'ok'}
+
+    if sync_configured(settings):
+        stop_sync = threading.Event()
+
+        def sync_loop():
+            while not stop_sync.is_set():
+                push_batch(api.state.session_factory, settings)
+                stop_sync.wait(settings.sync_interval_seconds)
+
+        @api.on_event("startup")
+        def start_sync_worker():
+            api.state.sync_thread = threading.Thread(
+                target=sync_loop, name="happycone-reporting-sync", daemon=True
+            )
+            api.state.sync_thread.start()
+
+        @api.on_event("shutdown")
+        def stop_sync_worker():
+            stop_sync.set()
+            api.state.sync_thread.join(timeout=5)
 
     return api
 

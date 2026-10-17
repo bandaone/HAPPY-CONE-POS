@@ -148,7 +148,7 @@ def test_cashier_name_migration_backfills_populated_database_and_retries(tmp_pat
     assert upgraded.returncode == 0, upgraded.stderr
     with engine.connect() as db:
         assert db.scalar(text("SELECT cashier_name FROM orders WHERE id = 'order-id'")) == 'Original Cashier'
-        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0012'
+        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0013'
         assert db.scalar(text('SELECT stand_name FROM stand_settings WHERE id = 1')) == 'Lusaka stand'
         assert db.scalar(text('SELECT tax_id FROM stand_settings WHERE id = 1')) == '1002681530'
         assert db.scalar(text('SELECT tax_label FROM stand_settings WHERE id = 1')) == 'TURNOVER TAX (TOT)'
@@ -190,7 +190,7 @@ def test_cashier_only_guidance_migration_updates_only_supplied_defaults(tmp_path
     upgraded = alembic('upgrade', 'head')
     assert upgraded.returncode == 0, upgraded.stderr
     with engine.connect() as db:
-        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0012'
+        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0013'
         row = db.execute(text(
             'SELECT ' + ', '.join(OLD_GUIDANCE) + ' FROM stand_settings WHERE id = 1'
         )).mappings().one()
@@ -320,7 +320,7 @@ def test_0009_preserves_financial_catalog_and_inventory_data(tmp_path):
     assert upgraded.returncode == 0, upgraded.stderr
     inspector = inspect(engine)
     with engine.connect() as db:
-        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0012'
+        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '0013'
         assert db.scalar(text(
             'SELECT inventory_tracking_enabled FROM stand_settings WHERE id = 1'
         )) in (False, 0)

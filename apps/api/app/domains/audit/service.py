@@ -1,4 +1,5 @@
 from sqlalchemy import select
+
 from app.models.audit import AuditEvent
 from app.models.user import User
 
@@ -9,6 +10,7 @@ def record(db, actor, action, entity, entity_id, metadata=None, correlation_id=N
     if correlation_id:
         event.correlation_id = correlation_id
     db.add(event)
+    db.info.setdefault("outbox_audits", []).append(event)
     return event
 
 

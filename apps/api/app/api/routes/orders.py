@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from app.api.deps import cashier, current_user, database, manager, server
+from app.api.deps import cashier, commit_result, current_user, database, manager, server
 from app.domains.catalog.service import price_lines
 from app.domains.orders import service
 from app.domains.orders.corrections import start_correction
@@ -26,8 +26,7 @@ def quote(command: QuoteCommand,user=Depends(cashier),db=Depends(database)):
 @router.post('',status_code=201)
 def checkout(command: CheckoutCommand,user=Depends(cashier),db=Depends(database)):
     result=service.checkout(db,user,command)
-    db.commit()
-    return result
+    return commit_result(db, result)
 
 
 @router.get('')
@@ -50,19 +49,16 @@ def order_ticket(order_id: str,user=Depends(current_user),db=Depends(database)):
 @router.post('/{order_id}/status')
 def status(order_id: str,command: StatusCommand,user=Depends(server),db=Depends(database)):
     result=transition(db,user,order_id,command)
-    db.commit()
-    return result
+    return commit_result(db, result)
 
 
 @router.post('/{order_id}/refund')
 def refund(order_id: str,command: RefundCommand,user=Depends(manager),db=Depends(database)):
     result=refund_order(db,user,order_id,command.reason)
-    db.commit()
-    return result
+    return commit_result(db, result)
 
 
 @router.post('/{order_id}/correction')
 def correction(order_id: str, command: CorrectionCommand, user=Depends(cashier), db=Depends(database)):
     result = start_correction(db, user, order_id, command.reason)
-    db.commit()
-    return result
+    return commit_result(db, result)

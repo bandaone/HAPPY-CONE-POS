@@ -1,8 +1,8 @@
-from zoneinfo import ZoneInfo
 from typing import Literal
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     login_rate_requests: int = Field(default=30, ge=1, le=1000)
     login_rate_window_seconds: int = Field(default=60, ge=1, le=3600)
     login_rate_capacity: int = Field(default=2048, ge=1, le=100_000)
+    supabase_url: str | None = None
+    supabase_service_role_key: SecretStr | None = None
+    sync_interval_seconds: int = Field(default=30, ge=5, le=3600)
+    sync_batch_size: int = Field(default=50, ge=1, le=500)
 
     @field_validator('branch_timezone')
     @classmethod

@@ -1,5 +1,6 @@
 from fastapi import Depends, HTTPException, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
 from app.domains.identity.service import session_user
 
 bearer = HTTPBearer(auto_error=False)
@@ -36,5 +37,8 @@ owner = roles('OWNER_ADMIN')
 
 def commit_result(db, result):
     """Commit before a success response can be serialized or sent."""
+    from app.domains.sync.outbox import enqueue_transaction
+
+    enqueue_transaction(db)
     db.commit()
     return result
