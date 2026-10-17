@@ -404,6 +404,122 @@ test("an offline cash sale survives reload and syncs once", async ({
   ).toHaveLength(1);
 });
 
+test("manager tracks stock, corrects the latest sale, records waste and closes the day", async ({
+  page,
+}) => {
+  const token = await signIn(page);
+  const headers = { Authorization: `Bearer ${token}` };
+  const inventory = (await (
+    await page.request.get("/api/inventory?include_inactive=true", { headers })
+  ).json()) as Array<{ id: string }>;
+  const activation = await page.request.post("/api/inventory/activate", {
+    headers,
+    data: {
+      opening_quantities: inventory.map((item) => ({
+        item_id: item.id,
+        quantity: "10000",
+      })),
+    },
+  });
+  expect(activation.ok()).toBe(true);
+
+  await openBusinessDay(page);
+  await addSeededVanilla(page);
+  await page.getByRole("button", { name: "Take payment", exact: true }).click();
+  await page.getByLabel("Cash received (K)").fill("50.00");
+  await page.getByRole("button", { name: "Confirm cash payment" }).click();
+  await page
+    .getByRole("dialog", { name: "Receipt A001" })
+    .getByRole("button", { name: "Done" })
+    .click();
+
+  let movements = (await (
+    await page.request.get("/api/inventory/movements", { headers })
+  ).json()) as Array<{ type: string; quantity: string }>;
+  expect(
+    movements.filter((movement) => movement.type === "SALE_CONSUMPTION"),
+  ).toHaveLength(4);
+
+  await page.getByRole("button", { name: "Sales", exact: true }).click();
+  await page.getByRole("button", { name: "Correct latest sale" }).click();
+  await page
+    .getByLabel("Required reason")
+    .fill("Customer requested a corrected serving");
+  await page.getByRole("button", { name: "Reverse and edit sale" }).click();
+  await expect(
+    page.getByText(/Receipt A001 is ready to correct/i),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Take payment", exact: true }).click();
+  await page.getByLabel("Cash received (K)").fill("50.00");
+  await page.getByRole("button", { name: "Confirm cash payment" }).click();
+  await page
+    .getByRole("dialog", { name: "Receipt A002" })
+    .getByRole("button", { name: "Done" })
+    .click();
+
+  const orders = (await (
+    await page.request.get("/api/orders", { headers })
+  ).json()) as Array<{
+    id: string;
+    number: string;
+    refunded: boolean;
+    correction_status: string | null;
+    corrects_order_id: string | null;
+  }>;
+  const original = orders.find((order) => order.number === "A001");
+  const replacement = orders.find((order) => order.number === "A002");
+  expect(original).toMatchObject({ refunded: true, correction_status: "COMPLETED" });
+  expect(replacement?.corrects_order_id).toBe(original?.id);
+
+  await addSeededVanilla(page);
+  await page
+    .getByRole("button", { name: "Record selected item as waste" })
+    .click();
+  const waste = page.getByRole("dialog", {
+    name: "Record prepared item as waste",
+  });
+  await waste.getByLabel("Waste reason").selectOption("DROPPED");
+  await waste.getByLabel("Waste comment").fill("Cone slipped before handover");
+  await waste.getByRole("button", { name: "Record waste", exact: true }).click();
+  await expect(page.getByText(/Waste recorded/i)).toBeVisible();
+
+  const report = await (
+    await page.request.get("/api/reports/daily", { headers })
+  ).json();
+  expect(report.net_sales_ngwee).toBe(4200);
+  expect(report.corrections_ngwee).toBe(4200);
+  expect(report.waste).toEqual([
+    expect.objectContaining({
+      reason: "DROPPED",
+      value_ngwee: 4200,
+      comment: "Cone slipped before handover",
+    }),
+  ]);
+
+  await page.getByRole("button", { name: "Cash day", exact: true }).click();
+  await page.getByRole("button", { name: "Close day", exact: true }).click();
+  await page.getByLabel("Actual cash").fill("542.00");
+  await page.getByRole("button", { name: "Confirm close" }).click();
+  await expect(page.getByText("Closed", { exact: true }).first()).toBeVisible();
+
+  const closedReport = await (
+    await page.request.get("/api/reports/daily", { headers })
+  ).json();
+  expect(closedReport.actual_cash_ngwee).toBe(54200);
+  expect(closedReport.variance_ngwee).toBe(0);
+  const sync = await (
+    await page.request.get("/api/sync/status", { headers })
+  ).json();
+  expect(sync.configured).toBe(false);
+  expect(sync.backlog).toBeGreaterThan(0);
+
+  movements = (await (
+    await page.request.get("/api/inventory/movements", { headers })
+  ).json()) as Array<{ type: string; quantity: string }>;
+  expect(movements.some((movement) => movement.type === "SALE_CORRECTION_RETURN")).toBe(true);
+  expect(movements.some((movement) => movement.type === "WASTE")).toBe(true);
+});
+
 test("owner edits stand details, receipt fields and staff access", async ({
   page,
 }) => {

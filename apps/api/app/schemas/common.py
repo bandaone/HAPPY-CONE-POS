@@ -1,6 +1,7 @@
-from typing import Annotated
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from decimal import Decimal
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 Money = Annotated[StrictInt, Field(ge=0, le=2_000_000_000)]
 Quantity = Annotated[Decimal, Field(gt=0, max_digits=15, decimal_places=3, allow_inf_nan=False)]

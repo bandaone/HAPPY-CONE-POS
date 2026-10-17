@@ -24,7 +24,7 @@ Copy this file for each release and fill every required result. Any blank or fai
 | Playwright full flow, accessibility scan and receipt overflow | |
 | Bundle-builder tests and full release manifest verification | |
 | PowerShell parser and all Pester tests on Windows | |
-| Clean offline wheelhouse install, timezone import and migration `0009` | |
+| Clean offline wheelhouse install, timezone import and migration `0013` | |
 | Container checks for the managed-Linux alternative | |
 
 ## Windows computer gate
@@ -50,7 +50,7 @@ Copy this file for each release and fill every required result. Any blank or fai
 | Manager menu, descriptions, prices, choices and availability | |
 | Cashier open day, fast checkout, receipt, reprint and close day | |
 | Cash, Mobile money and Card method recording and reconciliation | |
-| Existing inventory history retained without checkout stock changes | |
+| Optional stock activation, recipe consumption, correction return and waste movements | |
 | Refund, reports and activity record | |
 | Offline cash sale and reconnect sync | |
 | Archived price edit and restoration | |

@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
 from uuid import uuid4
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
 from sqlalchemy import Integer
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 def utcnow():

@@ -41,6 +41,9 @@ Describe 'Happy Cone operations script contracts' {
         $script | Should -Match 'pg_restore'
         $script | Should -Match "pg_restore\.exe'.+\| Out-Null"
         $script | Should -Match '\.tmp'
+        $script | Should -Match 'SELECT version_num FROM alembic_version'
+        $script | Should -Match 'migration=\$revision'
+        $script | Should -Not -Match "migration='0009'"
         $script.IndexOf('Assert-HappyConeBackupSpace') | Should -BeLessThan $script.IndexOf("'-Fc'")
         $script.IndexOf('Move-Item $temporaryArchive') | Should -BeLessThan $script.IndexOf('Get-HappyConePruneList')
     }
@@ -58,6 +61,8 @@ Describe 'Happy Cone operations script contracts' {
         $script | Should -Match 'ExpectedInstallIdentity'
         $script.IndexOf('Stop-Service HappyConeApi') | Should -BeLessThan $script.LastIndexOf('New-HappyConeBackup')
         $script | Should -Match "--single-transaction','--exit-on-error"
+        $script | Should -Match 'Invoke-HappyConeMigration'
+        $script.IndexOf("Invoke-HappyConeMigration -DatabaseName 'happycone'") | Should -BeLessThan $script.IndexOf('Start-Service HappyConeApi')
     }
 
     It 'installs permanent operations scripts and registers the daily backup' {

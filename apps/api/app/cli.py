@@ -2,10 +2,12 @@
 import argparse
 import os
 from pathlib import Path
-from alembic import command
+
 from alembic.config import Config
+
+from alembic import command
 from app.core.config import Settings
-from app.core.db import make_database, lock_branch
+from app.core.db import lock_branch, make_database
 from app.domains.identity.service import create_user
 from app.seed import seed_demo
 

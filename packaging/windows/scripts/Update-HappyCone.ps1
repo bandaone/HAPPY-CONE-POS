@@ -69,7 +69,7 @@ function Update-HappyCone {
         Start-Service HappyConeApi
         Wait-UpdateReady
         & (Join-Path $current 'scripts\Register-HappyConeBackupTask.ps1') -DataRoot $DataRoot
-        $state.version=[string]$manifest.version;$state.Complete=$true
+        $state.version=[string]$manifest.version;$state.migration=[string]$manifest.database_migration;$state.Complete=$true
         $state|Add-Member -NotePropertyName preUpdateBackup -NotePropertyValue $preUpdateBackup.FullName -Force
         $state|Add-Member -NotePropertyName lastUpdateAt -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
         Write-UpdateState $state $statePath

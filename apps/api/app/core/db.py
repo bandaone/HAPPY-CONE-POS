@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine, event, update
 from sqlalchemy.orm import sessionmaker
+
 from app.models import Base, BranchLock
 
 

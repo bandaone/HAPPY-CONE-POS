@@ -48,9 +48,9 @@ Create the first `OWNER_ADMIN` with `python -m app.cli create-user` and the `--p
 2. Close the business day if the release could interrupt service.
 3. Run an encrypted backup and verify its checksum and off-host copy.
 4. Pull or check out the reviewed release tag and build immutable images.
-5. Run the migration command once, then replace the API and web services. Migration `0009_menu_sales_mode` adds product-specific choices, disables stock enforcement, and updates untouched supplied guidance while preserving owner wording and existing business data; confirm `0009` is at head.
+5. Run the migration command once, then replace the API and web services. Migrations `0010` through `0013` add audited sale corrections, stock activation, waste records, and the reporting outbox while preserving existing users, menu, sales, payments, inventory ledger, and audit records; confirm `0013` is at head.
 6. Run `./scripts/production-check.sh` through the TLS URL by setting `HAPPYCONE_BASE_URL`.
-7. Complete a signed-in smoke test: create or edit a test menu item, price, and choice set as a manager; make low-value Cash, Mobile money, and Card sales; confirm each receipt, the completed sales, unchanged inventory history, report, and activity log. Archive the test item afterward if it is not part of the live menu.
+7. Complete a signed-in smoke test: create or edit a test menu item, price, and choice set as a manager; make low-value Cash, Mobile money, and Card sales; confirm each receipt, completed sale, payment split, recipe stock use (when tracking is active), report, and activity log. Archive the test item afterward if it is not part of the live menu.
 8. Record release version, operator, start/end time, migration result, backup identifier and smoke-test result.
 
 ## Backups and restore rehearsal

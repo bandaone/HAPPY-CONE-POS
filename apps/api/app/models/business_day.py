@@ -1,7 +1,10 @@
-from app.core.time import UTCDateTime
 from datetime import datetime
-from sqlalchemy import String, ForeignKey, JSON, CheckConstraint, Index, text
+
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column
+
+from app.core.time import UTCDateTime
+
 from .base import Base, new_id, utcnow
 
 

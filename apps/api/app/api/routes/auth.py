@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, Request
-from app.api.deps import database, current_user, bearer, manager, commit_result
-from app.schemas.auth import LoginCommand, PasswordChangeCommand
-from app.domains.identity.service import authenticate, change_password, user_dto
-from app.domains.audit.service import history, record
+
+from app.api.deps import bearer, commit_result, current_user, database, manager
 from app.core.security import token_digest
+from app.domains.audit.service import history, record
+from app.domains.identity.service import authenticate, change_password, user_dto
 from app.models.user import AuthSession
+from app.schemas.auth import LoginCommand, PasswordChangeCommand
 
 router = APIRouter(prefix='/api')
 

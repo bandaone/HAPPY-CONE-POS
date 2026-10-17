@@ -54,6 +54,11 @@ function errorText(error: unknown): string {
     ? error.message
     : "Something went wrong. Please try again.";
 }
+function paymentMethodName(method: Order["payment"]["method"]): string {
+  if (method === "CASH") return "Cash";
+  if (method === "CARD_MANUAL") return "Card";
+  return "Mobile money";
+}
 function statusTone(status: string): "neutral" | "green" | "orange" | "red" {
   if (
     [
@@ -1146,7 +1151,7 @@ export function Reports({ client }: { client: POSClient }) {
                 <tbody>{report.sales.map((sale) => <tr key={sale.order_id}>
                   <td><strong>{sale.receipt_number}</strong>{sale.corrects_receipt_number && <div className="table-detail">Corrects {sale.corrects_receipt_number}</div>}</td>
                   <td>{timeOf(sale.created_at)}<div className="table-detail">{sale.cashier_name}</div></td>
-                  <td>{readable(sale.payment_method)}</td>
+                  <td>{paymentMethodName(sale.payment_method)}</td>
                   <td>{sale.reversal_ngwee ? <Badge tone="red">Reversed</Badge> : <Badge tone="green">Completed</Badge>}{sale.reason && <div className="table-detail">{sale.reason}</div>}</td>
                   <td className="table-numeric"><strong>{money(sale.net_ngwee)}</strong></td>
                 </tr>)}</tbody>
@@ -1348,7 +1353,7 @@ export function Sales({ client, canManage, onReceipt, onCorrect, onChanged }: Sa
                         {label}
                       </Badge>
                     </td>
-                    <td>{readable(order.payment.method)}</td>
+                    <td>{paymentMethodName(order.payment.method)}</td>
                     <td className="table-numeric">
                       <strong>{money(order.total_ngwee)}</strong>
                     </td>
@@ -1434,7 +1439,7 @@ export function Sales({ client, canManage, onReceipt, onCorrect, onChanged }: Sa
             </div>
             <div className="key-value">
               <span>Payment</span>
-              <strong>{readable(selected.payment.method)}</strong>
+              <strong>{paymentMethodName(selected.payment.method)}</strong>
             </div>
             {selected.lines.map((line, index) => (
               <div className="key-value" key={`${line.variant_id}-${index}`}>

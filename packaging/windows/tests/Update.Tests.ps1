@@ -21,6 +21,7 @@ Describe 'Happy Cone update contract' {
         $script | Should -Match 'Add-Member -NotePropertyName preUpdateBackup'
         $script | Should -Match 'Test-Path \$previous'
         $script | Should -Match 'originalStateJson'
+        $script | Should -Match 'migration=\[string\]\$manifest.database_migration'
         $script.IndexOf('$previousMoved=$true') | Should -BeLessThan $script.IndexOf('Rename-Item $next')
     }
 }

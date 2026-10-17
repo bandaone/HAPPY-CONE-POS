@@ -1,12 +1,14 @@
 import hmac
 from datetime import timedelta, timezone
-from sqlalchemy import delete, func, select
+
 from fastapi import HTTPException
-from app.core.security import hash_password, verify_password, token_digest, new_token
+from sqlalchemy import delete, func, select
+
 from app.core.db import lock_branch
-from app.models.user import User, AuthSession
-from app.models.base import utcnow
+from app.core.security import hash_password, new_token, token_digest, verify_password
 from app.domains.audit.service import record
+from app.models.base import utcnow
+from app.models.user import AuthSession, User
 
 DUMMY_HASH = hash_password('not-a-real-account-password')
 

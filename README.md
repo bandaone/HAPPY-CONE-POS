@@ -76,7 +76,7 @@ The catalog call requires authentication in normal use, so an HTTP `401` confirm
 For the supported offline Windows shop-server package, see [Windows installation](docs/implementation/windows-installation.md). Build a checksummed release folder on the development computer with:
 
 ```bash
-./scripts/build-windows-bundle.sh --version 1.0.6 --cache /path/to/verified-cache --output build/windows
+./scripts/build-windows-bundle.sh --version 1.1.0 --cache /path/to/verified-cache --output build/windows
 ```
 
 The release contains the web app, API, Windows Python wheelhouse, PostgreSQL, Caddy, WinSW, age, and the lifecycle PowerShell commands. The shop computer does not need Docker, Node.js, Git, WSL, compilers, or internet access.

@@ -1,8 +1,9 @@
-from datetime import datetime, timedelta, timezone
 import time
+from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
+
 from app.models.user import AuthSession, User
 
 

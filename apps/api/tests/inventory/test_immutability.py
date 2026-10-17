@@ -1,8 +1,9 @@
 import pytest
-from sqlalchemy import select, update, delete
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import DBAPIError
-from app.models.inventory import StockMovement
+
 from app.models.audit import AuditEvent
+from app.models.inventory import StockMovement
 
 
 @pytest.mark.parametrize('model',[StockMovement, AuditEvent])
@@ -20,11 +21,11 @@ def test_ledgers_reject_database_update_and_delete(client, model):
 
 
 def test_original_sale_and_closed_day_cannot_be_rewritten(client,login):
-    from tests.orders.test_checkout import command,open_day
-    from app.models.order import Order,OrderLine
-    from app.models.payment import Payment,Refund
-    from app.models.business_day import BusinessDay,CashMovement
+    from app.models.business_day import BusinessDay, CashMovement
     from app.models.inventory import StockCount
+    from app.models.order import Order, OrderLine
+    from app.models.payment import Payment, Refund
+    from tests.orders.test_checkout import command, open_day
     headers = login()
     day = open_day(client,headers)
     sale = client.post('/api/orders',headers=headers,json=command(day)).json()

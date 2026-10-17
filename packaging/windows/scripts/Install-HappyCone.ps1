@@ -315,7 +315,7 @@ function Install-HappyCone {
         $programs = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs'
         New-HappyConeShortcut (Join-Path $desktop 'Happy Cone POS.lnk') "$env:SystemRoot\System32\cmd.exe" "/c start http://$($network.IPv4):$WebPort"
         New-HappyConeShortcut (Join-Path $programs 'Happy Cone POS.lnk') "$env:SystemRoot\System32\cmd.exe" "/c start http://$($network.IPv4):$WebPort"
-        $state.ServicesInstalled=$true; $state.Complete=$true; $state.version=$version; $state.targetVersion=$version; $state.address="http://$($network.IPv4):$WebPort"
+        $state.ServicesInstalled=$true; $state.Complete=$true; $state.version=$version; $state.targetVersion=$version; $state.migration=$manifest.database_migration; $state.address="http://$($network.IPv4):$WebPort"
         Save-HappyConeState $state $statePath
         Write-Host "Happy Cone is ready at $($state.address)"
     } catch {

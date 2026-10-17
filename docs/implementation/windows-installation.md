@@ -1,4 +1,4 @@
-# Install Happy Cone on the shop Windows computer
+# Install or update Happy Cone on the shop Windows computer
 
 This is the supported setup for the 64-bit Windows 10 or Windows 11 shop computer with 4 GB RAM and 128 GB storage. It runs PostgreSQL, one Happy Cone API worker, and Caddy as automatic Windows services. The computer does not need Docker, WSL, Node.js, Git, compilers, or internet access.
 
@@ -8,18 +8,18 @@ On the Ubuntu development computer, build a numbered release:
 
 ```bash
 ./scripts/build-windows-bundle.sh \
-  --version 1.0.6 \
+  --version 1.1.0 \
   --cache /tmp/happycone-vendor-cache \
   --output build/windows
 ```
 
-Use the prepared `HappyCone-Windows-1.0.6.zip` and `HappyCone-Windows-1.0.6.zip.sha256` files. Copy both files to a USB drive. The ZIP is self-contained; the shop computer will not download any installation files. `release-manifest.json` protects every application, installer, runtime, script, and configuration file with SHA-256.
+Use the prepared `HappyCone-Windows-1.1.0.zip` and `HappyCone-Windows-1.1.0.zip.sha256` files. Copy both files to a USB drive. The ZIP is self-contained; the shop computer will not download any installation files. `release-manifest.json` protects every application, installer, runtime, script, and configuration file with SHA-256.
 
 Before moving the USB, verify the transfer ZIP on Ubuntu:
 
 ```bash
 cd /home/on3/Downloads
-sha256sum --check HappyCone-Windows-1.0.6.zip.sha256
+sha256sum --check HappyCone-Windows-1.1.0.zip.sha256
 ```
 
 ## Prepare Windows
@@ -28,21 +28,21 @@ sha256sum --check HappyCone-Windows-1.0.6.zip.sha256
 2. Install all available Windows updates and restart.
 3. Set the shop network to **Private** in **Settings → Network & internet → Properties**.
 4. Keep at least 10 GB free on the Windows drive. Close unnecessary startup applications on the 4 GB computer.
-5. Copy both release files from USB to the Windows desktop. In Windows PowerShell, run `Get-FileHash "$HOME\Desktop\HappyCone-Windows-1.0.6.zip" -Algorithm SHA256` and confirm it equals `ec1edf228e054c7099bea5f93b48ae0c1e8865470bbf487488b66c1c1ebb9c52`.
-6. Right-click the ZIP, select **Extract All**, keep the default destination, then open the extracted `HappyCone-Windows-1.0.6` folder. `START-HAPPY-CONE.cmd` must be directly inside that folder, beside `api`, `config`, `installers`, `runtime`, `scripts`, `web`, and `wheelhouse`.
+5. Copy both release files from USB to the Windows desktop. In Windows PowerShell, run `Get-FileHash "$HOME\Desktop\HappyCone-Windows-1.1.0.zip" -Algorithm SHA256` and confirm it equals `a486eb5b650bb91749929c6f72dfd374ef22e15bd319bc273a2965c1253681c9`, the value also printed inside `HappyCone-Windows-1.1.0.zip.sha256`.
+6. Right-click the ZIP, select **Extract All**, keep the default destination, then open the extracted `HappyCone-Windows-1.1.0` folder. `START-HAPPY-CONE.cmd` must be directly inside that folder, beside `api`, `config`, `installers`, `runtime`, `scripts`, `web`, and `wheelhouse`.
 7. Open **Windows PowerShell as Administrator**. Use Windows PowerShell 5.1, the blue Windows application included with Windows.
 
 Run preflight from inside the extracted release folder:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
-cd "$HOME\Desktop\HappyCone-Windows-1.0.6"
+cd "$HOME\Desktop\HappyCone-Windows-1.1.0"
 .\scripts\Test-HappyConeComputer.ps1 -WebPort 8080
 ```
 
 Do not continue if `CanInstall` is false. Correct every blocking error first. Preflight does not change Windows. A computer sold with 4 GB RAM may report less than 4.00 GiB after hardware reservation; the supported reported floor is 3.50 GiB.
 
-## Install or resume production setup
+## New installation
 
 Double-click `START-HAPPY-CONE.cmd` in the extracted release folder and approve the Windows Administrator prompt. The guided setup runs preflight, asks for the first owner's real name, username and protected password, and then completes installation. The password must contain 12 to 256 characters and is never written to the installer log or command line.
 
@@ -52,11 +52,25 @@ If Windows blocks double-clicked command files, open Administrator PowerShell in
 .\scripts\Start-HappyConeSetup.ps1
 ```
 
-The setup is safe to run again after an interruption. Release 1.0.6 includes the early-install recovery added after 1.0.1, the pinned Microsoft Visual C++ x64 runtime, and the database-directory permission fixes verified in 1.0.5. It verifies PostgreSQL before initializing the database.
+The setup is safe to run again after an interruption. Release 1.1.0 contains the pinned Microsoft Visual C++ x64 runtime, database-directory permission fixes, detailed reconciliation, sale correction, optional stock and waste tracking, and offline-safe remote reporting. It verifies PostgreSQL before initializing the database.
 
 A successful installation prints the address staff should open, such as `http://192.168.1.20:8080`. It creates one owner account and an empty production database. It does not create sample staff, sample menu items, opening stock, or sales.
 
 The installer may be run again after an interruption. It records completed phases and never deletes an initialized database. It removes only an incomplete cluster left before database initialization; if a database phase or service was recorded, it stops instead of overwriting data.
+
+## Update an existing Happy Cone computer
+
+Do not uninstall the working release and do not run the new-install command. Keep the extracted 1.1.0 folder on the local drive, open **Windows PowerShell as Administrator**, and run:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+$Bundle = "$HOME\Desktop\HappyCone-Windows-1.1.0"
+& 'C:\Program Files\HappyCone\current\scripts\Update-HappyCone.ps1' -BundleRoot $Bundle
+```
+
+The updater verifies every release file, refuses an older or equal version, creates and verifies a database backup, stops checkout writes, installs the new application beside the old version, migrates the database to `0013`, and starts the new services. Existing users, menu, sales, stand settings, stock records, and `C:\ProgramData\HappyCone\api.env` are preserved.
+
+If the update reports an error, save the complete message. The application files and service configuration return to the previous version automatically. Do not uninstall or delete `C:\ProgramData\HappyCone`. The pre-update backup path is recorded in `C:\ProgramData\HappyCone\install-state.json` and the update-failure log. Follow [Windows recovery](windows-recovery.md) if the database also needs to be restored.
 
 ## Fix the network address
 
@@ -87,7 +101,7 @@ The database, API, and web entry point start automatically with Windows. After a
 & 'C:\Program Files\HappyCone\current\scripts\Get-HappyConeStatus.ps1'
 ```
 
-The result should show all three services as `Running`, `Health` and `Ready` as `True`, schema `0009`, adequate free disk, and a recent backup. A daily backup runs at 02:00 and keeps the latest 30 successful local backups.
+The result should show all three services as `Running`, `Health` and `Ready` as `True`, schema `0013`, adequate free disk, and a recent backup. A daily backup runs at 02:00 and keeps the latest 30 successful local backups.
 
 ## Acceptance before real sales
 
@@ -98,10 +112,20 @@ Complete all of these on the actual shop computer:
 - Test Owner administrator, Manager, and Cashier accounts.
 - Create a real menu item and price, attach any required choices, sell it, and confirm the sale and receipt show those choices.
 - Confirm Cash shows change before confirmation, while Mobile money and Card each record the method with one tap and no provider/reference entry.
-- Confirm sales do not change retained inventory balances in this release.
-- Open and close a business day; check payments, reports, activity, receipt reprint, and cash reconciliation.
+- If stock tracking is needed, enter current opening quantities under **Stock**, start tracking once, make a controlled sale, and confirm the exact recipe quantities appear in the movement ledger. Menu and sales can operate without activating stock.
+- Record one controlled waste item with a reason and confirm its selling value appears in the daily report.
+- Correct the latest sale before making another sale, complete its replacement, and confirm both the reversal and replacement remain in the audit trail.
+- Open and close a business day; check item quantities and values, payments, cash activity, stock used, waste, receipt reprint, expected cash, actual cash, and variance.
 - Create a backup, export it encrypted, and complete a restore rehearsal.
 - Commission the exact Xprinter model using [the printer checklist](xprinter-commissioning.md).
 - Record idle and checkout memory use. On the 4 GB PC, close unrelated applications if Windows begins paging heavily.
 
 A failed check blocks live sales until corrected.
+
+## Receipt printer check
+
+Install the exact Xprinter driver for the printer model and select the Xprinter in the browser print dialog. Do not select **HP DesignJet PostScript** or another large-format driver. Set the driver and Happy Cone receipt width to the same roll size, 58 mm or 80 mm. Use 100% scale, zero or minimum margins, one copy, and disable headers, footers, fit-to-page, and continuous/banner paper. Print a Windows test page first, then one Happy Cone receipt. If blank paper feeds continuously, cancel the job, clear the Windows print queue, switch away from the PostScript/DesignJet driver, and repeat the [Xprinter commissioning checklist](xprinter-commissioning.md).
+
+## LAN and internet checks
+
+Happy Cone works without internet as long as the shop computer and local router are on. Other staff devices must join the same router or local network as the shop computer. Changing the router or Wi-Fi can assign the shop computer a different address; run `ipconfig`, open the current IPv4 address with `:8080`, and update the router reservation and staff bookmarks. Remote owner reporting catches up after internet access returns. Never expose port 8080 through router port forwarding.

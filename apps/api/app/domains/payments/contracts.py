@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Protocol, Literal
+from typing import Literal, Protocol
 
 PaymentStatus = Literal['PENDING','CONFIRMED','FAILED','CANCELLED','REFUNDED','PARTIALLY_REFUNDED']
 

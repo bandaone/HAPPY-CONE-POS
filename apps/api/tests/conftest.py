@@ -1,9 +1,10 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
-from app.main import create_app
+
 from app.core.config import Settings
 from app.core.security import hash_password
+from app.main import create_app
 from app.models.user import User
 from app.seed import seed_demo
 

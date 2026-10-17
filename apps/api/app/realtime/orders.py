@@ -1,7 +1,9 @@
 import asyncio
 import json
-from fastapi import APIRouter,Depends,Request,HTTPException
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
+
 from app.api.deps import bearer
 from app.domains.identity.service import session_user
 from app.models.base import BranchLock

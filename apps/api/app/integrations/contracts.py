@@ -1,6 +1,6 @@
 """Provider-neutral boundaries; no gateway or fiscal certification is implied."""
 from dataclasses import dataclass
-from typing import Protocol,Literal
+from typing import Literal, Protocol
 
 
 @dataclass(frozen=True)

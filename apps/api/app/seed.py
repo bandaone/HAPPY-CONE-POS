@@ -1,7 +1,8 @@
 from sqlalchemy import select
-from app.models.user import User
+
 from app.core.security import hash_password
 from app.domains.audit.service import record
+from app.models.user import User
 
 
 def seed_demo(db, password):
@@ -19,8 +20,16 @@ def seed_demo(db, password):
 
 def seed_catalog(db):
     from decimal import Decimal
-    from app.models.catalog import (Category, Product, Variant, ModifierGroup,
-                                    ProductModifierGroup, Modifier, RecipeComponent)
+
+    from app.models.catalog import (
+        Category,
+        Modifier,
+        ModifierGroup,
+        Product,
+        ProductModifierGroup,
+        RecipeComponent,
+        Variant,
+    )
     from app.models.inventory import InventoryItem, StockMovement
     if db.get(Category, 'ice-cream'):
         return

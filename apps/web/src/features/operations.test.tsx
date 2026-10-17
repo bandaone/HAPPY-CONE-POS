@@ -137,7 +137,7 @@ describe("daily report payment labels", () => {
       closed_by_name: null,
       sales: [{
         order_id: "sale-1", receipt_number: "A001", created_at: "2026-09-28T08:30:00Z",
-        cashier_name: "Mwansa Banda", payment_method: "CASH", gross_ngwee: 4200,
+        cashier_name: "Mwansa Banda", payment_method: "MOBILE_MONEY_MANUAL", gross_ngwee: 4200,
         reversal_ngwee: 0, net_ngwee: 4200, correction_status: null,
         corrects_receipt_number: null, reason: null,
       }],
@@ -161,7 +161,7 @@ describe("daily report payment labels", () => {
 
     render(<Reports client={client} />);
 
-    expect(await screen.findByText("Mobile money")).toBeInTheDocument();
+    expect((await screen.findAllByText("Mobile money")).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("Card")).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/manual/i);
     expect(screen.getByRole("heading", { name: "Sale details" })).toBeInTheDocument();

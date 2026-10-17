@@ -7,17 +7,37 @@ import shutil
 import subprocess
 import sys
 import urllib.request
+import zipfile
 from pathlib import Path
 from uuid import uuid4
 
-DESTINATIONS = {'installers', 'runtime'}
-BUNDLE_DIRECTORIES = ('api', 'config', 'installers', 'runtime', 'scripts', 'web', 'wheelhouse')
+DESTINATIONS = {"installers", "runtime"}
+BUNDLE_DIRECTORIES = (
+    "api",
+    "config",
+    "installers",
+    "runtime",
+    "scripts",
+    "web",
+    "wheelhouse",
+)
+
+
+def latest_database_migration(source_root: Path) -> str:
+    revisions = []
+    for path in (source_root / "apps/api/alembic/versions").glob("*.py"):
+        match = re.match(r"^(\d{4})_", path.name)
+        if match:
+            revisions.append(match.group(1))
+    if not revisions:
+        raise FileNotFoundError("No numbered Alembic migrations were found")
+    return max(revisions, key=int)
 
 
 def sha256(path: Path) -> str:
     value = hashlib.sha256()
-    with path.open('rb') as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b''):
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
             value.update(chunk)
     return value.hexdigest()
 
@@ -25,121 +45,187 @@ def sha256(path: Path) -> str:
 def verify_sha256(path: Path, expected: str) -> None:
     actual = sha256(path)
     if actual.lower() != expected.lower():
-        raise ValueError(f'Artifact checksum mismatch for {path.name}: expected {expected}, got {actual}')
+        raise ValueError(
+            f"Artifact checksum mismatch for {path.name}: expected {expected}, got {actual}"
+        )
 
 
-def write_wheelhouse_manifest(cache_root: Path, requirements_path: Path | None = None) -> None:
-    wheels = sorted((cache_root / 'wheelhouse').glob('*.whl'))
+def write_wheelhouse_manifest(
+    cache_root: Path, requirements_path: Path | None = None
+) -> None:
+    wheels = sorted((cache_root / "wheelhouse").glob("*.whl"))
     if not wheels:
-        raise FileNotFoundError('The Windows wheelhouse is empty')
+        raise FileNotFoundError("The Windows wheelhouse is empty")
     payload = {
-        'schema': 1,
-        'requirements_sha256': sha256(requirements_path) if requirements_path else None,
-        'files': [{'filename': wheel.name, 'sha256': sha256(wheel)} for wheel in wheels],
+        "schema": 1,
+        "requirements_sha256": sha256(requirements_path) if requirements_path else None,
+        "files": [
+            {"filename": wheel.name, "sha256": sha256(wheel)} for wheel in wheels
+        ],
     }
-    (cache_root / 'wheelhouse-manifest.json').write_text(json.dumps(payload, indent=2) + '\n')
+    (cache_root / "wheelhouse-manifest.json").write_text(
+        json.dumps(payload, indent=2) + "\n"
+    )
 
 
 def verify_wheelhouse(cache_root: Path, requirements_path: Path | None = None) -> None:
-    manifest_path = cache_root / 'wheelhouse-manifest.json'
+    manifest_path = cache_root / "wheelhouse-manifest.json"
     if not manifest_path.is_file():
-        raise FileNotFoundError('wheelhouse-manifest.json is missing')
+        raise FileNotFoundError("wheelhouse-manifest.json is missing")
     data = json.loads(manifest_path.read_text())
-    if data.get('schema') != 1 or not data.get('files'):
-        raise ValueError('The wheelhouse manifest is invalid')
-    if requirements_path and data.get('requirements_sha256') != sha256(requirements_path):
-        raise ValueError('The wheelhouse was built for different API dependencies')
-    manifest_filenames = [entry.get('filename', '') for entry in data['files']]
-    actual_filenames = sorted(path.name for path in (cache_root / 'wheelhouse').glob('*.whl'))
-    if len(manifest_filenames) != len(set(manifest_filenames)) or sorted(manifest_filenames) != actual_filenames:
-        raise ValueError('The wheelhouse contents do not exactly match its manifest')
-    for entry in data['files']:
-        filename = entry.get('filename', '')
-        if Path(filename).name != filename or not filename.endswith('.whl'):
-            raise ValueError('The wheelhouse manifest contains an unsafe filename')
-        verify_sha256(cache_root / 'wheelhouse' / filename, entry.get('sha256', ''))
+    if data.get("schema") != 1 or not data.get("files"):
+        raise ValueError("The wheelhouse manifest is invalid")
+    if requirements_path and data.get("requirements_sha256") != sha256(
+        requirements_path
+    ):
+        raise ValueError("The wheelhouse was built for different API dependencies")
+    manifest_filenames = [entry.get("filename", "") for entry in data["files"]]
+    actual_filenames = sorted(
+        path.name for path in (cache_root / "wheelhouse").glob("*.whl")
+    )
+    if (
+        len(manifest_filenames) != len(set(manifest_filenames))
+        or sorted(manifest_filenames) != actual_filenames
+    ):
+        raise ValueError("The wheelhouse contents do not exactly match its manifest")
+    for entry in data["files"]:
+        filename = entry.get("filename", "")
+        if Path(filename).name != filename or not filename.endswith(".whl"):
+            raise ValueError("The wheelhouse manifest contains an unsafe filename")
+        verify_sha256(cache_root / "wheelhouse" / filename, entry.get("sha256", ""))
 
 
 def load_dependency_lock(path: Path) -> dict:
     data = json.loads(path.read_text())
-    if data.get('schema') != 1:
-        raise ValueError('Dependency lock schema must be 1')
-    if data.get('architecture') != 'win_amd64':
-        raise ValueError('Dependency lock architecture must be win_amd64')
-    if data.get('python_version') != '3.12':
-        raise ValueError('Dependency lock Python version must be 3.12')
-    for artifact in data.get('artifacts', []):
-        filename = artifact.get('filename', '')
-        if not filename or Path(filename).name != filename or filename in {'.', '..'}:
-            raise ValueError(f'Artifact {artifact.get("name", "unknown")} must use a safe filename')
-        if artifact.get('destination') not in DESTINATIONS:
-            raise ValueError(f'Artifact {artifact.get("name", filename)} has an invalid destination')
-        if not re.fullmatch(r'[0-9a-fA-F]{64}', artifact.get('sha256', '')):
-            raise ValueError(f'Artifact {artifact.get("name", filename)} must have a SHA-256 checksum')
-        if not artifact.get('url', '').startswith('https://'):
-            raise ValueError(f'Artifact {artifact.get("name", filename)} must use HTTPS')
+    if data.get("schema") != 1:
+        raise ValueError("Dependency lock schema must be 1")
+    if data.get("architecture") != "win_amd64":
+        raise ValueError("Dependency lock architecture must be win_amd64")
+    if data.get("python_version") != "3.12":
+        raise ValueError("Dependency lock Python version must be 3.12")
+    for artifact in data.get("artifacts", []):
+        filename = artifact.get("filename", "")
+        if not filename or Path(filename).name != filename or filename in {".", ".."}:
+            raise ValueError(
+                f'Artifact {artifact.get("name", "unknown")} must use a safe filename'
+            )
+        if artifact.get("destination") not in DESTINATIONS:
+            raise ValueError(
+                f'Artifact {artifact.get("name", filename)} has an invalid destination'
+            )
+        if not re.fullmatch(r"[0-9a-fA-F]{64}", artifact.get("sha256", "")):
+            raise ValueError(
+                f'Artifact {artifact.get("name", filename)} must have a SHA-256 checksum'
+            )
+        if not artifact.get("url", "").startswith("https://"):
+            raise ValueError(
+                f'Artifact {artifact.get("name", filename)} must use HTTPS'
+            )
     return data
 
 
 def load_bundle_layout(path: Path) -> tuple[str, ...]:
     data = json.loads(path.read_text())
-    if data.get('schema') != 1 or data.get('directories') != list(BUNDLE_DIRECTORIES):
-        raise ValueError('Bundle layout does not match the supported Windows release structure')
-    return tuple(data['directories'])
+    if data.get("schema") != 1 or data.get("directories") != list(BUNDLE_DIRECTORIES):
+        raise ValueError(
+            "Bundle layout does not match the supported Windows release structure"
+        )
+    return tuple(data["directories"])
 
 
 def copy_tree(source: Path, target: Path) -> None:
     if not source.is_dir():
-        raise FileNotFoundError(f'Required directory is missing: {source}')
-    shutil.copytree(source, target, dirs_exist_ok=True)
+        raise FileNotFoundError(f"Required directory is missing: {source}")
+    shutil.copytree(
+        source,
+        target,
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
+    )
 
 
-def assemble_bundle(source_root: Path, output_root: Path, cache_root: Path, version: str) -> Path:
-    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}', version):
-        raise ValueError('Release version contains unsupported characters')
-    lock = load_dependency_lock(source_root / 'packaging/windows/dependencies.lock.json')
-    load_bundle_layout(source_root / 'packaging/windows/bundle-layout.json')
-    missing = [item['filename'] for item in lock['artifacts'] if not (cache_root / item['filename']).is_file()]
-    if not (cache_root / 'wheelhouse').is_dir():
-        missing.append('wheelhouse/')
-    if not (cache_root / 'wheelhouse-manifest.json').is_file():
-        missing.append('wheelhouse-manifest.json')
+def assemble_bundle(
+    source_root: Path, output_root: Path, cache_root: Path, version: str
+) -> Path:
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", version):
+        raise ValueError("Release version contains unsupported characters")
+    lock = load_dependency_lock(
+        source_root / "packaging/windows/dependencies.lock.json"
+    )
+    load_bundle_layout(source_root / "packaging/windows/bundle-layout.json")
+    missing = [
+        item["filename"]
+        for item in lock["artifacts"]
+        if not (cache_root / item["filename"]).is_file()
+    ]
+    if not (cache_root / "wheelhouse").is_dir():
+        missing.append("wheelhouse/")
+    if not (cache_root / "wheelhouse-manifest.json").is_file():
+        missing.append("wheelhouse-manifest.json")
     if missing:
-        raise FileNotFoundError('Missing cached artifacts: ' + ', '.join(sorted(missing)))
-    for item in lock['artifacts']:
-        verify_sha256(cache_root / item['filename'], item['sha256'])
-    verify_wheelhouse(cache_root, source_root / 'apps/api/pyproject.toml')
+        raise FileNotFoundError(
+            "Missing cached artifacts: " + ", ".join(sorted(missing))
+        )
+    for item in lock["artifacts"]:
+        verify_sha256(cache_root / item["filename"], item["sha256"])
+    verify_wheelhouse(cache_root, source_root / "apps/api/pyproject.toml")
 
     output_root.mkdir(parents=True, exist_ok=True)
-    release = output_root / f'HappyCone-Windows-{version}'
+    release = output_root / f"HappyCone-Windows-{version}"
     if release.exists():
-        raise FileExistsError(f'Release already exists: {release}')
-    staging = output_root / f'.HappyCone-Windows-{version}.{uuid4().hex}.tmp'
+        raise FileExistsError(f"Release already exists: {release}")
+    staging = output_root / f".HappyCone-Windows-{version}.{uuid4().hex}.tmp"
     try:
         for directory in BUNDLE_DIRECTORIES:
             (staging / directory).mkdir(parents=True, exist_ok=True)
-        copy_tree(source_root / 'apps/web/dist', staging / 'web')
-        copy_tree(source_root / 'apps/api/app', staging / 'api/app')
-        copy_tree(source_root / 'apps/api/alembic', staging / 'api/alembic')
-        shutil.copy2(source_root / 'apps/api/alembic.ini', staging / 'api/alembic.ini')
-        shutil.copy2(source_root / 'apps/api/pyproject.toml', staging / 'api/pyproject.toml')
-        copy_tree(source_root / 'packaging/windows/scripts', staging / 'scripts')
-        copy_tree(source_root / 'packaging/windows/config', staging / 'config')
-        shutil.copy2(source_root / 'packaging/windows/START-HAPPY-CONE.cmd', staging / 'START-HAPPY-CONE.cmd')
-        shutil.copy2(source_root / 'packaging/windows/THIRD-PARTY-NOTICES.md', staging / 'THIRD-PARTY-NOTICES.md')
-        copy_tree(cache_root / 'wheelhouse', staging / 'wheelhouse')
-        shutil.copy2(cache_root / 'wheelhouse-manifest.json', staging / 'wheelhouse/manifest.json')
-        for item in lock['artifacts']:
-            shutil.copy2(cache_root / item['filename'], staging / item['destination'] / item['filename'])
+        copy_tree(source_root / "apps/web/dist", staging / "web")
+        copy_tree(source_root / "apps/api/app", staging / "api/app")
+        copy_tree(source_root / "apps/api/alembic", staging / "api/alembic")
+        shutil.copy2(source_root / "apps/api/alembic.ini", staging / "api/alembic.ini")
+        shutil.copy2(
+            source_root / "apps/api/pyproject.toml", staging / "api/pyproject.toml"
+        )
+        copy_tree(source_root / "packaging/windows/scripts", staging / "scripts")
+        copy_tree(source_root / "packaging/windows/config", staging / "config")
+        shutil.copy2(
+            source_root / "packaging/windows/START-HAPPY-CONE.cmd",
+            staging / "START-HAPPY-CONE.cmd",
+        )
+        shutil.copy2(
+            source_root / "packaging/windows/THIRD-PARTY-NOTICES.md",
+            staging / "THIRD-PARTY-NOTICES.md",
+        )
+        copy_tree(cache_root / "wheelhouse", staging / "wheelhouse")
+        shutil.copy2(
+            cache_root / "wheelhouse-manifest.json",
+            staging / "wheelhouse/manifest.json",
+        )
+        for item in lock["artifacts"]:
+            shutil.copy2(
+                cache_root / item["filename"],
+                staging / item["destination"] / item["filename"],
+            )
         files = []
-        for path in sorted(item for item in staging.rglob('*') if item.is_file()):
-            files.append({'path': path.relative_to(staging).as_posix(), 'sha256': sha256(path), 'bytes': path.stat().st_size})
+        for path in sorted(item for item in staging.rglob("*") if item.is_file()):
+            files.append(
+                {
+                    "path": path.relative_to(staging).as_posix(),
+                    "sha256": sha256(path),
+                    "bytes": path.stat().st_size,
+                }
+            )
         manifest = {
-            'schema': 1, 'product': 'Happy Cone POS', 'version': version,
-            'architecture': lock['architecture'], 'python_version': lock['python_version'],
-            'database_migration': '0009', 'files': files,
+            "schema": 1,
+            "product": "Happy Cone POS",
+            "version": version,
+            "architecture": lock["architecture"],
+            "python_version": lock["python_version"],
+            "database_migration": latest_database_migration(source_root),
+            "files": files,
         }
-        (staging / 'release-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+        (staging / "release-manifest.json").write_text(
+            json.dumps(manifest, indent=2) + "\n"
+        )
         staging.rename(release)
         return release
     except Exception:
@@ -147,61 +233,161 @@ def assemble_bundle(source_root: Path, output_root: Path, cache_root: Path, vers
         raise
 
 
+def create_transfer_archive(release: Path) -> tuple[Path, Path]:
+    archive = release.parent / f"{release.name}.zip"
+    checksum = Path(f"{archive}.sha256")
+    if archive.exists() or checksum.exists():
+        raise FileExistsError(f"Transfer archive already exists for {release.name}")
+    try:
+        with zipfile.ZipFile(
+            archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
+        ) as target:
+            for path in sorted(item for item in release.rglob("*") if item.is_file()):
+                target.write(
+                    path, (Path(release.name) / path.relative_to(release)).as_posix()
+                )
+        with zipfile.ZipFile(archive) as source:
+            damaged = source.testzip()
+            if damaged:
+                raise ValueError(f"Transfer ZIP failed CRC verification: {damaged}")
+        digest = sha256(archive)
+        checksum.write_text(f"{digest}  {archive.name}\n")
+        return archive, checksum
+    except Exception:
+        archive.unlink(missing_ok=True)
+        checksum.unlink(missing_ok=True)
+        raise
+
+
+def verify_release(release: Path, archive: Path, checksum: Path) -> dict:
+    manifest = json.loads((release / "release-manifest.json").read_text())
+    if manifest.get("schema") != 1 or manifest.get("product") != "Happy Cone POS":
+        raise ValueError("Release manifest identity is invalid")
+    expected = {
+        entry["path"]: (entry["sha256"], entry["bytes"])
+        for entry in manifest.get("files", [])
+    }
+    actual_paths = {
+        path.relative_to(release).as_posix(): path
+        for path in release.rglob("*")
+        if path.is_file() and path.name != "release-manifest.json"
+    }
+    if set(expected) != set(actual_paths):
+        raise ValueError("Release contents do not exactly match the manifest")
+    for relative, path in actual_paths.items():
+        expected_hash, expected_bytes = expected[relative]
+        if path.stat().st_size != expected_bytes or sha256(path) != expected_hash:
+            raise ValueError(f"Release manifest verification failed for {relative}")
+    checksum_parts = checksum.read_text().strip().split()
+    if len(checksum_parts) != 2 or checksum_parts[1] != archive.name:
+        raise ValueError("Transfer checksum file is invalid")
+    verify_sha256(archive, checksum_parts[0])
+    expected_archive_names = {
+        (Path(release.name) / path.relative_to(release)).as_posix()
+        for path in release.rglob("*")
+        if path.is_file()
+    }
+    with zipfile.ZipFile(archive) as source:
+        if source.testzip():
+            raise ValueError("Transfer ZIP failed CRC verification")
+        if set(source.namelist()) != expected_archive_names:
+            raise ValueError("Transfer ZIP contents do not match the release folder")
+    return manifest
+
+
 def populate_cache(source_root: Path, cache_root: Path, cache_only: bool) -> list[str]:
-    lock = load_dependency_lock(source_root / 'packaging/windows/dependencies.lock.json')
+    lock = load_dependency_lock(
+        source_root / "packaging/windows/dependencies.lock.json"
+    )
     cache_root.mkdir(parents=True, exist_ok=True)
     missing = []
-    for item in lock['artifacts']:
-        target = cache_root / item['filename']
+    for item in lock["artifacts"]:
+        target = cache_root / item["filename"]
         if not target.exists():
             if cache_only:
-                missing.append(item['filename'])
+                missing.append(item["filename"])
                 continue
-            urllib.request.urlretrieve(item['url'], target)
-        verify_sha256(target, item['sha256'])
-    wheelhouse = cache_root / 'wheelhouse'
-    wheel_manifest = cache_root / 'wheelhouse-manifest.json'
-    wheelhouse_ready = wheelhouse.is_dir() and any(wheelhouse.glob('*.whl')) and wheel_manifest.is_file()
+            urllib.request.urlretrieve(item["url"], target)
+        verify_sha256(target, item["sha256"])
+    wheelhouse = cache_root / "wheelhouse"
+    wheel_manifest = cache_root / "wheelhouse-manifest.json"
+    wheelhouse_ready = (
+        wheelhouse.is_dir()
+        and any(wheelhouse.glob("*.whl"))
+        and wheel_manifest.is_file()
+    )
     if wheelhouse_ready:
         try:
-            verify_wheelhouse(cache_root, source_root / 'apps/api/pyproject.toml')
+            verify_wheelhouse(cache_root, source_root / "apps/api/pyproject.toml")
         except (FileNotFoundError, ValueError):
             wheelhouse_ready = False
     if not wheelhouse_ready:
         if cache_only:
-            missing.append('wheelhouse-manifest.json')
+            missing.append("wheelhouse-manifest.json")
         else:
             shutil.rmtree(wheelhouse, ignore_errors=True)
             wheelhouse.mkdir(exist_ok=True)
-            subprocess.run([
-                sys.executable, '-m', 'pip', 'download', '--dest', str(wheelhouse),
-                '--platform', 'win_amd64', '--python-version', '312', '--implementation', 'cp',
-                '--abi', 'cp312', '--only-binary=:all:', str(source_root / 'apps/api'),
-            ], check=True)
-            write_wheelhouse_manifest(cache_root, source_root / 'apps/api/pyproject.toml')
+            subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "download",
+                    "--dest",
+                    str(wheelhouse),
+                    "--platform",
+                    "win_amd64",
+                    "--python-version",
+                    "312",
+                    "--implementation",
+                    "cp",
+                    "--abi",
+                    "cp312",
+                    "--only-binary=:all:",
+                    str(source_root / "apps/api"),
+                ],
+                check=True,
+            )
+            write_wheelhouse_manifest(
+                cache_root, source_root / "apps/api/pyproject.toml"
+            )
     if not missing:
-        verify_wheelhouse(cache_root, source_root / 'apps/api/pyproject.toml')
+        verify_wheelhouse(cache_root, source_root / "apps/api/pyproject.toml")
     return missing
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description='Build the offline Happy Cone Windows release folder')
-    parser.add_argument('--version', required=True)
-    parser.add_argument('--cache', type=Path, required=True)
-    parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--cache-only', action='store_true', help='Use only files already present in the cache')
+    parser = argparse.ArgumentParser(
+        description="Build the offline Happy Cone Windows release folder"
+    )
+    parser.add_argument("--version", required=True)
+    parser.add_argument("--cache", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--cache-only",
+        action="store_true",
+        help="Use only files already present in the cache",
+    )
     args = parser.parse_args()
     source_root = Path(__file__).resolve().parents[1]
     missing = populate_cache(source_root, args.cache, args.cache_only)
     if missing:
-        print('Missing cached artifacts: ' + ', '.join(sorted(missing)), file=sys.stderr)
+        print(
+            "Missing cached artifacts: " + ", ".join(sorted(missing)), file=sys.stderr
+        )
         return 2
     if not args.cache_only:
-        subprocess.run(['npm', 'run', 'build'], cwd=source_root / 'apps/web', check=True)
+        subprocess.run(
+            ["npm", "run", "build"], cwd=source_root / "apps/web", check=True
+        )
     release = assemble_bundle(source_root, args.output, args.cache, args.version)
     print(release)
+    archive, checksum = create_transfer_archive(release)
+    verify_release(release, archive, checksum)
+    print(archive)
+    print(checksum)
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     raise SystemExit(main())
